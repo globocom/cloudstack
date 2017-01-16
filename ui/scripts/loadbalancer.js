@@ -230,6 +230,9 @@
                             cache: {
                                 label: 'Cache'
                             },
+                            dsr: {
+                                label: 'DSR'
+                            },
                             stickiness: {
                                 label: 'label.stickiness'
                             },
@@ -276,13 +279,31 @@
                                 async: false,
                                     success: function(json) {
                                         if(json.getgloboresourceconfigurationresponse.globoresourceconfiguration.configurationvalue == null){
-                                            args.jsonObj["dns_registry"] = "true"
+                                            args.jsonObj["dns_registry"] = "Yes"
                                         } else {
-                                            args.jsonObj["dns_registry"] = json.getgloboresourceconfigurationresponse.globoresourceconfiguration.configurationvalue;
+                                            args.jsonObj["dns_registry"] = json.getgloboresourceconfigurationresponse.globoresourceconfiguration.configurationvalue == "true" ? "Yes" : "No";
                                         }
                                 },
                                 error: function (errorMessage) {
-                                    args.jsonObj["dns_registry"] = "true";
+                                    args.jsonObj["dns_registry"] = "Yes";
+                                }
+                            });
+
+                            $.ajax({
+                                url: createURL("getGloboResourceConfiguration"),
+                                data: {
+                                    resourceid: args.jsonObj.id,
+                                    resourcetype: 'LOAD_BALANCER',
+                                    resourcekey: 'dsr'
+                                },
+                                dataType: "json",
+                                async: false,
+                                    success: function(json) {
+                                        if(json.getgloboresourceconfigurationresponse.globoresourceconfiguration.configurationvalue == null){
+                                            args.jsonObj["dsr"] = "No"
+                                        } else {
+                                            args.jsonObj["dsr"] = json.getgloboresourceconfigurationresponse.globoresourceconfiguration.configurationvalue == "true" ? "Yes" : "No";
+                                        }
                                 }
                             });
 

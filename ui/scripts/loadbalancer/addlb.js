@@ -220,6 +220,18 @@
                    }
                },
 
+               dsr: {
+                   label: 'DSR',
+                   dependsOn: ['isLbAdvanced'],
+                   isHidden: function (args) {
+                       var isAdvancedChecked = $('input[name=isLbAdvanced]:checked').length > 0;
+                       return !isAdvancedChecked;
+                   },
+                   isBoolean: true,
+                   defaultValue: false,
+                   isChecked: false,
+               },
+
                sticky: {
                    label: 'label.stickiness',
                    isHidden: function (args) {
@@ -397,7 +409,7 @@
             return false;
         }
 
-        if (!validatePortsMap(args.data.ports)) {
+        if (!validatePortsMap(args, args.data.ports, args.data.dsr)) {
             return false;
         };
 
@@ -427,7 +439,7 @@
         return networkoffering;
     }
 
-    var validatePortsMap = function(portsInString) {
+    var validatePortsMap = function(args, portsInString, dsr) {
         var portList = portsInString.replace(/[^\d\:\,]/g, "").replace(/\,+$/g, "").split(",");
 
         var portsMap = [];
@@ -451,6 +463,26 @@
             args.response.error("Invalid ports. It should be in the form \"80:8080,443:8443\"");
             return false;
         }
+
+        if(dsr == 'on'){
+            var publicPorts = new Array();
+            $.each(portList, function() {
+                publicPorts.push(this.split(":")[0])
+            });
+
+            var privatePorts = new Array();
+            $.each(portList, function() {
+                privatePorts.push(this.split(":")[1])
+            });
+
+            for(var i=0 ; i < portList.length; i++){
+                if(publicPorts[i] != privatePorts[i]){
+                    args.response.error("In DSR load balancer the public port must always be the same as private port.");
+                    return false;
+                }
+            }
+        }
+
         return true;
 
     }
@@ -501,6 +533,7 @@
            openfirewall:         false,
            networkid:            args.data.network,
            cache:                args.data.cachegroup,
+           dsr:                  args.data.dsr == 'on',
            healthcheckType:      args.data.healthchecktype,
            healthcheckrequest:   healthcheckrequest,
            expectedhealthcheck:  expectedhealthcheck,

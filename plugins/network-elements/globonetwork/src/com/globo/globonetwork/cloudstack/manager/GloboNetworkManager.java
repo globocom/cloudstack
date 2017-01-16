@@ -2123,6 +2123,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         cmd.setHost(rule.getName());
         cmd.setCache(rule.getCache());
         cmd.setServiceDownAction(rule.getServiceDownAction());
+        cmd.setDsr(rule.isDsr());
         cmd.setHealthCheckDestination(rule.getHealthcheckDestination());
         cmd.setIpv4(rule.getSourceIp().addr());
         cmd.setVipEnvironmentId(lbEnvironment.getGloboNetworkLoadBalancerEnvironmentId());
@@ -2573,7 +2574,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
                 // Create LB
                 LoadBalancer lb = _lbMgr.createPublicLoadBalancer(null, globoNetworkLB.getName().toLowerCase(), globoNetworkLB.getDetails(), Integer.parseInt(globoNetworkPorts[0], 10),
-                        Integer.parseInt(globoNetworkPorts[1], 10), publicIp.getId(), NetUtils.TCP_PROTO, algorithm, false, CallContext.current(), null, Boolean.TRUE, additionalPortMapList, cache, null, null, null, null, true);
+                        Integer.parseInt(globoNetworkPorts[1], 10), publicIp.getId(), NetUtils.TCP_PROTO, algorithm, false, CallContext.current(), null, Boolean.TRUE, additionalPortMapList, cache, null, null, null, null, true, false);
 
                 // If healthcheck is TCP, do nothing; otherwise, create the healthcheck policy
                 if (globoNetworkLB.getHealthcheckType() != null && "HTTP".equals(globoNetworkLB.getHealthcheckType())) {

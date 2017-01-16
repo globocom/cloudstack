@@ -44,6 +44,7 @@ public class LoadBalancingRule {
     private String healthCheckType;
     private String expectedHealthCheck;
     private boolean skipDnsError = false;
+    private boolean dsr;
 
     private List<Long> additionalNetworks;
     private List<String> additionalPortMap;
@@ -206,6 +207,14 @@ public class LoadBalancingRule {
 
     public void setSkipDnsError(boolean skipDnsError) {
         this.skipDnsError = skipDnsError;
+    }
+
+    public void setDsr(boolean dsr) {
+        this.dsr = dsr;
+    }
+
+    public boolean isDsr() {
+        return dsr;
     }
 
     public interface Destination {

@@ -30,6 +30,9 @@ import com.cloud.network.dao.LoadBalancerPortMapDao;
 import com.cloud.user.User;
 import org.apache.cloudstack.api.command.user.loadbalancer.UpdateLoadBalancerRuleCmd;
 import org.apache.cloudstack.context.CallContext;
+import org.apache.cloudstack.globoconfig.GloboResourceConfigurationDao;
+import org.apache.cloudstack.globoconfig.GloboResourceKey;
+import org.apache.cloudstack.globoconfig.GloboResourceType;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -84,6 +87,7 @@ public class UpdateLoadBalancerTest {
         _lbMgr._lbPortMapDao = Mockito.mock(LoadBalancerPortMapDao.class);
         _lbMgr._lbOptionsDao = Mockito.mock(LoadBalancerOptionsDao.class);
         _lbMgr._lbCertMapDao = Mockito.mock(LoadBalancerCertMapDao.class);
+        _lbMgr._globoResourceConfigurationDao = Mockito.mock(GloboResourceConfigurationDao.class);
         _lbMgr._lbDao = lbDao;
         _lbMgr._lbProviders = new ArrayList<LoadBalancingServiceProvider>();
         _lbMgr._lbProviders.add(lbServiceProvider);
@@ -108,7 +112,8 @@ public class UpdateLoadBalancerTest {
 
         _lbMgr.updateLoadBalancerRule(updateLbRuleCmd);
 
-        InOrder inOrder = Mockito.inOrder(lbServiceProvider, lbDao);
+        InOrder inOrder = Mockito.inOrder(_lbMgr._globoResourceConfigurationDao, lbServiceProvider, lbDao);
+        inOrder.verify(_lbMgr._globoResourceConfigurationDao).getFirst(GloboResourceType.LOAD_BALANCER, lb.getUuid(), GloboResourceKey.dsr);
         inOrder.verify(lbServiceProvider).validateLBRule(any(Network.class), any(LoadBalancingRule.class));
         inOrder.verify(lbDao).update(anyLong(), eq(lb));
     }

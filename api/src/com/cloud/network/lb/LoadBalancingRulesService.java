@@ -42,18 +42,19 @@ import com.cloud.utils.net.Ip;
 public interface LoadBalancingRulesService {
     /**
      * Create a load balancer rule from the given ipAddress/port to the given private port
-     * @param openFirewall
-     *            TODO
-     * @param forDisplay TODO
      * @param cmd
      *            the command specifying the ip address, public port, protocol, private port, and algorithm
      *
+     * @param openFirewall
+     *            TODO
+     * @param forDisplay TODO
+     * @param skipDnsError
      * @return the newly created LoadBalancerVO if successful, null otherwise
      * @throws InsufficientAddressCapacityException
      */
     LoadBalancer createPublicLoadBalancerRule(String xId, String name, String description, int srcPortStart, int srcPortEnd, int defPortStart, int defPortEnd,
                                               Long ipAddrId, String protocol, String algorithm, long networkId, long lbOwnerId, boolean openFirewall, String lbProtocol, Boolean forDisplay, List<String> additionalPortMap, String cache,
-                                              String serviceDownAction, String healthCheckDestination, String expectedHealthcheck, String healthcheckType, boolean forcedns)
+                                              String serviceDownAction, String healthCheckDestination, String expectedHealthcheck, String healthcheckType, boolean forcedns, boolean dsr)
             throws NetworkRuleConflictException, InsufficientAddressCapacityException;
 
     LoadBalancer updateLoadBalancerRule(UpdateLoadBalancerRuleCmd cmd);

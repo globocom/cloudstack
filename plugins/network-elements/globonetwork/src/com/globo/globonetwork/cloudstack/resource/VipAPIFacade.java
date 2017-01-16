@@ -29,6 +29,7 @@ class VipAPIFacade {
     private static final String DEFAULT_CACHE = "(nenhum)";
     private static final Integer DEFAULT_TIMEOUT = 5;
     private static final String DEFAULT_TRAFFIC_RETURN = "Normal";
+    private static final String DSR_TRAFFIC_RETURN = "DSRL3";
     private static final Logger s_logger = Logger.getLogger(VipAPIFacade.class);
 
     VipAPIFacade(Long id, GloboNetworkAPI globoNetworkAPI) throws GloboNetworkException {
@@ -146,7 +147,7 @@ class VipAPIFacade {
         Long environment = cmd.getVipEnvironmentId();
 
         OptionVipV3 cacheGroup = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(environment, "cache", cache).get(0);
-        OptionVipV3 trafficReturn = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(environment, "Retorno de trafego", DEFAULT_TRAFFIC_RETURN).get(0);
+        OptionVipV3 trafficReturn = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(environment, "Retorno de trafego", cmd.isDsr() ? DSR_TRAFFIC_RETURN : DEFAULT_TRAFFIC_RETURN).get(0);
         OptionVipV3 timeout = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(environment, "timeout", String.valueOf(DEFAULT_TIMEOUT)).get(0);
         OptionVipV3 persistence = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(environment, "Persistencia", lbPersistence).get(0);
 

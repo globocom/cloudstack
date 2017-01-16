@@ -1723,7 +1723,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
     @ActionEvent(eventType = EventTypes.EVENT_LOAD_BALANCER_CREATE, eventDescription = "creating load balancer")
     public LoadBalancer createPublicLoadBalancerRule(String xId, String name, String description, int srcPortStart, int srcPortEnd, int defPortStart, int defPortEnd,
                                                      Long ipAddrId, String protocol, String algorithm, long networkId, long lbOwnerId, boolean openFirewall, String lbProtocol, Boolean forDisplay, List<String> additionalPortMap, String cache,
-                                                     String serviceDownAction, String healthCheckDestination, String expectedHealthcheck, String healthcheckType, boolean skipDnsError)
+                                                     String serviceDownAction, String healthCheckDestination, String expectedHealthcheck, String healthcheckType, boolean skipDnsError, boolean dsr)
             throws NetworkRuleConflictException, InsufficientAddressCapacityException {
         Account lbOwner = _accountMgr.getAccount(lbOwnerId);
 
@@ -1783,7 +1783,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
 
                 result = createPublicLoadBalancer(xId, name, description, srcPortStart, defPortStart, ipVO.getId(), protocol, algorithm, openFirewall, CallContext.current(),
                         lbProtocol, forDisplay, additionalPortMap, cache,
-                        serviceDownAction, healthCheckDestination, expectedHealthcheck, healthcheckType, skipDnsError);
+                        serviceDownAction, healthCheckDestination, expectedHealthcheck, healthcheckType, skipDnsError, dsr);
             } catch (CloudRuntimeException e) {
                throw  e;
             } catch (Exception ex) {
@@ -1820,7 +1820,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
     @Override
     public LoadBalancer createPublicLoadBalancer(final String xId, final String name, final String description, final int srcPort, final int destPort, final long sourceIpId,
                                                  final String protocol, final String algorithm, final boolean openFirewall, final CallContext caller, final String lbProtocol, final Boolean forDisplay, final List<String> additionalPortMap, final String cache,
-                                                 final String serviceDownAction, final String healthCheckDestination, final String expectedHealthcheck, final String healthcheckType, final boolean skipDnsError)
+                                                 final String serviceDownAction, final String healthCheckDestination, final String expectedHealthcheck, final String healthcheckType, final boolean skipDnsError, final boolean dsr)
             throws NetworkRuleConflictException {
 
         if (!NetUtils.isValidPort(destPort)) {
@@ -1869,9 +1869,14 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         LoadBalancingRule loadBalancing = new LoadBalancingRule(newRule, new ArrayList<LbDestination>(), new ArrayList<LbStickinessPolicy>(), new ArrayList<LbHealthCheckPolicy>(),
                 sourceIp, null, lbProtocol);
         loadBalancing.setSkipDnsError(skipDnsError);
+        loadBalancing.setDsr(dsr);
         loadBalancing.setAdditionalPortMap(additionalPortMap);
         if (!validateLbRule(loadBalancing)) {
             throw new InvalidParameterValueException("LB service provider cannot support this rule");
+        }
+
+        if(loadBalancing.isDsr()){
+            validatePortsForDSRLoadBalancer(loadBalancing);
         }
 
         LoadBalancerVO lb = Transaction.execute(new TransactionCallbackWithException<LoadBalancerVO, NetworkRuleConflictException>() {
@@ -1895,6 +1900,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
                 loadBalancing.setExpectedHealthCheck(expectedHealthcheck);
                 loadBalancing.setHealthCheckType(healthcheckType);
                 loadBalancing.setSkipDnsError(skipDnsError);
+                loadBalancing.setDsr(dsr);
                 if (!validateLbRule(loadBalancing)) {
                     throw new InvalidParameterValueException("LB service provider cannot support this rule");
                 }
@@ -1903,6 +1909,10 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
 
                 GloboResourceConfigurationVO config = new GloboResourceConfigurationVO(GloboResourceType.LOAD_BALANCER, newRule.getUuid(), GloboResourceKey.skipDnsError, Boolean.toString(skipDnsError));
                 _globoResourceConfigurationDao.persist(config);
+
+                GloboResourceConfigurationVO dsrConfig = new GloboResourceConfigurationVO(GloboResourceType.LOAD_BALANCER, newRule.getUuid(), GloboResourceKey.dsr, Boolean.toString(dsr));
+                _globoResourceConfigurationDao.persist(dsrConfig);
+
                 //create rule for all CIDRs
                 if (openFirewall) {
                     _firewallMgr.createRuleForAllCidrs(sourceIpId, caller.getCallingAccount(), srcPort, srcPort, protocol, null, null, newRule.getId(), networkId);
@@ -1965,6 +1975,20 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         }
 
         return lb;
+    }
+
+    private void validatePortsForDSRLoadBalancer(LoadBalancingRule loadBalancing) {
+        String message = "In DSR load balancer the public port must always be the same as private port.";
+        if(loadBalancing.getDefaultPortStart() != loadBalancing.getSourcePortStart()){
+            throw new InvalidParameterValueException(message);
+        }
+        for(String portPair : loadBalancing.getAdditionalPortMap()){
+            String publicPort = portPair.split(":")[0];
+            String privatePort = portPair.split(":")[1];
+            if(!publicPort.equals(privatePort)){
+                throw new InvalidParameterValueException(message);
+            }
+        }
     }
 
     @Override
@@ -2062,6 +2086,9 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
                 }
             }
         }
+
+        GloboResourceConfigurationVO dsrConfig = _globoResourceConfigurationDao.getFirst(GloboResourceType.LOAD_BALANCER, lb.getUuid(), GloboResourceKey.dsr);
+        loadBalancing.setDsr(dsrConfig != null && dsrConfig.getBooleanValue());
 
         List<LbHealthCheckPolicy> hcPolicyList = getHealthCheckPolicies(lb.getId());
         loadBalancing.setHealthCheckPolicies(hcPolicyList);

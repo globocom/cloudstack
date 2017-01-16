@@ -138,16 +138,11 @@ public class CreateLoadBalancerRuleCmd extends BaseAsyncCreateCmd /*implements L
     @Parameter(name = ApiConstants.EXPECTED_HEALTHCHECK, type = CommandType.STRING, description = "Expected healthcheck string to check if is in service.")
     private String expectedHealthCheck;
 
-    public boolean isSkipDnsError() {
-        return skipDnsError;
-    }
-
-    public void setSkipDnsError(boolean skipDnsError) {
-        this.skipDnsError = skipDnsError;
-    }
-
     @Parameter(name = "skipdnserror", type = CommandType.BOOLEAN, description = "when false if dns integration failed, the loadbalancer will not be created and throw an exception, else lb will be created and dns it could be register later")
     private boolean skipDnsError = false ;
+
+    @Parameter(name = "dsr", type = CommandType.BOOLEAN, description = "when true creates the load balancing using DSR (Direct server return)")
+    private boolean dsr = false ;
 
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
@@ -362,7 +357,7 @@ public class CreateLoadBalancerRuleCmd extends BaseAsyncCreateCmd /*implements L
             LoadBalancer result =
                 _lbService.createPublicLoadBalancerRule(getXid(), getName(), getDescription(), getSourcePortStart(), getSourcePortEnd(), getDefaultPortStart(),
                     getDefaultPortEnd(), getSourceIpAddressId(), getProtocol(), getAlgorithm(), getNetworkId(), getEntityOwnerId(), getOpenFirewall(), getLbProtocol(), isDisplay(),
-                    getAdditionalPortMap(), getCache(), getServiceDownAction(), getHealthCheckDestination(), getExpectedHealthCheck(), healthCheckType, skipDnsError);
+                    getAdditionalPortMap(), getCache(), getServiceDownAction(), getHealthCheckDestination(), getExpectedHealthCheck(), healthCheckType, skipDnsError, dsr);
             this.setEntityId(result.getId());
             this.setEntityUuid(result.getUuid());
         } catch (NetworkRuleConflictException e) {
@@ -474,12 +469,27 @@ public class CreateLoadBalancerRuleCmd extends BaseAsyncCreateCmd /*implements L
         return getNetworkId();
     }
 
-
     public String getHealthCheckType() {
         return healthCheckType;
     }
 
     public String getExpectedHealthCheck() {
         return expectedHealthCheck;
+    }
+
+    public boolean isSkipDnsError() {
+        return skipDnsError;
+    }
+
+    public void setSkipDnsError(boolean skipDnsError) {
+        this.skipDnsError = skipDnsError;
+    }
+
+    public boolean isDsr() {
+        return dsr;
+    }
+
+    public void setDsr(boolean dsr) {
+        this.dsr = dsr;
     }
 }

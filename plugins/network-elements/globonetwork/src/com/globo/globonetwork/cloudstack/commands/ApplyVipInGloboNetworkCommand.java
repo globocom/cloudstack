@@ -45,6 +45,8 @@ public class ApplyVipInGloboNetworkCommand extends Command {
 
     private String cache;
 
+    private boolean dsr;
+
     private String serviceDownAction;
 
     private String healthCheckDestination;
@@ -213,5 +215,13 @@ public class ApplyVipInGloboNetworkCommand extends Command {
     }
     public void setRegion(String region) {
         this.region = region;
+    }
+
+    public void setDsr(boolean dsr) {
+        this.dsr = dsr;
+    }
+
+    public boolean isDsr() {
+        return dsr;
     }
 }
