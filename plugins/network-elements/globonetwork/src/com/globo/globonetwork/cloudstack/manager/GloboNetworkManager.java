@@ -46,10 +46,12 @@ import com.globo.globonetwork.cloudstack.api.UpdateGloboNetworkPoolCmd;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.CreateGloboLoadBalancerCmd;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.DeleteGloboLoadBalancerCmd;
 import com.globo.globonetwork.cloudstack.commands.ApplyVipInGloboNetworkCommand;
+import com.globo.globonetwork.cloudstack.commands.CheckDSREnabled;
 import com.globo.globonetwork.cloudstack.commands.GetPoolLBByIdCommand;
 import com.globo.globonetwork.cloudstack.commands.ListExpectedHealthchecksCommand;
 import com.globo.globonetwork.cloudstack.commands.ListPoolLBCommand;
 import com.globo.globonetwork.cloudstack.commands.UpdatePoolCommand;
+import com.globo.globonetwork.cloudstack.response.CheckDSREnabledResponse;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkExpectHealthcheckResponse;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
 import java.math.BigInteger;
@@ -2023,6 +2025,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
             String integrationContext =  ex.getContext();
             String msg = "Integration problem with NetworkAPI, please contact your system administrator. Context: " + context + ", Integration context: " + integrationContext + ", name=" + rule.getName();
             throw new UserCloudRuntimeException(msg);
+        } catch (InvalidParameterValueException e){
+            throw new UserCloudRuntimeException(e.getMessage(), e);
         } catch (Exception e) {
             // Convert all exceptions to ResourceUnavailable to user have feedback of what happens. All others exceptions only show 'error'
             s_logger.error("[load balancer "+ rule.getName()+ "] Error applying load balancer rules. Uuid: " + rule.getUuid(), e);
@@ -2039,6 +2043,9 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
     }
 
     private void saveLBInGloboNetwork(Network network, LoadBalancingRule rule, Account account, GloboNetworkIpDetailVO globoNetworkIpDetail, GloboNetworkLoadBalancerEnvironment lbEnvironment) throws ResourceUnavailableException {
+        if(rule.isDsr()){
+            validateEnvironmentSupportsDSR(network, lbEnvironment);
+        }
         validateSticknessPolicy(rule);
         validateHealthCheckPolicies(rule);
         List<String> ports = getServicePorts(rule);
@@ -2056,6 +2063,14 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         if (globoNetworkIpDetail.getGloboNetworkVipId() == null) {
             globoNetworkIpDetail.setGloboNetworkVipId(answer.getId());
             _globoNetworkIpDetailDao.persist(globoNetworkIpDetail);
+        }
+    }
+
+    private void validateEnvironmentSupportsDSR(Network network, GloboNetworkLoadBalancerEnvironment lbEnvironment) {
+        CheckDSREnabled cmd = new CheckDSREnabled(lbEnvironment.getGloboNetworkLoadBalancerEnvironmentId());
+        CheckDSREnabledResponse answer = (CheckDSREnabledResponse) this.callCommand(cmd, network.getDataCenterId());
+        if(!answer.getResult() || !answer.isDsrEnabled()){
+            throw new InvalidParameterValueException(answer.getDetails());
         }
     }
 

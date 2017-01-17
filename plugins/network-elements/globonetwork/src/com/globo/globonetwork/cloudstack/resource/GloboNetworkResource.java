@@ -20,11 +20,13 @@ import com.cloud.exception.InvalidParameterValueException;
 import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.utils.Pair;
 import com.cloud.utils.StringUtils;
+import com.globo.globonetwork.cloudstack.response.CheckDSREnabledResponse;
 import com.globo.globonetwork.client.api.ExpectHealthcheckAPI;
 import com.globo.globonetwork.client.api.GloboNetworkAPI;
 import com.globo.globonetwork.client.api.PoolAPI;
 import com.globo.globonetwork.client.model.healthcheck.ExpectHealthcheck;
 import com.globo.globonetwork.client.model.pool.PoolV3;
+import com.globo.globonetwork.cloudstack.commands.CheckDSREnabled;
 import com.globo.globonetwork.cloudstack.commands.GetPoolLBByIdCommand;
 import com.globo.globonetwork.cloudstack.commands.ListExpectedHealthchecksCommand;
 import com.globo.globonetwork.cloudstack.commands.ListPoolLBCommand;
@@ -299,6 +301,8 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             return execute((ListExpectedHealthchecksCommand) cmd);
         }else if (cmd instanceof UpdatePoolCommand) {
             return execute((UpdatePoolCommand) cmd);
+        }else if (cmd instanceof CheckDSREnabled) {
+            return execute((CheckDSREnabled) cmd);
         }
         return Answer.createUnsupportedCommandAnswer(cmd);
     }
@@ -842,6 +846,20 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             return answer;
         } catch (GloboNetworkException e) {
             return handleGloboNetworkException(cmd, e);
+        }
+    }
+
+    public Answer execute(CheckDSREnabled cmd) {
+        try {
+            GloboNetworkAPI gnApi = getNewGloboNetworkAPI();
+            VipAPIFacade vipAPIFacade = this.createVipAPIFacade(null, gnApi);
+            if(vipAPIFacade.isDSRVipEnabled(cmd.getVipEnvironmentId())){
+                return new CheckDSREnabledResponse(cmd, true, true, "");
+            }else{
+                return new CheckDSREnabledResponse(cmd, true, false, "This VIP environment does not support DSR");
+            }
+        } catch (GloboNetworkException e) {
+            return new CheckDSREnabledResponse(cmd, false, false, "Error checking VIP environment configuration");
         }
     }
 
