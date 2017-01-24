@@ -20,6 +20,7 @@ import com.cloud.exception.InvalidParameterValueException;
 import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.utils.Pair;
 import com.cloud.utils.StringUtils;
+import com.globo.globonetwork.cloudstack.commands.CreatePoolCommand;
 import com.globo.globonetwork.cloudstack.response.CheckDSREnabledResponse;
 import com.globo.globonetwork.client.api.ExpectHealthcheckAPI;
 import com.globo.globonetwork.client.api.GloboNetworkAPI;
@@ -301,6 +302,8 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             return execute((ListExpectedHealthchecksCommand) cmd);
         }else if (cmd instanceof UpdatePoolCommand) {
             return execute((UpdatePoolCommand) cmd);
+        }else if (cmd instanceof CreatePoolCommand) {
+            return execute((CreatePoolCommand) cmd);
         }else if (cmd instanceof CheckDSREnabled) {
             return execute((CheckDSREnabled) cmd);
         }
@@ -326,6 +329,49 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
         } catch (Exception e) {
             s_logger.error("Generic error accessing GloboNetwork while update pool", e);
             return new Answer(cmd, false, e.getMessage());
+        }
+    }
+
+    private Answer execute(CreatePoolCommand cmd) {
+        PoolV3 pool = null;
+        GloboNetworkAPI gnAPI = getNewGloboNetworkAPI();
+
+        try{
+            VipAPIFacade vipAPIFacade = createVipAPIFacade(cmd.getVipId(), gnAPI);
+
+            if(vipAPIFacade.hasVip()) {
+                VipInfoHelper vipInfo = getVipInfos(gnAPI, cmd.getVipEnvironment(), cmd.getVipIp());
+
+                pool = createPool(
+                    cmd.getPublicPort(), cmd.getPrivatePort(), vipInfo.getEnvironment(), cmd.getVipName(),
+                    cmd.getBalacingAlgorithm(), HealthCheckHelper.HealthCheckType.TCP.name(), null, null, null,
+                    DEFAULT_MAX_CONN, cmd.getServiceDownAction(), buildPoolMembers(gnAPI, cmd.getReals()), cmd.getRegion()
+                );
+
+                pool = gnAPI.getPoolAPI().save(pool);
+
+                VipEnvironment vipEnv = gnAPI.getVipEnvironmentAPI().search(cmd.getVipEnvironment(), null, null, null);
+                vipAPIFacade.addPool(vipEnv, cmd.getPublicPort(), HealthCheckHelper.HealthCheckType.TCP.name(), pool);
+                return new GloboNetworkPoolResponse(poolV3FromNetworkApi(pool));
+            }
+            return new GloboNetworkPoolResponse(cmd, true, "", new GloboNetworkPoolResponse.Pool());
+        } catch (GloboNetworkException e) {
+            rollbackPoolCreation(pool, gnAPI);
+            return handleGloboNetworkException(cmd, e);
+        } catch (Exception e) {
+            rollbackPoolCreation(pool, gnAPI);
+            s_logger.error("Generic error accessing GloboNetwork while creating new pool", e);
+            return new Answer(cmd, false, e.getMessage());
+        }
+    }
+
+    private void rollbackPoolCreation(PoolV3 pool, GloboNetworkAPI gnAPI){
+        if(pool != null && pool.getId() != null){
+            try {
+                gnAPI.getPoolAPI().deleteV3(pool.getId());
+            } catch (GloboNetworkException e) {
+                s_logger.error("Error rollbacking pool creation", e);
+            }
         }
     }
 
@@ -1105,36 +1151,55 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             Integer vipPort = portPair.first();
             Integer realPort = portPair.second();
 
-            PoolV3 poolV3 = new PoolV3();
-            poolV3.setMaxconn(DEFAULT_MAX_CONN);
-            poolV3.setIdentifier(buildPoolName(cmd.getRegion(), cmd.getHost(), vipPort, realPort));
-            poolV3.setDefaultPort(realPort);
-            poolV3.setEnvironment(vipEnvironment);
+            PoolV3 pool = createPool(
+                vipPort,
+                realPort,
+                vipEnvironment,
+                cmd.getHost(),
+                cmd.getMethodBal(),
+                cmd.getHealthcheckType(),
+                cmd.getHealthcheck(),
+                cmd.getExpectedHealthcheck(),
+                cmd.getHealthCheckDestination(),
+                DEFAULT_MAX_CONN,
+                cmd.getServiceDownAction(),
+                poolMembers,
+                cmd.getRegion()
+            );
 
-            PoolV3.Healthcheck healthcheck = poolV3.getHealthcheck();
-            healthcheck.setDestination(cmd.getHealthCheckDestination());
-            if (forceSupportOldPoolVersion(cmd.getHealthcheckType(), realPort)) {
-                healthcheck.setHealthcheck("TCP", "", "");
-            } else {
-                healthcheck.setHealthcheck(cmd.getHealthcheckType(), cmd.getHealthcheck(), cmd.getExpectedHealthcheck());
-            }
-
-            LbAlgorithm lbAlgorithm = getBalancingAlgorithm(cmd.getMethodBal());
-            poolV3.setLbMethod(lbAlgorithm.getGloboNetworkBalMethod());
-
-            PoolV3.ServiceDownAction serviceDownAction = new PoolV3.ServiceDownAction();
-            serviceDownAction.setName(cmd.getServiceDownAction());
-            poolV3.setServiceDownAction(serviceDownAction);
-
-            for (PoolV3.PoolMember poolMember : poolMembers) {
-                poolMember.setPortReal(realPort);
-                poolV3.getPoolMembers().add(poolMember);
-            }
-
-            poolV3 = poolAPI.save(poolV3);
-            vipPoolMaps.put(vipPort + ":" + realPort, new VipPoolMap(poolV3.getId(), vipPort));
+            pool = poolAPI.save(pool);
+            vipPoolMaps.put(vipPort + ":" + realPort, new VipPoolMap(pool.getId(), vipPort));
         }
         return new ArrayList<>(vipPoolMaps.values());
+    }
+
+    protected PoolV3 createPool(Integer vipPort, Integer realPort, Long environment, String lbName, String balancingAlgorithm, String healthcheckType, String healthcheckPath, String expectedHealthcheck, String healthcheckDestination, Integer maxConn, String serviceDownActionStr, List<PoolV3.PoolMember> poolMembers, String region){
+        PoolV3 poolV3 = new PoolV3();
+        poolV3.setMaxconn(maxConn != null ? maxConn : DEFAULT_MAX_CONN);
+        poolV3.setIdentifier(buildPoolName(region, lbName, vipPort, realPort));
+        poolV3.setDefaultPort(realPort);
+        poolV3.setEnvironment(environment);
+
+        PoolV3.Healthcheck healthcheck = poolV3.getHealthcheck();
+        healthcheck.setDestination(healthcheckDestination);
+        if (forceSupportOldPoolVersion(healthcheckType, realPort)) {
+            healthcheck.setHealthcheck("TCP", "", "");
+        } else {
+            healthcheck.setHealthcheck(healthcheckType, healthcheckPath, expectedHealthcheck);
+        }
+
+        LbAlgorithm lbAlgorithm = getBalancingAlgorithm(balancingAlgorithm);
+        poolV3.setLbMethod(lbAlgorithm.getGloboNetworkBalMethod());
+
+        PoolV3.ServiceDownAction serviceDownAction = new PoolV3.ServiceDownAction();
+        serviceDownAction.setName(serviceDownActionStr);
+        poolV3.setServiceDownAction(serviceDownAction);
+
+        for (PoolV3.PoolMember poolMember : poolMembers) {
+            poolMember.setPortReal(realPort);
+            poolV3.getPoolMembers().add(poolMember);
+        }
+        return poolV3;
     }
 
     protected void updatePools(GloboNetworkAPI gnApi, List<Long> poolIds, List<PoolV3.PoolMember> poolMembers, List<Pair<Integer, Integer>> portPairs) throws GloboNetworkException {

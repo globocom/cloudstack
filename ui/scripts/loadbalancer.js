@@ -690,7 +690,117 @@
                             },
                             actions: {
                                 add: {
-                                    label: 'Edit All Pools',
+                                    label: 'Add port',
+                                    preAction: function(args) {
+                                        var data = {
+                                            lbruleid: args.context.loadbalancers[0].id,
+                                            zoneid: args.context.loadbalancers[0].zoneid
+                                        };
+
+                                        var pools = [];
+                                        $.ajax({
+                                            url: createURL("listGloboNetworkPools"),
+                                            data: data,
+                                            dataType: "json",
+                                            async: false,
+                                            success: function(data) {
+                                                pools = data.listglobonetworkpoolresponse.globonetworkpool;
+                                            },
+                                            error: function(errorMessage) {
+                                                args.response.error(errorMessage);
+                                            }
+                                        });
+                                        return true;
+                                    },
+                                    createForm: {
+                                        fields: {
+                                            publicPort: {
+                                                label: 'Public port',
+                                                validation: {
+                                                    required: true,
+                                                    positiveNumber: true
+                                                }
+                                            },
+                                            privatePort: {
+                                                label: 'Private port',
+                                                validation: {
+                                                    required: true,
+                                                    positiveNumber: true
+                                                }
+                                            }
+                                        },
+                                    },
+                                    action: function(args) {
+                                        var msg = "Are you sure you want to add these new ports?<br/><br/>";
+                                        msg += "Public port: <span style='font-weight: bold'>" + args.data.publicPort
+                                        msg += "</span><br/>";
+                                        msg += "Private port: <span style='font-weight: bold'>" + args.data.privatePort
+
+                                        cloudStack.dialog.confirm({
+                                            message: msg,
+                                            action: function() { // "Yes"
+                                                var poolsList = [];
+                                                $.ajax({
+                                                    url: createURL("listGloboNetworkPools"),
+                                                    data: {
+                                                        lbruleid: args.context.loadbalancers[0].id,
+                                                        zoneid: args.context.loadbalancers[0].zoneid
+                                                    },
+                                                    dataType: "json",
+                                                    async: false,
+                                                    success: function(data) {
+                                                        poolsList = data.listglobonetworkpoolresponse.globonetworkpool;
+                                                    },
+                                                    error: function(errorMessage) {
+                                                        args.response.error(errorMessage);
+                                                    }
+                                                });
+
+                                                $.ajax({
+                                                    url: createURL('createGloboNetworkPool'),
+                                                    dataType: 'json',
+                                                    async: true,
+                                                    data: {
+                                                        lbruleid: args.context.loadbalancers[0].id,
+                                                        zoneid: args.context.loadbalancers[0].zoneid,
+                                                        publicPort: args.data.publicPort,
+                                                        privatePort: args.data.privatePort,
+                                                    },
+                                                    success: function(json) {
+                                                        var jid = json.createglobonetworkpoolresponse.jobid;
+                                                        args.response.success({
+                                                            _custom: {
+                                                                jobId: jid,
+                                                                getUpdatedItem: function(json) {
+                                                                    $(window).trigger('cloudStack.fullRefresh');
+                                                                }
+                                                            }
+                                                        });
+                                                    },
+                                                    error: function(errorMessage) {
+                                                        args.response.error(errorMessage);
+                                                    }
+                                                });
+                                            },
+                                            cancelAction: function() { // "Cancel"
+                                                $(window).trigger('cloudStack.fullRefresh');
+                                            }
+                                        });
+                                        return;
+                                    },
+                                    messages: {
+                                        notification: function() {
+                                            return 'Add new port';
+                                        }
+                                    },
+                                    notification: {
+                                        label: 'Add new port',
+                                        poll: pollAsyncJobResult
+                                    },
+                                },
+                                editAll: {
+                                    label: 'Edit all pools',
+                                    isHeader: true,
                                     preAction: function(args) {
                                         var data = {
                                             lbruleid: args.context.loadbalancers[0].id,

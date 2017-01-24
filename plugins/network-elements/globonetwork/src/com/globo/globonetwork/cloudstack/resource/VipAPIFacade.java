@@ -25,6 +25,7 @@ import com.globo.globonetwork.client.model.VipPoolMap;
 import com.globo.globonetwork.client.model.VipV3;
 import com.globo.globonetwork.client.model.OptionVipV3;
 import com.globo.globonetwork.client.model.Ip;
+import com.globo.globonetwork.client.model.pool.PoolV3;
 import com.globo.globonetwork.cloudstack.commands.ApplyVipInGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper.HealthCheckType;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkVipResponse;
@@ -72,33 +73,7 @@ class VipAPIFacade {
         OptionVipV3 l7Rule = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l7_rule", "default_vip").get(0);
         List<VipV3.Port> ports = new ArrayList<>();
         for(VipPoolMap vipPoolMap : vipPoolMapping){
-            String l4ProtocolString;
-            String l7ProtocolString;
-
-            if(HealthCheckType.isLayer7(cmd.getHealthcheckType())){
-                l4ProtocolString = HealthCheckType.TCP.name();
-                if (vipPoolMap.getPort() == 443 || vipPoolMap.getPort() == 8443) {
-                    l7ProtocolString = HealthCheckType.HTTPS.name();
-                } else if (vipPoolMap.getPort() == 80 || vipPoolMap.getPort() == 8080) {
-                    l7ProtocolString = HealthCheckType.HTTP.name();
-                } else{
-                    l7ProtocolString = cmd.getHealthcheckType().toUpperCase();
-                }
-            } else{
-                l4ProtocolString = cmd.getHealthcheckType().toUpperCase();
-                l7ProtocolString = "Outros";
-            }
-
-            OptionVipV3 l4Protocol = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l4_protocol", l4ProtocolString).get(0);
-            OptionVipV3 l7Protocol = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l7_protocol", l7ProtocolString).get(0);
-
-            VipV3.Port port = new VipV3.Port();
-            port.setPort(vipPoolMap.getPort());
-            port.setOptions(new VipV3.PortOptions(l4Protocol.getId(), l7Protocol.getId()));
-
-            VipV3.Pool pool = new VipV3.Pool(vipPoolMap.getPoolId(), l7Rule.getId(), null);
-            port.setPools(Collections.singletonList(pool));
-            ports.add(port);
+            ports.add(createPort(vipEnvironment, vipPoolMap.getPoolId(), vipPoolMap.getPort(), cmd.getHealthcheckType(), l7Rule));
         }
         vip.setPorts(ports);
 
@@ -106,6 +81,36 @@ class VipAPIFacade {
 
         this.vip = globoNetworkAPI.getVipV3API().getById(vip.getId());
         return this;
+    }
+
+    private VipV3.Port createPort(VipEnvironment vipEnvironment, Long poolId, Integer vipPort, String healthcheckType, OptionVipV3 l7Rule) throws GloboNetworkException {
+        String l4ProtocolString;
+        String l7ProtocolString;
+
+        if(HealthCheckType.isLayer7(healthcheckType)){
+            l4ProtocolString = HealthCheckType.TCP.name();
+            if (vipPort == 443 || vipPort == 8443) {
+                l7ProtocolString = HealthCheckType.HTTPS.name();
+            } else if (vipPort == 80 || vipPort == 8080) {
+                l7ProtocolString = HealthCheckType.HTTP.name();
+            } else{
+                l7ProtocolString = healthcheckType.toUpperCase();
+            }
+        } else{
+            l4ProtocolString = healthcheckType.toUpperCase();
+            l7ProtocolString = "Outros";
+        }
+
+        OptionVipV3 l4Protocol = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l4_protocol", l4ProtocolString).get(0);
+        OptionVipV3 l7Protocol = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l7_protocol", l7ProtocolString).get(0);
+
+        VipV3.Port port = new VipV3.Port();
+        port.setPort(vipPort);
+        port.setOptions(new VipV3.PortOptions(l4Protocol.getId(), l7Protocol.getId()));
+
+        VipV3.Pool pool = new VipV3.Pool(poolId, l7Rule.getId(), null);
+        port.setPools(Collections.singletonList(pool));
+        return port;
     }
 
     public VipAPIFacade update(ApplyVipInGloboNetworkCommand cmd, Ip ip, List<VipPoolMap> vipPoolMapping) throws GloboNetworkException {
@@ -155,6 +160,12 @@ class VipAPIFacade {
 
     void delete(Boolean keepIp) throws GloboNetworkException {
         globoNetworkAPI.getVipV3API().delete(vip.getId(), keepIp);
+    }
+
+    void addPool(VipEnvironment vipEnvironment, Integer vipPort, String healthcheckType, PoolV3 poolV3) throws GloboNetworkException {
+        OptionVipV3 l7Rule = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l7_rule", "default_vip").get(0);
+        vip.getPorts().add(createPort(vipEnvironment, poolV3.getId(), vipPort, healthcheckType, l7Rule));
+        globoNetworkAPI.getVipV3API().deployUpdate(vip);
     }
 
     private VipV3.VipOptions buildVipOptions(ApplyVipInGloboNetworkCommand cmd) throws GloboNetworkException {
