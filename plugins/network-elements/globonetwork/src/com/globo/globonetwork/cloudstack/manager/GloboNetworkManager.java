@@ -40,6 +40,7 @@ import com.cloud.vm.UserVmVO;
 import com.cloud.vm.dao.UserVmDao;
 import com.globo.globodns.cloudstack.element.GloboDnsTO;
 import com.globo.globonetwork.cloudstack.api.CreateGloboNetworkPoolCmd;
+import com.globo.globonetwork.cloudstack.api.DeleteGloboNetworkPoolCmd;
 import com.globo.globonetwork.cloudstack.api.GetGloboNetworkPoolCmd;
 import com.globo.globonetwork.cloudstack.api.ListGloboLbNetworksCmd;
 import com.globo.globonetwork.cloudstack.api.ListGloboNetworkExpectedHealthchecksCmd;
@@ -50,6 +51,7 @@ import com.globo.globonetwork.cloudstack.api.loadbalancer.DeleteGloboLoadBalance
 import com.globo.globonetwork.cloudstack.commands.ApplyVipInGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.commands.CheckDSREnabled;
 import com.globo.globonetwork.cloudstack.commands.CreatePoolCommand;
+import com.globo.globonetwork.cloudstack.commands.DeletePoolCommand;
 import com.globo.globonetwork.cloudstack.commands.GetPoolLBByIdCommand;
 import com.globo.globonetwork.cloudstack.commands.ListExpectedHealthchecksCommand;
 import com.globo.globonetwork.cloudstack.commands.ListPoolLBCommand;
@@ -1067,6 +1069,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         cmdList.add(GetGloboNetworkPoolCmd.class);
         cmdList.add(UpdateGloboNetworkPoolCmd.class);
         cmdList.add(CreateGloboNetworkPoolCmd.class);
+        cmdList.add(DeleteGloboNetworkPoolCmd.class);
         cmdList.add(ListGloboLbNetworksCmd.class);
         cmdList.add(RegisterDnsForResourceCmd.class);
         cmdList.add(GetGloboResourceConfigurationCmd.class);
@@ -2744,21 +2747,20 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         }
         validatePortPair(lb, cmd.getPublicPort(), cmd.getPrivatePort());
 
+        GloboNetworkIpDetailVO ipDetail = getNetworkApiVipIp(lb);
+        GloboNetworkLoadBalancerEnvironment lbEnvironment = _globoNetworkLBEnvironmentDao.findById(ipDetail.getGloboNetworkEnvironmentRefId());
+        if (lbEnvironment == null) {
+            throw new InvalidParameterValueException("Could not find mapping between lb environment " + ipDetail.getGloboNetworkEnvironmentRefId());
+        }
+        List<LoadBalancerOptionsVO> options = _lbOptionsDao.listByLoadBalancerId(cmd.getLbId());
+
         String lbIpAddress = _lbMgr.getSourceIp(lb).addr();
         String lockName = "globonetworklb-" + lbIpAddress;
         final ReentrantLock lock = GlobalLock.getReentrantLock(lockName);
-
         try {
             if (!lock.tryLock(GloboNetworkLBLockTimeout.value(), TimeUnit.SECONDS)) {
                 throw new ResourceUnavailableException(String.format("Failed to acquire lock for load balancer %s", lb.getUuid()), DataCenter.class, cmd.getZoneId());
-
             }
-            GloboNetworkIpDetailVO ipDetail = getNetworkApiVipIp(lb);
-            GloboNetworkLoadBalancerEnvironment lbEnvironment = _globoNetworkLBEnvironmentDao.findById(ipDetail.getGloboNetworkEnvironmentRefId());
-            if (lbEnvironment == null) {
-                throw new InvalidParameterValueException("Could not find mapping between lb environment " + ipDetail.getGloboNetworkEnvironmentRefId());
-            }
-            List<LoadBalancerOptionsVO> options = _lbOptionsDao.listByLoadBalancerId(cmd.getLbId());
             List<Real> reals = this.getReals(_lbMgr.getExistingDestinations(cmd.getLbId()), null);
 
             CreatePoolCommand command = new CreatePoolCommand();
@@ -2786,12 +2788,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
             String integrationContext =  ex.getContext();
             String msg = "Integration problem with NetworkAPI, please contact your system administrator. Context: " + context + ", Integration context: " + integrationContext + ", name=" + lb.getName();
             throw new UserCloudRuntimeException(msg);
-        } catch (InvalidParameterValueException e){
-            throw new UserCloudRuntimeException(e.getMessage(), e);
         } catch (Exception e) {
-            // Convert all exceptions to ResourceUnavailable to user have feedback of what happens. All others exceptions only show 'error'
-            String context = CallContext.current().getNdcContext();
-            throw new UserCloudRuntimeException("Error adding new port to load balancer. Context: "+ context+ ", lb name=" + lb.getName(), e);
+            throw new UserCloudRuntimeException("Error adding new pool to load balancer. Context: "+ CallContext.current().getNdcContext() + ", lb name=" + lb.getName(), e);
         } finally {
             if (lock != null && lock.isHeldByCurrentThread()) {
                 lock.unlock();
@@ -2800,18 +2798,78 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         }
     }
 
+    @Override
+    public void deletePool(DeleteGloboNetworkPoolCmd cmd) {
+        LoadBalancer lb = _lbService.findById(cmd.getLbId());
+        if (lb == null){
+            throw new CloudRuntimeException("Could not find Load balancer with id: " + cmd.getLbId());
+        }
+        GloboNetworkIpDetailVO ipDetail = getNetworkApiVipIp(lb);
+        GloboNetworkPoolResponse.Pool poolToRemove = findPoolById(cmd.getLbId(), cmd.getZoneId(), cmd.getPoolId());
+        if(poolToRemove.getVipPort().equals(lb.getSourcePortStart()) && poolToRemove.getPort().equals(lb.getDefaultPortStart())){
+            throw new InvalidParameterValueException("Default Load balancer port cannot be removed");
+        }
+
+        String lockName = "globonetworklb-" + _lbMgr.getSourceIp(lb).addr();
+        final ReentrantLock lock = GlobalLock.getReentrantLock(lockName);
+        try {
+            if (!lock.tryLock(GloboNetworkLBLockTimeout.value(), TimeUnit.SECONDS)) {
+                throw new ResourceUnavailableException(String.format("Failed to acquire lock for load balancer %s", lb.getUuid()), DataCenter.class, cmd.getZoneId());
+            }
+
+            removePortMapping(lb, poolToRemove);
+            DeletePoolCommand command = new DeletePoolCommand(ipDetail.getGloboNetworkVipId(), cmd.getPoolId(), poolToRemove.getVipPort());
+            Answer answer = callCommand(command, cmd.getZoneId());
+            handleAnswerIfFail(answer, "Could not remove pool");
+        } catch (CloudstackGloboNetworkException ex) {
+            String context = CallContext.current().getNdcContext();
+            String integrationContext =  ex.getContext();
+            String msg = "Integration problem with NetworkAPI, please contact your system administrator. Context: " + context + ", Integration context: " + integrationContext + ", name=" + lb.getName();
+            throw new UserCloudRuntimeException(msg);
+        } catch (Exception e) {
+            throw new UserCloudRuntimeException("Error removing port from load balancer. Context: "+ CallContext.current().getNdcContext() + ", lb name=" + lb.getName(), e);
+        } finally {
+            if (lock != null && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+            GlobalLock.releaseReentrantLock(lockName);
+        }
+    }
+
+    protected GloboNetworkPoolResponse.Pool findPoolById(Long lbId, Long zoneId, Long poolId) {
+        List<GloboNetworkPoolResponse.Pool> pools = listAllPoolByVipId(lbId, zoneId);
+        GloboNetworkPoolResponse.Pool poolToRemove = null;
+        for(GloboNetworkPoolResponse.Pool pool : pools){
+            if(pool.getId().equals(poolId)){
+                poolToRemove = pool;
+                break;
+            }
+        }
+        if(poolToRemove == null){
+            throw new InvalidParameterValueException("Pool not found");
+        }
+        return poolToRemove;
+    }
+
+    protected void removePortMapping(LoadBalancer lb, GloboNetworkPoolResponse.Pool poolToRemove) {
+        List<LoadBalancerPortMapVO> portMaps = _lbPortMapDao.listByLoadBalancerId(lb.getId());
+        for(LoadBalancerPortMapVO portMap : portMaps){
+            if(portMap.getPublicPort() == poolToRemove.getVipPort() && portMap.getPrivatePort() == poolToRemove.getPort()){
+                _lbPortMapDao.remove(portMap.getId());
+            }
+        }
+    }
+
     private void validatePortPair(LoadBalancer lb, Integer publicPort, Integer privatePort) {
         List<LoadBalancerPortMapVO> lbPortMaps = _lbPortMapDao.listByLoadBalancerId(lb.getId());
         lbPortMaps.add(new LoadBalancerPortMapVO(0L, lb.getSourcePortStart(), lb.getDefaultPortStart()));
 
-        if (lbPortMaps != null) {
-            for (LoadBalancerPortMapVO lbPortMap : lbPortMaps) {
-                if(publicPort.equals(lbPortMap.getPublicPort())){
-                    if(privatePort.equals(lbPortMap.getPrivatePort())) {
-                        throw new InvalidParameterValueException("This public/private port pair already exists.");
-                    }
-                    throw new InvalidParameterValueException("This public port already exists.");
+        for (LoadBalancerPortMapVO lbPortMap : lbPortMaps) {
+            if(publicPort.equals(lbPortMap.getPublicPort())){
+                if(privatePort.equals(lbPortMap.getPrivatePort())) {
+                    throw new InvalidParameterValueException("This public/private port pair already exists.");
                 }
+                throw new InvalidParameterValueException("This public port already exists.");
             }
         }
 

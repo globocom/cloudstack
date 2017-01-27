@@ -31,6 +31,7 @@ import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper.HealthCheckTy
 import com.globo.globonetwork.cloudstack.response.GloboNetworkVipResponse;
 import org.apache.log4j.Logger;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
@@ -166,6 +167,27 @@ class VipAPIFacade {
         OptionVipV3 l7Rule = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l7_rule", "default_vip").get(0);
         vip.getPorts().add(createPort(vipEnvironment, poolV3.getId(), vipPort, healthcheckType, l7Rule));
         globoNetworkAPI.getVipV3API().deployUpdate(vip);
+    }
+
+    void removePool(Long poolId) throws GloboNetworkException {
+        Iterator<VipV3.Port> portIterator = vip.getPorts().iterator();
+        while(portIterator.hasNext()){
+            VipV3.Port port = portIterator.next();
+            Iterator<VipV3.Pool> poolIterator = port.getPools().iterator();
+
+            while(poolIterator.hasNext()){
+                VipV3.Pool pool = poolIterator.next();
+                if(pool.getPoolId().equals(poolId)) {
+                    if(port.getPools().size() == 1){
+                        portIterator.remove();
+                    }else{
+                        poolIterator.remove();
+                    }
+                    globoNetworkAPI.getVipV3API().deployUpdate(vip);
+                    return;
+                }
+            }
+        }
     }
 
     private VipV3.VipOptions buildVipOptions(ApplyVipInGloboNetworkCommand cmd) throws GloboNetworkException {

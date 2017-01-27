@@ -44,6 +44,7 @@ import com.globo.globonetwork.client.model.Pool;
 import com.globo.globonetwork.client.model.PoolOption;
 import com.globo.globonetwork.client.model.VipJson;
 import com.globo.globonetwork.client.model.VipPoolMap;
+import com.globo.globonetwork.client.model.VipV3;
 import com.globo.globonetwork.client.model.VipXml;
 import com.globo.globonetwork.client.model.Vlan;
 
@@ -51,6 +52,7 @@ import com.globo.globonetwork.client.model.healthcheck.ExpectHealthcheck;
 import com.globo.globonetwork.client.model.pool.PoolV3;
 import com.globo.globonetwork.cloudstack.commands.ApplyVipInGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.commands.CreatePoolCommand;
+import com.globo.globonetwork.cloudstack.commands.DeletePoolCommand;
 import com.globo.globonetwork.cloudstack.commands.ListExpectedHealthchecksCommand;
 import com.globo.globonetwork.cloudstack.commands.ListPoolLBCommand;
 import com.globo.globonetwork.cloudstack.commands.RemoveVipFromGloboNetworkCommand;
@@ -638,6 +640,74 @@ public class GloboNetworkResourceTest {
 
         assertTrue(answer.getResult());
         verify(facadeMock, times(0)).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), any(PoolV3.class));
+    }
+
+    @Test
+    public void testDeletePool() throws GloboNetworkException {
+        PoolV3 pool = new PoolV3();
+        pool.setId(1L);
+        pool.setPoolCreated(true);
+
+        VipAPIFacade facadeMock = mock(VipAPIFacade.class);
+        doReturn(facadeMock).when(_resource).createVipAPIFacade(1L, gnAPI);
+        when(gnAPI.getPoolAPI().getById(1L)).thenReturn(pool);
+
+        Answer answer = _resource.executeRequest(new DeletePoolCommand(1L, 1L, 80));
+
+        assertTrue(answer.getResult());
+        verify(facadeMock).removePool(1L);
+        verify(gnAPI.getPoolAPI()).getById(1L);
+        verify(gnAPI.getPoolAPI()).undeployV3(1L);
+        verify(gnAPI.getPoolAPI()).deleteV3(1L);
+    }
+
+    @Test
+    public void testDeletePoolGivenNotDeployedPool() throws GloboNetworkException {
+        PoolV3 pool = new PoolV3();
+        pool.setId(1L);
+        pool.setPoolCreated(false);
+
+        VipAPIFacade facadeMock = mock(VipAPIFacade.class);
+        doReturn(facadeMock).when(_resource).createVipAPIFacade(1L, gnAPI);
+        when(gnAPI.getPoolAPI().getById(1L)).thenReturn(pool);
+
+        Answer answer = _resource.executeRequest(new DeletePoolCommand(1L, 1L, 80));
+
+        assertTrue(answer.getResult());
+        verify(facadeMock).removePool(1L);
+        verify(gnAPI.getPoolAPI()).getById(1L);
+        verify(gnAPI.getPoolAPI(), times(0)).undeployV3(1L);
+        verify(gnAPI.getPoolAPI()).deleteV3(1L);
+    }
+
+    @Test
+    public void testDeletePoolGivenError() throws GloboNetworkException {
+        PoolAPI poolAPI = gnAPI.getPoolAPI();
+        PoolV3 pool = new PoolV3();
+        pool.setId(1L);
+        pool.setPoolCreated(true);
+        pool.setHealthcheck(new PoolV3.Healthcheck());
+
+        VipV3 vip = new VipV3();
+        vip.setEnvironmentVipId(99L);
+
+        VipAPIFacade facadeMock = mock(VipAPIFacade.class);
+        doReturn(facadeMock).when(_resource).createVipAPIFacade(1L, gnAPI);
+        when(facadeMock.getVip()).thenReturn(vip);
+        when(poolAPI.getById(1L)).thenReturn(pool);
+        doThrow(new RuntimeException("")).when(poolAPI).deleteV3(1L);
+        when(gnAPI.getVipEnvironmentAPI().search(99L, null, null, null)).thenReturn(new VipEnvironment());
+
+        Answer answer = _resource.executeRequest(new DeletePoolCommand(1L, 1L, 80));
+
+        assertFalse(answer.getResult());
+        verify(facadeMock).removePool(1L);
+        verify(poolAPI, times(2)).getById(1L);
+        verify(poolAPI).undeployV3(1L);
+        verify(poolAPI).deleteV3(1L);
+        // verify rollback
+        verify(gnAPI.getVipEnvironmentAPI()).search(99L, null, null, null);
+        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq(pool.getHealthcheck().getHealthcheckType()), eq(pool));
     }
 
     private void mockGetVipInfos() throws GloboNetworkException {

@@ -19,39 +19,36 @@ package com.globo.globonetwork.cloudstack.api;
 
 import com.cloud.event.EventTypes;
 import com.globo.globonetwork.cloudstack.manager.GloboNetworkManager;
-import javax.inject.Inject;
-
-import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
 import org.apache.cloudstack.api.APICommand;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseAsyncCmd;
 import org.apache.cloudstack.api.Parameter;
 import org.apache.cloudstack.api.response.FirewallRuleResponse;
 import org.apache.cloudstack.api.response.PoolResponse;
+import org.apache.cloudstack.api.response.SuccessResponse;
 import org.apache.cloudstack.api.response.ZoneResponse;
 import org.apache.cloudstack.context.CallContext;
 import org.apache.log4j.Logger;
 
-@APICommand(name = "createGloboNetworkPool", description = "Creates a new pool to a load balancer", responseObject = PoolResponse.class,
+import javax.inject.Inject;
+
+
+@APICommand(name = "deleteGloboNetworkPool", description = "Deletes a pool from a load balancer", responseObject = PoolResponse.class,
         requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
-public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
+public class DeleteGloboNetworkPoolCmd extends BaseAsyncCmd {
 
-    public static final Logger s_logger = Logger.getLogger(CreateGloboNetworkPoolCmd.class.getName());
+    public static final Logger s_logger = Logger.getLogger(DeleteGloboNetworkPoolCmd.class.getName());
 
-    private static final String s_name = "createglobonetworkpoolresponse";
+    private static final String s_name = "deleteglobonetworkpoolresponse";
 
-    @Parameter(name= ApiConstants.ZONE_ID, type = CommandType.UUID, required = true, entityType = ZoneResponse.class, description = "the ID of the zone")
-    private Long zoneId;
+    @Parameter(name = ApiConstants.ID, type = CommandType.LONG, required = true, description = "the ID of the pool to be removed")
+    private Long poolId;
 
     @Parameter(name= ApiConstants.LBID, type = CommandType.UUID, required = true, entityType = FirewallRuleResponse.class, description = "the ID of the load balancer rule")
     private Long lbId;
 
-    @Parameter(name = ApiConstants.PUBLIC_PORT, type = CommandType.INTEGER, required = true, description = "the public port from where the network traffic will be load balanced from")
-    private Integer publicPort;
-
-
-    @Parameter(name = ApiConstants.PRIVATE_PORT, type = CommandType.INTEGER, required = true, description = "the private port of the private ip address/virtual machine where the network traffic will be load balanced to")
-    private Integer privatePort;
+    @Parameter(name= ApiConstants.ZONE_ID, type = CommandType.UUID, required = true, entityType = ZoneResponse.class, description = "the ID of the zone")
+    private Long zoneId;
 
     @Inject
     GloboNetworkManager _globoNetworkService;
@@ -72,21 +69,8 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() {
-        GloboNetworkPoolResponse.Pool pool = _globoNetworkService.createPool(this);
-        PoolResponse poolResp = new PoolResponse();
-        if(pool != null) {
-            poolResp.setId(pool.getId());
-            poolResp.setName(pool.getIdentifier());
-            poolResp.setLbMethod(pool.getLbMethod());
-            poolResp.setPort(pool.getPort());
-            poolResp.setHealthcheckType(pool.getHealthcheckType());
-            poolResp.setHealthcheck(pool.getHealthcheck());
-            poolResp.setExpectedHealthcheck(pool.getExpectedHealthcheck());
-            poolResp.setMaxconn(pool.getMaxconn());
-            poolResp.setObjectName("globonetworkpool");
-        }
-        poolResp.setResponseName(getCommandName());
-        this.setResponseObject(poolResp);
+        _globoNetworkService.deletePool(this);
+        setResponseObject(new SuccessResponse(getCommandName()));
     }
 
     // ///////////////////////////////////////////////////
@@ -101,20 +85,12 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
         this.lbId = lbId;
     }
 
-    public Integer getPublicPort() {
-        return publicPort;
+    public Long getPoolId() {
+        return poolId;
     }
 
-    public void setPublicPort(Integer publicPort) {
-        this.publicPort = publicPort;
-    }
-
-    public Integer getPrivatePort() {
-        return privatePort;
-    }
-
-    public void setPrivatePort(Integer privatePort) {
-        this.privatePort = privatePort;
+    public void setPoolId(Long poolId) {
+        this.poolId = poolId;
     }
 
     public Long getZoneId() {
@@ -127,12 +103,11 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
 
     @Override
     public String getEventType() {
-        return EventTypes.EVENT_LB_CREATE_POOL;
+        return EventTypes.EVENT_LB_REMOVE_POOL;
     }
 
     @Override
     public String getEventDescription() {
-        return "Creates a new pool";
+        return "Deletes a pool";
     }
-
 }

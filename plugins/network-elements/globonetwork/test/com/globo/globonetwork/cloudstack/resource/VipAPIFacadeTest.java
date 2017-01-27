@@ -228,6 +228,63 @@ public class VipAPIFacadeTest {
         assertEquals(0, poolIds.size());
     }
 
+    @Test
+    public void testRemovePoolGivenVipWithOnePoolPerPort() throws GloboNetworkException {
+        VipV3 vip = new VipV3();
+        vip.setId(1L);
+
+        List<VipV3.Pool> pools = new ArrayList<>();
+        VipV3.Pool pool = new VipV3.Pool();
+        pool.setPoolId(1L);
+        pools.add(pool);
+
+        List<VipV3.Port> ports = new ArrayList<>();
+        VipV3.Port port = new VipV3.Port();
+        port.setPools(pools);
+        port.setPort(80);
+
+        ports.add(port);
+        vip.setPorts(ports);
+
+        VipAPIFacade facade = createTestVipAPIFacade(vip);
+
+        facade.removePool(1L);
+
+        assertEquals(0, vip.getPorts().size());
+        verify(globoNetworkAPI.getVipV3API()).deployUpdate(vip);
+    }
+
+    @Test
+    public void testRemovePoolGivenVipPortWithTwoPools() throws GloboNetworkException {
+        VipV3 vip = new VipV3();
+        vip.setId(1L);
+
+        List<VipV3.Pool> pools = new ArrayList<>();
+        VipV3.Pool pool1 = new VipV3.Pool();
+        pool1.setPoolId(1L);
+        VipV3.Pool pool2 = new VipV3.Pool();
+        pool2.setPoolId(2L);
+        pools.add(pool1);
+        pools.add(pool2);
+
+        List<VipV3.Port> ports = new ArrayList<>();
+        VipV3.Port port = new VipV3.Port();
+        port.setPools(pools);
+        port.setPort(80);
+
+        ports.add(port);
+        vip.setPorts(ports);
+
+        VipAPIFacade facade = createTestVipAPIFacade(vip);
+
+        facade.removePool(1L);
+
+        assertEquals(1, vip.getPorts().size());
+        assertEquals(1, vip.getPorts().get(0).getPools().size());
+        assertEquals((Long) 2L, vip.getPorts().get(0).getPools().get(0).getPoolId());
+        verify(globoNetworkAPI.getVipV3API()).deployUpdate(vip);
+    }
+
     private VipV3 buildFakeVip(Long vipId, Boolean created) throws GloboNetworkException {
         VipV3 vip = new VipV3();
         vip.setId(vipId);
@@ -246,6 +303,11 @@ public class VipAPIFacadeTest {
     private VipAPIFacade createTestVipAPIFacade(Long vipId, Boolean created) throws GloboNetworkException {
         when(vipAPI.getById(vipId)).thenReturn(buildFakeVip(vipId, created));
         return new VipAPIFacade(vipId, globoNetworkAPI);
+    }
+
+    private VipAPIFacade createTestVipAPIFacade(VipV3 vip) throws GloboNetworkException {
+        when(vipAPI.getById(vip.getId())).thenReturn(vip);
+        return new VipAPIFacade(vip.getId(), globoNetworkAPI);
     }
 
     private void mockVipOptions(VipEnvironment environment) throws GloboNetworkException {

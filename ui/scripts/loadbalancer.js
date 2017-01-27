@@ -690,7 +690,7 @@
                             },
                             actions: {
                                 add: {
-                                    label: 'Add port',
+                                    label: 'Add pool',
                                     preAction: function(args) {
                                         var data = {
                                             lbruleid: args.context.loadbalancers[0].id,
@@ -731,7 +731,7 @@
                                         },
                                     },
                                     action: function(args) {
-                                        var msg = "Are you sure you want to add these new ports?<br/><br/>";
+                                        var msg = "Are you sure you want to add this pool?<br/><br/>";
                                         msg += "Public port: <span style='font-weight: bold'>" + args.data.publicPort
                                         msg += "</span><br/>";
                                         msg += "Private port: <span style='font-weight: bold'>" + args.data.privatePort
@@ -790,11 +790,11 @@
                                     },
                                     messages: {
                                         notification: function() {
-                                            return 'Add new port';
+                                            return 'Add new pool';
                                         }
                                     },
                                     notification: {
-                                        label: 'Add new port',
+                                        label: 'Add new pool',
                                         poll: pollAsyncJobResult
                                     },
                                 },
@@ -971,6 +971,58 @@
                                         notification: function() {
                                             return 'Edit All Pools';
                                         }
+                                    },
+                                    notification: {
+                                        poll: pollAsyncJobResult
+                                    },
+                                },
+                                remove: {
+                                    label : 'label.delete',
+                                    messages: {
+                                        confirm: function(args) {
+                                            return 'Are you sure you want to remove this pool:' + args.name + '?';
+                                        },
+                                        notification: function(args) {
+                                            return 'Removing pool';
+                                        }
+                                    },
+                                    action: function(args) {
+                                        var show_error_message = function(json) {
+                                          args.response.error(parseXMLHttpResponse(json));
+                                        };
+                                        var lb = args.context.loadbalancers[0];
+                                        var pool = args.data.jsonObj
+
+                                        if(lb.publicport == pool.vipport && lb.privateport == pool.port){
+                                            args.response.error("Default load balancer pool cannot be removed");
+                                            return;
+                                        }
+
+                                        $.ajax({
+                                            url: createURL("deleteGloboNetworkPool"),
+                                            data: {
+                                                id: pool.id,
+                                                lbruleid: lb.id,
+                                                zoneid: lb.zoneid
+                                            },
+                                            dataType: "json",
+                                            success: function(data) {
+                                                cloudStack.ui.notifications.add({
+                                                        desc: 'Removing pool',
+                                                        section: 'Load balancer',
+                                                        poll: pollAsyncJobResult,
+                                                        _custom: {
+                                                            jobId: data.deleteglobonetworkpoolresponse.jobid,
+                                                            fullRefreshAfterComplete: true
+                                                        }
+                                                    },
+                                                    function() {
+                                                    }, {},
+                                                    show_error_message, {} // job deleteLoadBalancerRule
+                                                );
+                                            },
+                                            error: show_error_message // ajax deleteLoadBalancerRule
+                                        });
                                     },
                                     notification: {
                                         poll: pollAsyncJobResult

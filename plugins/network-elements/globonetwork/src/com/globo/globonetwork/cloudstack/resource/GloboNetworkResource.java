@@ -21,6 +21,7 @@ import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.utils.Pair;
 import com.cloud.utils.StringUtils;
 import com.globo.globonetwork.cloudstack.commands.CreatePoolCommand;
+import com.globo.globonetwork.cloudstack.commands.DeletePoolCommand;
 import com.globo.globonetwork.cloudstack.response.CheckDSREnabledResponse;
 import com.globo.globonetwork.client.api.ExpectHealthcheckAPI;
 import com.globo.globonetwork.client.api.GloboNetworkAPI;
@@ -304,6 +305,8 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             return execute((UpdatePoolCommand) cmd);
         }else if (cmd instanceof CreatePoolCommand) {
             return execute((CreatePoolCommand) cmd);
+        }else if (cmd instanceof DeletePoolCommand) {
+            return execute((DeletePoolCommand) cmd);
         }else if (cmd instanceof CheckDSREnabled) {
             return execute((CheckDSREnabled) cmd);
         }
@@ -372,6 +375,45 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             } catch (GloboNetworkException e) {
                 s_logger.error("Error rollbacking pool creation", e);
             }
+        }
+    }
+
+    private Answer execute(DeletePoolCommand cmd) {
+        GloboNetworkAPI gnAPI = getNewGloboNetworkAPI();
+        VipAPIFacade vipAPIFacade = null;
+
+        try{
+            vipAPIFacade = createVipAPIFacade(cmd.getVipId(), gnAPI);
+            vipAPIFacade.removePool(cmd.getPoolId());
+
+            PoolAPI poolAPI = gnAPI.getPoolAPI();
+            PoolV3 pool = poolAPI.getById(cmd.getPoolId());
+            if(pool.getPoolCreated()){
+                poolAPI.undeployV3(pool.getId());
+            }
+
+            poolAPI.deleteV3(cmd.getPoolId());
+
+            return new Answer(cmd, true, "Pool successfuly removed");
+        } catch (GloboNetworkException e) {
+            rollbackPoolRemoval(cmd.getPoolId(), cmd.getVipPort(), vipAPIFacade, gnAPI);
+            return handleGloboNetworkException(cmd, e);
+        } catch (Exception e) {
+            rollbackPoolRemoval(cmd.getPoolId(), cmd.getVipPort(), vipAPIFacade, gnAPI);
+            s_logger.error("Generic error accessing GloboNetwork while creating new pool", e);
+            return new Answer(cmd, false, e.getMessage());
+        }
+    }
+
+    private void rollbackPoolRemoval(Long poolId, Integer vipPort, VipAPIFacade vipAPIFacade, GloboNetworkAPI gnAPI){
+        try {
+            PoolV3 pool = gnAPI.getPoolAPI().getById(poolId);
+            if(pool != null) {
+                VipEnvironment vipEnv = gnAPI.getVipEnvironmentAPI().search(vipAPIFacade.getVip().getEnvironmentVipId(), null, null, null);
+                vipAPIFacade.addPool(vipEnv, vipPort, pool.getHealthcheck().getHealthcheckType(), pool);
+            }
+        } catch (GloboNetworkException e) {
+            s_logger.error("Error rollbacking pool removal", e);
         }
     }
 

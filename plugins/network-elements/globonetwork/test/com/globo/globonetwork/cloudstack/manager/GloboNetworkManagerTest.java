@@ -27,6 +27,7 @@ import static org.mockito.Matchers.anyMapOf;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -51,8 +52,10 @@ import com.cloud.vm.VirtualMachine;
 import com.globo.globodns.cloudstack.element.GloboDnsTO;
 import com.globo.globonetwork.cloudstack.GloboNetworkIpDetailVO;
 import com.globo.globonetwork.cloudstack.api.CreateGloboNetworkPoolCmd;
+import com.globo.globonetwork.cloudstack.api.DeleteGloboNetworkPoolCmd;
 import com.globo.globonetwork.cloudstack.commands.ApplyVipInGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.commands.CreatePoolCommand;
+import com.globo.globonetwork.cloudstack.commands.DeletePoolCommand;
 import com.globo.globonetwork.cloudstack.commands.GetPoolLBByIdCommand;
 import com.globo.globonetwork.cloudstack.commands.ListPoolLBCommand;
 import com.globo.globonetwork.cloudstack.commands.UpdatePoolCommand;
@@ -831,6 +834,36 @@ public class GloboNetworkManagerTest {
         }catch(InvalidParameterValueException e){
             assertEquals("In DSR load balancer the public port must always be the same as private port.", e.getMessage());
         }
+    }
+
+    @Test
+    public void testDeletePool(){
+        LoadBalancerVO loadBalancer = new LoadBalancerVO(null,null,null, 0L, 80, 80,null, 10, 0L, 0L,"");
+        GloboNetworkPoolResponse.Pool pool = new GloboNetworkPoolResponse.Pool();
+        pool.setId(1L);
+        pool.setVipPort(443);
+        pool.setPort(8443);
+
+        DeleteGloboNetworkPoolCmd cmd = new DeleteGloboNetworkPoolCmd();
+        cmd.setLbId(1L);
+        cmd.setPoolId(1L);
+        cmd.setZoneId(1L);
+
+        GloboNetworkManager manager = spy(new GloboNetworkManager());
+        manager._lbMgr = mock(LoadBalancingRulesManager.class);
+        when(manager._lbMgr.getSourceIp(loadBalancer)).thenReturn(new Ip("192.168.10.5"));
+        manager._lbService = mock(LoadBalancingRulesService.class);
+        when(manager._lbService.findById(cmd.getLbId())).thenReturn(loadBalancer);
+        doReturn(new GloboNetworkIpDetailVO(1L, 1L)).when(manager).getNetworkApiVipIp(loadBalancer);
+        doReturn(pool).when(manager).findPoolById(anyLong(), anyLong(), anyLong());
+        doReturn(new Answer(null, true, "")).when(manager).callCommand(any(DeletePoolCommand.class), eq(cmd.getZoneId()));
+        doNothing().when(manager).removePortMapping(eq(loadBalancer), any(GloboNetworkPoolResponse.Pool.class));
+
+        manager.deletePool(cmd);
+
+        verify(manager).findPoolById(anyLong(), anyLong(), anyLong());
+        verify(manager).removePortMapping(eq(loadBalancer), eq(pool));
+        verify(manager).callCommand(any(DeletePoolCommand.class), eq(cmd.getZoneId()));
     }
 
     @Test

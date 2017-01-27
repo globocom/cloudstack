@@ -19,6 +19,7 @@ package com.globo.globonetwork.cloudstack.manager;
 import com.cloud.exception.InsufficientVirtualNetworkCapacityException;
 import com.cloud.utils.Pair;
 import com.globo.globonetwork.cloudstack.api.CreateGloboNetworkPoolCmd;
+import com.globo.globonetwork.cloudstack.api.DeleteGloboNetworkPoolCmd;
 import com.globo.globonetwork.cloudstack.api.ListGloboLbNetworksCmd;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkExpectHealthcheckResponse;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
@@ -293,4 +294,6 @@ public interface GloboNetworkService {
     public void registerDnsForResource(String id, GloboResourceType resourceType);
 
     GloboNetworkPoolResponse.Pool createPool(CreateGloboNetworkPoolCmd createGloboNetworkPoolCmd);
+
+    void deletePool(DeleteGloboNetworkPoolCmd deleteGloboNetworkPoolCmd);
 }
