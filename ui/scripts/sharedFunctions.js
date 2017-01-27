@@ -2156,8 +2156,8 @@ cloudStack.api = {
                         data: {
                             'tags[0].key': data.key,
                             'tags[0].value': data.value,
-                            resourceIds: resourceId,
-                            resourceType: resourceType
+                            resourceids: resourceId,
+                            resourcetype: resourceType
                         },
                         success: function(json) {
                             args.response.success({
@@ -2182,8 +2182,8 @@ cloudStack.api = {
                         data: {
                             'tags[0].key': data.key,
                             'tags[0].value': data.value,
-                            resourceIds: resourceId,
-                            resourceType: resourceType
+                            resourceids: resourceId,
+                            resourcetype: resourceType
                         },
                         success: function(json) {
                             args.response.success({
