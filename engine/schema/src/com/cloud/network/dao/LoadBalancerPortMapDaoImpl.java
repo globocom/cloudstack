@@ -18,9 +18,7 @@ package com.cloud.network.dao;
 
 import com.cloud.utils.db.DB;
 import com.cloud.utils.db.GenericDaoBase;
-import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
-import com.cloud.utils.db.SearchCriteria.Op;
 import org.springframework.stereotype.Component;
 
 import javax.ejb.Local;
@@ -31,20 +29,10 @@ import java.util.List;
 @DB
 public class LoadBalancerPortMapDaoImpl extends GenericDaoBase<LoadBalancerPortMapVO, Long> implements LoadBalancerPortMapDao {
 
-    final SearchBuilder<LoadBalancerPortMapVO> LoadBalancerSearch;
-
-    protected LoadBalancerPortMapDaoImpl() {
-        super();
-
-        LoadBalancerSearch = createSearchBuilder();
-        LoadBalancerSearch.and("lbId", LoadBalancerSearch.entity().getLoadBalancerId(), Op.EQ);
-        LoadBalancerSearch.done();
-    }
-
     @Override
     public List<LoadBalancerPortMapVO> listByLoadBalancerId(long loadBalancerId) {
-        SearchCriteria<LoadBalancerPortMapVO> sc = LoadBalancerSearch.create();
-        sc.setParameters("lbId", loadBalancerId);
+        SearchCriteria<LoadBalancerPortMapVO> sc = createSearchCriteria();
+        sc.addAnd("lbId", SearchCriteria.Op.EQ, loadBalancerId);
         return listBy(sc);
     }
 }
