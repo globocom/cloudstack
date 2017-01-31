@@ -2067,9 +2067,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         List<LoadBalancerPortMapVO> lbPortMaps = _lbPortMapDao.listByLoadBalancerId(lb.getId());
         if (lbPortMaps != null) {
             for (LoadBalancerPortMapVO lbPortMap : lbPortMaps) {
-                if (lbPortMap.getLoadBalancerId() == lb.getId()) { // FIXME Double-check lbID because query doesn't seem to be working
-                    additionalPorts.add(lbPortMap.getPublicPort() + ":" + lbPortMap.getPrivatePort());
-                }
+                additionalPorts.add(lbPortMap.getPublicPort() + ":" + lbPortMap.getPrivatePort());
             }
         }
         loadBalancing.setAdditionalPortMap(additionalPorts);
