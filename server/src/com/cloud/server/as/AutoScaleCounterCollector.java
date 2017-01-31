@@ -82,21 +82,25 @@ public class AutoScaleCounterCollector extends ManagedContextRunnable implements
 
     @Override
     protected void runInContext() {
-        if(elasticSearchDataSourceEnabled() && isConfiguredManagementServer()){
-            List<AutoScaleVmGroupVO> autoScaleVmGroups = this.listEnabledAutoScaleGroups();
-            for (AutoScaleVmGroupVO asGroup : autoScaleVmGroups){
-                s_logger.debug("[AutoScale] Reading VM stats from AutoScaleGroup #" + asGroup.getId());
-                try{
-                    List<VirtualMachineAddress> virtualMachines = this.getVirtualMachinesFrom(asGroup);
-                    if(!virtualMachines.isEmpty()) {
-                        counterProcessor.process(asGroup, virtualMachines, this.getCountersFrom(asGroup));
+        try {
+            if (elasticSearchDataSourceEnabled() && isConfiguredManagementServer()) {
+                List<AutoScaleVmGroupVO> autoScaleVmGroups = this.listEnabledAutoScaleGroups();
+                for (AutoScaleVmGroupVO asGroup : autoScaleVmGroups) {
+                    s_logger.debug("[AutoScale] Reading VM stats from AutoScaleGroup #" + asGroup.getId());
+                    try {
+                        List<VirtualMachineAddress> virtualMachines = this.getVirtualMachinesFrom(asGroup);
+                        if (!virtualMachines.isEmpty()) {
+                            counterProcessor.process(asGroup, virtualMachines, this.getCountersFrom(asGroup));
+                        }
+                    } catch (Exception ex) {
+                        s_logger.error("[AutoScale] Error while reading AutoScaleGroup #" + asGroup.getId(), ex);
                     }
-                }catch(Exception ex){
-                    s_logger.error("[AutoScale] Error while reading AutoScaleGroup #" + asGroup.getId(), ex);
                 }
+            } else {
+                s_logger.debug("[AutoScale] Elasticsearch stats datasource not enabled or management server not configured");
             }
-        }else{
-            s_logger.debug("[AutoScale] Elasticsearch stats datasource not enabled or management server not configured");
+        }catch(Exception ex){
+            s_logger.error("[AutoScale] Error processing VM counters, skipping to next execution");
         }
     }
 
