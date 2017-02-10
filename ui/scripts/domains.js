@@ -505,7 +505,7 @@
                             });
 
                             $.ajax({
-                                url: createURL("listProjects&domainid=" + domainObj.id),
+                                url: createURL("listProjects&domainid=" + domainObj.id + "&simple=true"),
                                 async: false,
                                 data: {},
                                 success: function(json) {

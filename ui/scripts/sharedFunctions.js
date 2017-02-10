@@ -513,7 +513,7 @@ var addGuestNetworkDialog = {
                     select: function(args) {
                         var items = [];
                         $.ajax({
-                            url: createURL("listProjects&listAll=true"),
+                            url: createURL("listProjects&listAll=true&simple=true"),
                             dataType: "json",
                             async: false,
                             success: function(json) {

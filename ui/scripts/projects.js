@@ -637,12 +637,14 @@
             var getNextPage = function() {            	
             	var data2 = $.extend({}, data1, {
             		page: page,
+                    simple: true,
             		pageSize: 500
             	});
             	
 	            $.ajax({
 	                url: createURL('listProjects', {
-	                    ignoreProject: true
+	                    ignoreProject: true,
+                        simple: true
 	                }),
 	                data: data2,	                
 	                async: false,
@@ -769,7 +771,7 @@
                     },
 
                     dataProvider: function(args) {
-                        var data = {};
+                        var data = {"simple": true};
                         listViewDataProvider(args, data);
 
                         if (isDomainAdmin()) {
@@ -811,11 +813,13 @@
                             if (isDomainAdmin()) {
                                 url += '&domainid=' + args.context.users[0].domainid;
                             }
+                            url += "&simple=true"
                             $.ajax({
                                 url: createURL(url),
                                 data: {
                                     listAll: true,
-                                    id: projectID
+                                    id: projectID,
+                                    simple: true
                                 },
                                 async: false,
                                 success: function(json) {
@@ -1032,6 +1036,7 @@
                                     if (isDomainAdmin()) {
                                         url += '&domainid=' + args.context.users[0].domainid;
                                     }
+                                    url += "&simple=true"
                                     $.ajax({
                                         url: createURL(url),
                                         data: {
