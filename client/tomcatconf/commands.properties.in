@@ -801,4 +801,6 @@ listGloboNetworkPools=15
 listGloboNetworkExpectedHealthchecks=15
 getGloboNetworkPool=15
 updateGloboNetworkPool=15
+createGloboNetworkPool=15
+deleteGloboNetworkPool=15
 listGloboVirtualMachines=15
