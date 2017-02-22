@@ -267,6 +267,8 @@ public class StorageManagerImpl extends ManagerBase implements StorageManager, C
     @Inject
     private TemplateService _imageSrv;
     @Inject
+    private VolumeService _volumeSrv;
+    @Inject
     EndPointSelector _epSelector;
 
     protected List<StoragePoolDiscoverer> _discoverers;
@@ -1682,6 +1684,9 @@ public class StorageManagerImpl extends ManagerBase implements StorageManager, C
         return null;
     }
 
+    @Inject
+    private DataStoreManager _storeMgr;
+
     @Override
     public ImageStore discoverImageStore(String name, String url, String providerName, Long dcId, Map details) throws IllegalArgumentException, DiscoveryException,
     InvalidParameterValueException {
@@ -1774,8 +1779,11 @@ public class StorageManagerImpl extends ManagerBase implements StorageManager, C
         if (scopeType == ScopeType.REGION) {
             duplicateCacheStoreRecordsToRegionStore(store.getId());
         }
+        ImageStore storeImg = (ImageStore)_dataStoreMgr.getDataStore(store.getId(), DataStoreRole.Image);
 
-        return (ImageStore)_dataStoreMgr.getDataStore(store.getId(), DataStoreRole.Image);
+        _volumeSrv.handleVolumeSync(store);
+        _imageSrv.handleTemplateSync(store);
+        return storeImg;
     }
 
     @Override
