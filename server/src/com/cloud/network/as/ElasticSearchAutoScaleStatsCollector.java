@@ -23,18 +23,21 @@ import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.log4j.Logger;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.transport.TransportClient;
-import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
-import org.elasticsearch.index.query.FilterBuilders;
+import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.Aggregations;
 import org.elasticsearch.search.aggregations.metrics.avg.InternalAvg;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 
 public class ElasticSearchAutoScaleStatsCollector extends AutoScaleStatsCollector implements Configurable{
 
@@ -94,17 +97,15 @@ public class ElasticSearchAutoScaleStatsCollector extends AutoScaleStatsCollecto
     }
 
     private SearchResponse queryForStats(String autoScaleGroupUUID, String counterName, Integer duration) {
+        QueryBuilder queryBuilder = QueryBuilders
+            .boolQuery()
+            .must(QueryBuilders.rangeQuery("time").to("now").from("now-" + duration + "s/s"))
+            .must(termQuery("autoScaleGroupUuid.raw", autoScaleGroupUUID));
+
         return elasticSearchClient.prepareSearch(ElasticSearchIndexName.value())
             .setTypes(counterName)
             .setFrom(0).setSize(0)
-            .setQuery(QueryBuilders.filteredQuery(
-                    QueryBuilders.matchAllQuery(),
-                    FilterBuilders.andFilter(
-                        FilterBuilders.rangeFilter("@timestamp").from("now-" + duration + "s/s").to("now"),
-                        FilterBuilders.termFilter("autoScaleGroupUuid.raw", autoScaleGroupUUID)
-                    )
-                )
-            )
+            .setQuery(queryBuilder)
             .addAggregation(AggregationBuilders.avg("counter_average").field("value"))
             .execute()
             .actionGet();
@@ -117,16 +118,23 @@ public class ElasticSearchAutoScaleStatsCollector extends AutoScaleStatsCollecto
         return elasticSearchClient != null;
     }
 
-    private void buildConnection(){
-        if(ElasticSearchHost.value() != null && ElasticSearchPort.value() != null && ElasticSearchClusterName.value() != null){
-            Settings settings = ImmutableSettings.settingsBuilder()
+    private void buildConnection() {
+        try {
+            if(ElasticSearchHost.value() != null && ElasticSearchPort.value() != null && ElasticSearchClusterName.value() != null){
+                Settings settings = Settings.settingsBuilder()
                     .put("cluster.name", ElasticSearchClusterName.value())
                     .put("client.transport.sniff", true)
                     .put("client.transport.ping_timeout", "30s")
                     .put("client.transport.nodes_sampler_interval", "10s")
                     .build();
-            this.elasticSearchClient = new TransportClient(settings);
-            elasticSearchClient.addTransportAddress(new InetSocketTransportAddress(ElasticSearchHost.value(), ElasticSearchPort.value()));
+                this.elasticSearchClient = TransportClient.builder().settings(settings).build();
+                elasticSearchClient.addTransportAddress(new InetSocketTransportAddress(
+                    InetAddress.getByName(ElasticSearchHost.value()),
+                    ElasticSearchPort.value())
+                );
+        }
+        } catch (UnknownHostException e) {
+            throw new RuntimeException("Error connecting to elasticsearch host", e);
         }
     }
 

@@ -20,12 +20,10 @@ public class LogStashClientImpl implements LogStashClient, Configurable {
         DatagramSocket socket = null;
         try {
             socket = new DatagramSocket();
-
+            socket.setSoTimeout(500);
             byte[] data = message.getBytes();
             DatagramPacket packet = new DatagramPacket(data, data.length, InetAddress.getByName(LogStashServer.value()), LogStashPort.value());
-
             socket.send(packet);
-            socket.setSoTimeout(500);
         } catch (Exception e) {
             s_logger.error("Error sending data to logstash", e);
             return false;
