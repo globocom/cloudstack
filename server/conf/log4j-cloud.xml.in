@@ -125,6 +125,10 @@ under the License.
         <priority value="DEBUG"/>
    </category>
 
+   <category name="com.google.api.client">
+        <priority value="DEBUG"/>
+   </category>
+
    <logger name="apiserver.com.cloud" additivity="false">
       <level value="DEBUG"/>
       <appender-ref ref="APISERVER"/>

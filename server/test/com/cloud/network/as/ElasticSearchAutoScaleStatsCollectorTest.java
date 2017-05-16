@@ -16,26 +16,14 @@
 // under the License.
 package com.cloud.network.as;
 
-import org.elasticsearch.action.ListenableActionFuture;
-import org.elasticsearch.action.search.SearchRequestBuilder;
-import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.client.transport.TransportClient;
-import org.elasticsearch.index.query.QueryBuilder;
-import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
-import org.elasticsearch.search.aggregations.Aggregation;
-import org.elasticsearch.search.aggregations.Aggregations;
-import org.elasticsearch.search.aggregations.metrics.avg.InternalAvg;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.HashMap;
 import java.util.Map;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 
 public class ElasticSearchAutoScaleStatsCollectorTest extends AutoScaleStatsCollectorTest{
 
@@ -72,26 +60,48 @@ public class ElasticSearchAutoScaleStatsCollectorTest extends AutoScaleStatsColl
         assert countersSummary.get("cpu") == null;
     }
 
+
+    @Test
+    public void testBuildQuery() {
+
+        ElasticSearchAutoScaleStatsCollector elasticCollector =  new ElasticSearchAutoScaleStatsCollector();
+
+        String query = elasticCollector.buildQuery("abc", 10);
+
+        assertNotNull(query);
+
+        System.out.println(query);
+
+        assertTrue(query.contains("from"));
+        assertTrue(query.contains("to"));
+
+
+        assertTrue(query.startsWith("{"));
+        assertTrue(query.endsWith("}"));
+
+        assertTrue(query.contains("\"autoScaleGroupUuid.raw\":\"abc\""));
+    }
+
     private void mockElasticSearchClient(Double average){
-        TransportClient client = mock(TransportClient.class);
-        SearchRequestBuilder searchRequestBuilder = mock(SearchRequestBuilder.class);
-        ListenableActionFuture listenableActionFuture = mock(ListenableActionFuture.class);
-        SearchResponse searchResponse = mock(SearchResponse.class);
-        Aggregations aggregations = mock(Aggregations.class);
-        Map<String, Aggregation> aggregationResponse = new HashMap<>();
-        aggregationResponse.put("counter_average", new InternalAvg("counter_average", average != null ? average : Double.NaN, 1));
-
-        when(client.prepareSearch(anyString())).thenReturn(searchRequestBuilder);
-        when(searchRequestBuilder.setTypes(anyString())).thenReturn(searchRequestBuilder);
-        when(searchRequestBuilder.setFrom(anyInt())).thenReturn(searchRequestBuilder);
-        when(searchRequestBuilder.setSize(anyInt())).thenReturn(searchRequestBuilder);
-        when(searchRequestBuilder.setQuery(any(QueryBuilder.class))).thenReturn(searchRequestBuilder);
-        when(searchRequestBuilder.addAggregation(any(AbstractAggregationBuilder.class))).thenReturn(searchRequestBuilder);
-        when(searchRequestBuilder.execute()).thenReturn(listenableActionFuture);
-        when(listenableActionFuture.actionGet()).thenReturn(searchResponse);
-        when(searchResponse.getAggregations()).thenReturn(aggregations);
-        when(aggregations.asMap()).thenReturn(aggregationResponse);
-
-        ((ElasticSearchAutoScaleStatsCollector)autoScaleStatsCollector).elasticSearchClient = client;
+//        TransportClient client = mock(TransportClient.class);
+//        SearchRequestBuilder searchRequestBuilder = mock(SearchRequestBuilder.class);
+//        ListenableActionFuture listenableActionFuture = mock(ListenableActionFuture.class);
+//        SearchResponse searchResponse = mock(SearchResponse.class);
+//        Aggregations aggregations = mock(Aggregations.class);
+//        Map<String, Aggregation> aggregationResponse = new HashMap<>();
+//        aggregationResponse.put("counter_average", new InternalAvg("counter_average", average != null ? average : Double.NaN, 1));
+//
+//        when(client.prepareSearch(anyString())).thenReturn(searchRequestBuilder);
+//        when(searchRequestBuilder.setTypes(anyString())).thenReturn(searchRequestBuilder);
+//        when(searchRequestBuilder.setFrom(anyInt())).thenReturn(searchRequestBuilder);
+//        when(searchRequestBuilder.setSize(anyInt())).thenReturn(searchRequestBuilder);
+//        when(searchRequestBuilder.setQuery(any(QueryBuilder.class))).thenReturn(searchRequestBuilder);
+//        when(searchRequestBuilder.addAggregation(any(AbstractAggregationBuilder.class))).thenReturn(searchRequestBuilder);
+//        when(searchRequestBuilder.execute()).thenReturn(listenableActionFuture);
+//        when(listenableActionFuture.actionGet()).thenReturn(searchResponse);
+//        when(searchResponse.getAggregations()).thenReturn(aggregations);
+//        when(aggregations.asMap()).thenReturn(aggregationResponse);
+//
+//        ((ElasticSearchAutoScaleStatsCollector)autoScaleStatsCollector).elasticSearchClient = client;
     }
 }

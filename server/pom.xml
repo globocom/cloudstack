@@ -154,6 +154,21 @@
       <artifactId>opensaml</artifactId>
       <version>${cs.opensaml.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.google.http-client</groupId>
+      <artifactId>google-http-client-jackson2</artifactId>
+      <version>1.17.0-rc</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.http-client</groupId>
+      <artifactId>google-http-client</artifactId>
+      <version>1.17.0-rc</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.http-client</groupId>
+      <artifactId>google-http-client-xml</artifactId>
+      <version>1.17.0-rc</version>
+    </dependency>
   </dependencies>
   <build>
     <testResources>
