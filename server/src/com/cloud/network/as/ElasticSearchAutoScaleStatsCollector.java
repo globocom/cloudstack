@@ -19,30 +19,10 @@ package com.cloud.network.as;
 import com.cloud.utils.Pair;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.vm.VMInstanceVO;
-import com.google.api.client.http.ByteArrayContent;
-import com.google.api.client.http.GenericUrl;
-import com.google.api.client.http.HttpContent;
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpRequestFactory;
-import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpResponse;
-import com.google.api.client.http.HttpResponseException;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-
-//import com.google.api.client.http.json.JsonHttpContent;
 import com.google.api.client.json.GenericJson;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.JsonObjectParser;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.client.util.Key;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.Charset;
+import com.google.api.client.util.ArrayMap;
+import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Level;
 import org.apache.cloudstack.framework.config.ConfigKey;
 import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.log4j.Logger;
@@ -75,14 +55,11 @@ public class ElasticSearchAutoScaleStatsCollector extends AutoScaleStatsCollecto
     private static final Logger s_logger = Logger.getLogger(ElasticSearchAutoScaleStatsCollector.class.getName());
 
 
-    static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
-    static final JsonFactory JSON_FACTORY = new JacksonFactory();
+    private SimpleHttp simpleHttp;
 
-    private static final Charset DEFAULT_CHARSET = Charset.forName("UTF-8");
-    private volatile HttpRequestFactory requestFactory;
 
     public ElasticSearchAutoScaleStatsCollector(){
-        this.requestFactory = getRequestFactory();
+        this.simpleHttp = new SimpleHttp();
     }
 
     @Override
@@ -91,8 +68,14 @@ public class ElasticSearchAutoScaleStatsCollector extends AutoScaleStatsCollecto
             s_logger.debug("[AutoScale] Collecting ElasticSearch data.");
         }
 
-        if(!connectionIsSet())
+        if(vmList == null || vmList.size() == 0){
             return null;
+        }
+
+        if(!connectionIsSet()) {
+            s_logger.debug("[AutoScale] connection not setted.");
+            return null;
+        }
 
         Map<String, Double> avgSummary = new HashMap<>();
         List<Pair<String, Integer>> counterNameAndDuration = this.getPairOfCounterNameAndDuration(asGroup);
@@ -121,56 +104,28 @@ public class ElasticSearchAutoScaleStatsCollector extends AutoScaleStatsCollecto
     }
 
     protected Double queryForStats(String autoScaleGroupUUID, String counterName, Integer duration) {
-        try{
-            String query = buildQuery(autoScaleGroupUUID, duration);
-            HttpRequest request;
 
-            final byte [] contentBytes = query.getBytes();
-            HttpContent body = new ByteArrayContent("application/json", contentBytes );
-
-            HttpRequestFactory requestFactory = this.getRequestFactory();
-
-            GenericUrl url = getUrl(counterName);
-            request = requestFactory.buildRequest("POST", url, body);
-
-            request.setLoggingEnabled(true);
-
-            s_logger.debug("[AutoScale] searching autoscalegroup: " + autoScaleGroupUUID + ", url:" + request.getUrl().toString() + ", result: " + query);
-            HttpResponse response = request.execute();
-
-            String responseContent = response.parseAsString();
-            Integer statusCode = response.getStatusCode();
-
-            s_logger.debug("[AutoScale] results metrics autoscalegroup: " + autoScaleGroupUUID + ", statusCode:" + statusCode + ", result: " + responseContent);
-
-            MetricResult result = parse(responseContent, MetricResult.class);
-
-            return result.getValue();
-        } catch (HttpResponseException httpException){
-            s_logger.error("[AutoScale] error while get metrics. StatusCode: " + httpException.getStatusCode() + ", Content: " + httpException.getContent() + ", msg:" + httpException.getMessage(), httpException);
-
-
-            throw new CloudRuntimeException("error searching autoscale metrics", httpException);
-        } catch (IOException e) {
-            s_logger.error("IOError " , e);
-            throw new CloudRuntimeException("error searching autoscale metrics", e);
-        }
-
-    }
-
-    private GenericUrl getUrl(String counterName) {
         try {
+            String query = buildQuery(autoScaleGroupUUID, duration);
+
             String url = ElasticSearchProtocol.value() + "://" +
                     ElasticSearchHost.value() + ":" +
                     ElasticSearchPort.value().toString() + "/" +
                     ElasticSearchIndexName.value() + "/" +
                     counterName + "/_search";
 
-            return new GenericUrl(url);
-        } catch (Exception e) {
-            throw new CloudRuntimeException("Error build elasticsearch url. ", e);
+            String result = simpleHttp.post(url, query);
+            GenericJson metric = SimpleHttp.parse(result, GenericJson.class);
+            ArrayMap aggregations = (ArrayMap)metric.get("aggregations");
+            ArrayMap counterAverage = (ArrayMap)aggregations.get("counter_average");
+            return ((BigDecimal)counterAverage.get("value")).doubleValue();
+
+        }catch (Exception e) {
+            throw new CloudRuntimeException("Error while searching autoscale metrics. autoscaleGroup: " + autoScaleGroupUUID, e);
         }
     }
+
+
 
     protected String buildQuery(String autoScaleGroupUUID, Integer duration){
 
@@ -233,25 +188,10 @@ public class ElasticSearchAutoScaleStatsCollector extends AutoScaleStatsCollecto
     }
 
     private boolean connectionIsSet() {
-        return true;
+        return ElasticSearchHost.value() != null && ElasticSearchIndexName.value() != null && ElasticSearchPort.value().toString() != null;
     }
 
-    protected HttpRequestFactory getRequestFactory() {
-        if (this.requestFactory == null) {
-            synchronized (this) {
-                loadConfig();
-                this.requestFactory = HTTP_TRANSPORT.createRequestFactory(new HttpRequestInitializer() {
-                    public void initialize(HttpRequest request) throws IOException {
-                        request.setParser(new JsonObjectParser(JSON_FACTORY));
-//                        request.setReadTimeout(ElasticSearchAutoScaleStatsCollector.this.readTimeout);
-//                        request.setConnectTimeout(ElasticSearchAutoScaleStatsCollector.this.connectTimeout);
-//                        request.setNumberOfRetries(ElasticSearchAutoScaleStatsCollector.this.numberOfRetries);
-                    }
-                });
-            }
-        }
-        return this.requestFactory;
-    }
+
 
     @Override
     public String getConfigComponentName() {
@@ -263,59 +203,13 @@ public class ElasticSearchAutoScaleStatsCollector extends AutoScaleStatsCollecto
         return new ConfigKey<?>[]{ ElasticSearchPort, ElasticSearchHost, ElasticSearchClusterName, ElasticSearchIndexName };
     }
 
-    public static <T> T parse(String output, Class<T> dataType) throws CloudRuntimeException {
-        try {
-            InputStream stream = new ByteArrayInputStream(output.getBytes(DEFAULT_CHARSET));
+    public SimpleHttp getSimpleHttp() {
+        return simpleHttp;
+    }
 
-            com.google.api.client.json.JsonFactory jsonFactory = new JacksonFactory();
-            return new JsonObjectParser(jsonFactory).parseAndClose(stream, DEFAULT_CHARSET, dataType);
-
-        } catch (IOException e) {
-            throw new CloudRuntimeException("IOError trying to parse : " + output + " to " + dataType + e, e);
-        }
+    public void setSimpleHttp(SimpleHttp simpleHttp) {
+        this.simpleHttp = simpleHttp;
     }
 
 
-    public static class MetricResult extends GenericJson {
-        @Key("aggregations")
-        private Aggregations aggregations;
-
-
-        public static class Aggregations  extends GenericJson{
-            @Key("counter_average")
-            private CounterAverage counterAverage;
-
-
-            public static class CounterAverage extends GenericJson{
-                @Key("value")
-                private Double value;
-            }
-        }
-        public Double getValue() {
-            if ( aggregations != null && aggregations.counterAverage != null ) {
-                Double value = aggregations.counterAverage.value;
-                return aggregations.counterAverage.value >= 0.0 ? value : null;
-            }
-            return null;
-        }
-    }
-
-    private static void loadConfig() {
-        System.out.println("Init");
-
-//
-//        URL url = MainTester.class.getClassLoader().getResource("config.properties");
-//        System.setProperty("java.util.logging.config.file", url.getFile());
-//            System.setProperty("java.util.logging.config.file", "/Users/lucas.castro/projects/globoNetworkAPI/globoNetworkAPI-tester/src/main/resources/config.properties");
-
-        ConsoleHandler logHandler = new ConsoleHandler();
-        logHandler.setLevel(Level.ALL);
-        java.util.logging.Logger httpLogger = java.util.logging.Logger.getLogger("com.google.api.client.http");
-        httpLogger.setLevel(Level.ALL);
-        httpLogger.addHandler(logHandler);
-
-        httpLogger = java.util.logging.Logger.getLogger("com.globocom.globoNetwork.client");
-        httpLogger.setLevel(Level.CONFIG);
-        httpLogger.addHandler(logHandler);
-    }
 }
