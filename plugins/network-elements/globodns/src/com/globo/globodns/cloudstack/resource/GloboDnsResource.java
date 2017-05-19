@@ -68,6 +68,10 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
 
     private String _password;
 
+    private Integer numberOfRetries = 1;
+    private Integer connectTimeout = 20000;
+    private Integer readTimeout = 20000;;
+
     protected GloboDns _globoDns;
 
     private static final String IPV4_RECORD_TYPE = "A";
@@ -113,6 +117,22 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
         }
 
         _globoDns = GloboDns.buildHttpApi(_url, _username, _password);
+
+        if (params.containsKey("readTimeout")) {
+            readTimeout = Integer.valueOf((String)params.get("readTimeout"));
+        }
+
+        if (params.containsKey("connectTimeout")) {
+            connectTimeout = Integer.valueOf((String)params.get("connectTimeout"));
+        }
+
+        if (params.containsKey("numberOfRetries")) {
+            numberOfRetries = Integer.valueOf((String)params.get("numberOfRetries"));
+        }
+
+        _globoDns.setReadTimeout(readTimeout);
+        _globoDns.setConnectTimeout(connectTimeout);
+        _globoDns.setNumberOfRetries(numberOfRetries);
 
         return true;
     }
