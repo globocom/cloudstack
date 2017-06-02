@@ -24,6 +24,10 @@ import org.apache.cloudstack.api.InternalIdentity;
 
 public interface AutoScalePolicy extends ControlledEntity, InternalIdentity {
 
+    enum LogicalOperator{
+        OR, AND
+    }
+
     @Override
     long getId();
 
@@ -36,6 +40,8 @@ public interface AutoScalePolicy extends ControlledEntity, InternalIdentity {
     public Date getLastQuiteTime();
 
     public String getAction();
+
+    public LogicalOperator getLogicalOperator();
 
     public Integer getStep();
 

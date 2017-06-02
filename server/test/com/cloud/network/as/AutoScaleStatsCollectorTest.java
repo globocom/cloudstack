@@ -127,7 +127,7 @@ public abstract class AutoScaleStatsCollectorTest {
         autoScaleStatsCollector._asGroupPolicyDao = _asGroupPolicyDao;
 
         AutoScalePolicyDao _asPolicyDao = mock(AutoScalePolicyDao.class);
-        AutoScalePolicyVO policyUp = new AutoScalePolicyVO(1L, 1L, 60, 120, new Date(), "scaleup", 1);
+        AutoScalePolicyVO policyUp = new AutoScalePolicyVO(1L, 1L, 60, 120, new Date(), "scaleup", 1, AutoScalePolicy.LogicalOperator.AND);
         when(_asPolicyDao.findById(1L)).thenReturn(policyUp);
         autoScaleStatsCollector._asPolicyDao = _asPolicyDao;
 
@@ -163,7 +163,7 @@ public abstract class AutoScaleStatsCollectorTest {
         autoScaleStatsCollector._asGroupPolicyDao = _asGroupPolicyDao;
 
         AutoScalePolicyDao _asPolicyDao = mock(AutoScalePolicyDao.class);
-        AutoScalePolicyVO policyUp = new AutoScalePolicyVO(1L, 1L, 60, 120, new Date(), "scaleup", 1);
+        AutoScalePolicyVO policyUp = new AutoScalePolicyVO(1L, 1L, 60, 120, new Date(), "scaleup", 1, AutoScalePolicy.LogicalOperator.AND);
         when(_asPolicyDao.findById(1L)).thenReturn(policyUp);
         autoScaleStatsCollector._asPolicyDao = _asPolicyDao;
 
@@ -239,8 +239,8 @@ public abstract class AutoScaleStatsCollectorTest {
 
     protected void mockAutoScalePolicyDao() {
         AutoScalePolicyDao _asPolicyDao = mock(AutoScalePolicyDao.class);
-        AutoScalePolicyVO policyUp = new AutoScalePolicyVO(1L, 1L, 60, 120, new Date(), "scaleup", 1);
-        AutoScalePolicyVO policyDown = new AutoScalePolicyVO(1L, 1L, 60, 120, new Date(), "scaledown", 1);
+        AutoScalePolicyVO policyUp = new AutoScalePolicyVO(1L, 1L, 60, 120, new Date(), "scaleup", 1, AutoScalePolicy.LogicalOperator.AND);
+        AutoScalePolicyVO policyDown = new AutoScalePolicyVO(1L, 1L, 60, 120, new Date(), "scaledown", 1, AutoScalePolicy.LogicalOperator.AND);
         when(_asPolicyDao.findById(1L)).thenReturn(policyUp);
         when(_asPolicyDao.findById(2L)).thenReturn(policyDown);
         autoScaleStatsCollector._asPolicyDao = _asPolicyDao;

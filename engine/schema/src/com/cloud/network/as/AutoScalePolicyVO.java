@@ -21,6 +21,8 @@ import java.util.UUID;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
@@ -63,6 +65,10 @@ public class AutoScalePolicyVO implements AutoScalePolicy, InternalIdentity {
     @Temporal(value = TemporalType.TIMESTAMP)
     private Date lastQuiteTime;
 
+    @Column(name = "logical_operator", updatable = true, nullable = true)
+    @Enumerated(value = EnumType.STRING)
+    private LogicalOperator logicalOperator = LogicalOperator.AND;
+
     @Column(name = "action", updatable = false, nullable = false)
     private String action;
 
@@ -79,7 +85,7 @@ public class AutoScalePolicyVO implements AutoScalePolicy, InternalIdentity {
     }
 
     public AutoScalePolicyVO(long domainId, long accountId, int duration,
-            int quietTime, Date lastQuiteTime, String action, Integer step) {
+            int quietTime, Date lastQuiteTime, String action, Integer step, LogicalOperator logicalOperator) {
         uuid = UUID.randomUUID().toString();
         this.domainId = domainId;
         this.accountId = accountId;
@@ -88,6 +94,7 @@ public class AutoScalePolicyVO implements AutoScalePolicy, InternalIdentity {
         this.lastQuiteTime = lastQuiteTime;
         this.action = action;
         this.step = step;
+        this.logicalOperator = logicalOperator;
     }
 
     @Override
@@ -136,6 +143,14 @@ public class AutoScalePolicyVO implements AutoScalePolicy, InternalIdentity {
     }
 
     @Override
+    public LogicalOperator getLogicalOperator() {
+        if(logicalOperator == null){
+            return LogicalOperator.AND;
+        }
+        return logicalOperator;
+    }
+
+    @Override
     public Integer getStep() {
         return step;
     }
@@ -162,6 +177,10 @@ public class AutoScalePolicyVO implements AutoScalePolicy, InternalIdentity {
 
     public void setStep(Integer step) {
         this.step = step;
+    }
+
+    public void setLogicalOperator(LogicalOperator logicalOperator) {
+        this.logicalOperator = logicalOperator;
     }
 
     @Override

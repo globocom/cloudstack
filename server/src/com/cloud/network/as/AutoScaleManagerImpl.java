@@ -670,6 +670,13 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
         Integer quietTime = cmd.getQuietTime();
         String action = cmd.getAction();
         Integer step = cmd.getStep();
+        AutoScalePolicy.LogicalOperator operator;
+
+        try {
+            operator = AutoScalePolicy.LogicalOperator.valueOf(cmd.getLogicalOperator());
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidParameterValueException("The logical Operator " + cmd.getLogicalOperator() + " does not exist; Unable to create policy.");
+        }
 
         if (quietTime == null) {
             quietTime = NetUtils.DEFAULT_AUTOSCALE_POLICY_QUIET_TIME;
@@ -680,7 +687,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
             throw new InvalidParameterValueException("action is invalid, only 'scaleup' and 'scaledown' is supported");
         }
 
-        AutoScalePolicyVO policyVO = new AutoScalePolicyVO(cmd.getDomainId(), cmd.getAccountId(), duration, quietTime, null, action, step);
+        AutoScalePolicyVO policyVO = new AutoScalePolicyVO(cmd.getDomainId(), cmd.getAccountId(), duration, quietTime, null, action, step, operator);
 
         policyVO = checkValidityAndPersist(policyVO, cmd.getConditionIds());
         s_logger.info("Successfully created AutoScale Policy with Id: " + policyVO.getId());
@@ -836,6 +843,14 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
         Integer quietTime = cmd.getQuietTime();
         Integer step = cmd.getStep();
         List<Long> conditionIds = cmd.getConditionIds();
+        AutoScalePolicy.LogicalOperator operator;
+
+        try {
+            operator = AutoScalePolicy.LogicalOperator.valueOf(cmd.getLogicalOperator());
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidParameterValueException("The logical Operator " + cmd.getLogicalOperator() + " does not exist; Unable to update policy.");
+        }
+
         AutoScalePolicyVO policy = getEntityInDatabase(CallContext.current().getCallingAccount(), "Auto Scale Policy", policyId, _autoScalePolicyDao);
 
         if (duration != null) {
@@ -848,6 +863,10 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
 
         if (step != null) {
             policy.setStep(step);
+        }
+
+        if(operator != null){
+            policy.setLogicalOperator(operator);
         }
 
         List<AutoScaleVmGroupPolicyMapVO> vmGroupPolicyList = _autoScaleVmGroupPolicyMapDao.listByPolicyId(policyId);

@@ -1341,6 +1341,10 @@ cloudStack.docs = {
         desc: 'The number of virtual machines that will be created/destroyed on a scale up/down action',
         externalLink: ''
     },
+    helpScaleLogicalOperator: {
+        desc: 'Logical operator to be used between each of the policy\'s conditions',
+        externalLink: ''
+    },
     helpAutoscaleProfileNetworks: {
         desc: 'Additional networks (optional) to be added to the created VMs. The default network interface will be the load balancer\'s followed by the networks selected here.',
         externalLink: ''

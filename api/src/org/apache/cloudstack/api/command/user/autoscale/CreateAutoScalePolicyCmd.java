@@ -82,6 +82,11 @@ public class CreateAutoScalePolicyCmd extends BaseAsyncCreateCmd {
                description = "the list of IDs of the conditions that are being evaluated on every interval")
     private List<Long> conditionIds;
 
+    @Parameter(name = ApiConstants.LOGICAL_OPERATOR,
+            type = CommandType.STRING,
+            description = "logical operator to be used between all of the conditions")
+    private String logicalOperator = AutoScalePolicy.LogicalOperator.AND.name();
+
     // ///////////////////////////////////////////////////
     // ///////////////// Accessors ///////////////////////
     // ///////////////////////////////////////////////////
@@ -107,6 +112,10 @@ public class CreateAutoScalePolicyCmd extends BaseAsyncCreateCmd {
 
     public List<Long> getConditionIds() {
         return conditionIds;
+    }
+
+    public String getLogicalOperator() {
+        return logicalOperator;
     }
 
     // ///////////////////////////////////////////////////

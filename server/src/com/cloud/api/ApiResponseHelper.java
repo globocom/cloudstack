@@ -2841,6 +2841,7 @@ public class ApiResponseHelper implements ResponseGenerator {
         response.setQuietTime(policy.getQuietTime());
         response.setAction(policy.getAction());
         response.setStep(policy.getStep());
+        response.setLogicalOperator(policy.getLogicalOperator().name());
         List<ConditionVO> vos = ApiDBUtils.getAutoScalePolicyConditions(policy.getId());
         ArrayList<ConditionResponse> conditions = new ArrayList<ConditionResponse>(vos.size());
         for (ConditionVO vo : vos) {

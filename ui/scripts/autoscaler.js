@@ -147,6 +147,7 @@
                                     id: autoscaleVmGroup.scaleuppolicies[0].id,
                                     duration: autoscaleVmGroup.scaleuppolicies[0].duration,
                                     step: autoscaleVmGroup.scaleuppolicies[0].step,
+                                    logicaloperator: autoscaleVmGroup.scaleuppolicies[0].logicaloperator,
                                     conditions: []
                                 };
                                 $(autoscaleVmGroup.scaleuppolicies[0].conditions).each(function() {
@@ -163,6 +164,7 @@
                                     id: autoscaleVmGroup.scaledownpolicies[0].id,
                                     duration: autoscaleVmGroup.scaledownpolicies[0].duration,
                                     step: autoscaleVmGroup.scaledownpolicies[0].step,
+                                    logicaloperator: autoscaleVmGroup.scaledownpolicies[0].logicaloperator,
                                     conditions: []
                                 };
                                 $(autoscaleVmGroup.scaledownpolicies[0].conditions).each(function() {
@@ -1041,7 +1043,8 @@
                                                                 conditionids: scaleUpConditionIds.join(","),
                                                                 duration: args.data.scaleUpDuration,
                                                                 quiettime: args.data.quietTime,
-                                                                step: args.data.scaleUpStep
+                                                                step: args.data.scaleUpStep,
+                                                                logicaloperator: args.data.scaleUpLogicalOperator
                                                             };
                                                             $.ajax({
                                                                 url: createURL('createAutoScalePolicy'),
@@ -1081,7 +1084,8 @@
                                                                 conditionids: scaleUpConditionIds.join(","),
                                                                 duration: args.data.scaleUpDuration,
                                                                 quiettime: args.data.quietTime,
-                                                                step: args.data.scaleUpStep
+                                                                step: args.data.scaleUpStep,
+                                                                logicaloperator: args.data.scaleUpLogicalOperator
                                                             };
 
                                                             $.ajax({
@@ -1175,7 +1179,8 @@
                                                                 conditionids: scaleDownConditionIds.join(","),
                                                                 duration: args.data.scaleDownDuration,
                                                                 quiettime: args.data.quietTime,
-                                                                step: args.data.scaleDownStep
+                                                                step: args.data.scaleDownStep,
+                                                                logicaloperator: args.data.scaleDownLogicalOperator
                                                             };
                                                             $.ajax({
                                                                 url: createURL('createAutoScalePolicy'),
@@ -1215,7 +1220,8 @@
                                                                 conditionids: scaleDownConditionIds.join(","),
                                                                 duration: args.data.scaleDownDuration,
                                                                 quiettime: args.data.quietTime,
-                                                                step: args.data.scaleDownStep
+                                                                step: args.data.scaleDownStep,
+                                                                logicaloperator: args.data.scaleDownLogicalOperator
                                                             };
 
                                                             $.ajax({
