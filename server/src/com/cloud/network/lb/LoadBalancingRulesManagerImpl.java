@@ -1181,7 +1181,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
                 }
             }
 
-            List<String> vmIpsList = vmIdIpMap.get(instanceId);
+            List<String> vmIpsList = new ArrayList<>(vmIdIpMap.get(instanceId));
             String vmLbIp = null;
 
             if (vmIpsList != null) {
