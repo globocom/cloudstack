@@ -1181,11 +1181,11 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
                 }
             }
 
-            List<String> vmIpsList = new ArrayList<>(vmIdIpMap.get(instanceId));
-            String vmLbIp = null;
-
+            List<String> vmIpsList = null;
+            if(vmIdIpMap.get(instanceId) != null && !vmIdIpMap.get(instanceId).isEmpty()) {
+                vmIpsList = new ArrayList<>(vmIdIpMap.get(instanceId));
+            }
             if (vmIpsList != null) {
-
                 //check if the ips belongs to nic secondary ip
                 for (String ip: vmIpsList) {
                     // skip the primary ip from vm secondary ip comparisions
