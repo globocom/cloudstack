@@ -289,9 +289,9 @@ public class AutoScaleManagerImplTest {
 
         AutoScaleVmGroupPolicyMapVO asPolicyMap1 = new AutoScaleVmGroupPolicyMapVO(1L, 1L, false);
         AutoScaleVmGroupPolicyMapVO asPolicyMap2 = new AutoScaleVmGroupPolicyMapVO(1L, 2L, false);
-        AutoScalePolicyVO policy1 = new AutoScalePolicyVO(1L, 1L, 60, 120, null, "scaleup", 1);
+        AutoScalePolicyVO policy1 = new AutoScalePolicyVO(1L, 1L, 60, 120, null, "scaleup", 1, AutoScalePolicy.LogicalOperator.AND);
         policy1.id = 1L;
-        AutoScalePolicyVO policy2 = new AutoScalePolicyVO(1L, 1L, 60, 120, null, "scaledown", 1);
+        AutoScalePolicyVO policy2 = new AutoScalePolicyVO(1L, 1L, 60, 120, null, "scaledown", 1, AutoScalePolicy.LogicalOperator.AND);
         policy2.id = 2L;
 
         when(autoScaleVmGroupPolicyMapDao.listByVmGroupId(anyLong())).thenReturn(Arrays.asList(asPolicyMap1, asPolicyMap2));
@@ -311,9 +311,9 @@ public class AutoScaleManagerImplTest {
 
         AutoScaleVmGroupPolicyMapVO asPolicyMap1 = new AutoScaleVmGroupPolicyMapVO(1L, 1L, false);
         AutoScaleVmGroupPolicyMapVO asPolicyMap2 = new AutoScaleVmGroupPolicyMapVO(1L, 2L, false);
-        AutoScalePolicyVO policy1 = new AutoScalePolicyVO(1L, 1L, 60, 120, null, "scaleup", 1);
+        AutoScalePolicyVO policy1 = new AutoScalePolicyVO(1L, 1L, 60, 120, null, "scaleup", 1, AutoScalePolicy.LogicalOperator.AND);
         policy1.id = 1L;
-        AutoScalePolicyVO policy2 = new AutoScalePolicyVO(1L, 1L, 60, 120, null, "scaledown", 1);
+        AutoScalePolicyVO policy2 = new AutoScalePolicyVO(1L, 1L, 60, 120, null, "scaledown", 1, AutoScalePolicy.LogicalOperator.AND);
         policy2.id = 2L;
 
         when(autoScaleVmGroupPolicyMapDao.listByVmGroupId(anyLong())).thenReturn(Arrays.asList(asPolicyMap1, asPolicyMap2));

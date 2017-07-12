@@ -215,6 +215,21 @@
                                  validation: {
                                      required: true
                                  }
+                            },
+                            scaleUpLogicalOperator: {
+                                 label: 'label.scale.logicaloperator',
+                                 docID: 'helpScaleLogicalOperator',
+                                 select: function(args) {
+                                     args.response.success({
+                                         data: [{
+                                             name: 'AND',
+                                             description: 'AND'
+                                         }, {
+                                             name: 'OR',
+                                             description: 'OR'
+                                         }]
+                                     });
+                                 }
                             }
                         }
                     }
@@ -242,6 +257,21 @@
                                 validation: {
                                     required: true
                                 }
+                            },
+                            scaleDownLogicalOperator: {
+                                 label: 'label.scale.logicaloperator',
+                                 docID: 'helpScaleLogicalOperator',
+                                 select: function(args) {
+                                     args.response.success({
+                                         data: [{
+                                             name: 'AND',
+                                             description: 'AND'
+                                         }, {
+                                             name: 'OR',
+                                             description: 'OR'
+                                         }]
+                                     });
+                                 }
                             }
                         }
                     }
@@ -267,6 +297,10 @@
                     data.scaleUpPolicy ? data.scaleUpPolicy.step : 1
                 );
 
+                $scaleUpPolicyTitleForm.find('select[name=scaleUpLogicalOperator]').val(
+                    data.scaleUpPolicy ? data.scaleUpPolicy.logicaloperator : 'AND'
+                );
+
                 scaleuppolicy.context = context;
                 scaleUpPolicyForm = $scaleUpPolicy.multiEdit(scaleuppolicy);
 
@@ -284,6 +318,10 @@
 
                 $scaleDownPolicyTitleForm.find('input[name=scaleDownStep]').val(
                     data.scaleDownPolicy ? data.scaleDownPolicy.step : 1
+                );
+
+                $scaleDownPolicyTitleForm.find('select[name=scaleDownLogicalOperator]').val(
+                    data.scaleDownPolicy ? data.scaleDownPolicy.logicaloperator : 'AND'
                 );
 
                 scaledownpolicy.context = context;

@@ -18,6 +18,7 @@ package com.cloud.server.as;
 
 import com.cloud.hypervisor.Hypervisor;
 import com.cloud.network.as.AutoScaleManager;
+import com.cloud.network.as.AutoScalePolicy;
 import com.cloud.network.as.AutoScalePolicyConditionMapVO;
 import com.cloud.network.as.AutoScalePolicyVO;
 import com.cloud.network.as.AutoScaleStatsCollector;
@@ -45,12 +46,15 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
+import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyList;
@@ -70,6 +74,7 @@ public class AutoScaleMonitorTest {
     @Before
     public void setUp(){
         autoScaleMonitor = new AutoScaleMonitor();
+        autoScaleMonitor._asCounterDao = mock(CounterDao.class);
         AutoScaleVmGroupVO asGroup = new AutoScaleVmGroupVO(1L,1l, 1L, 1L, 1, 3, 80, 30, new Date(), 1, "enabled", "as-group");
         asGroups.add(asGroup);
         VMInstanceVO vm = new VMInstanceVO(1, 1, "vm-01", "vm-01", VirtualMachine.Type.Instance, 1L, Hypervisor.HypervisorType.Simulator, 1, 1, 1, false, true, 1L);
@@ -106,7 +111,7 @@ public class AutoScaleMonitorTest {
 
         //Mock scale up policy
         autoScaleMonitor._asPolicyDao = mock(AutoScalePolicyDao.class);
-        when(autoScaleMonitor._asPolicyDao.findById(anyLong())).thenReturn(new AutoScalePolicyVO(1, 1, 60, 120, new Date(1), "scaleup", 1));
+        when(autoScaleMonitor._asPolicyDao.findById(anyLong())).thenReturn(new AutoScalePolicyVO(1, 1, 60, 120, new Date(1), "scaleup", 1, AutoScalePolicy.LogicalOperator.AND));
 
         autoScaleMonitor.processAutoScaleGroup(asGroup);
 
@@ -144,7 +149,7 @@ public class AutoScaleMonitorTest {
 
         //Mock scale down policy
         autoScaleMonitor._asPolicyDao = mock(AutoScalePolicyDao.class);
-        when(autoScaleMonitor._asPolicyDao.findById(anyLong())).thenReturn(new AutoScalePolicyVO(1, 1, 60, 120, new Date(1), "scaledown", 1));
+        when(autoScaleMonitor._asPolicyDao.findById(anyLong())).thenReturn(new AutoScalePolicyVO(1, 1, 60, 120, new Date(1), "scaledown", 1, AutoScalePolicy.LogicalOperator.AND));
 
         autoScaleMonitor.processAutoScaleGroup(asGroup);
 
@@ -184,7 +189,7 @@ public class AutoScaleMonitorTest {
         //Mock scale down policy with NOW as last quiet time
         Date now = new Date();
         autoScaleMonitor._asPolicyDao = mock(AutoScalePolicyDao.class);
-        when(autoScaleMonitor._asPolicyDao.findById(anyLong())).thenReturn(new AutoScalePolicyVO(1, 1, 60, 120, now, "scaledown", 1));
+        when(autoScaleMonitor._asPolicyDao.findById(anyLong())).thenReturn(new AutoScalePolicyVO(1, 1, 60, 120, now, "scaledown", 1, AutoScalePolicy.LogicalOperator.AND));
 
         autoScaleMonitor.processAutoScaleGroup(asGroup);
 
@@ -330,6 +335,137 @@ public class AutoScaleMonitorTest {
         autoScaleMonitor.runInContext();
         verify(autoScaleMonitor.threadExecutor, times(3)).execute(any(Runnable.class));
         verify(autoScaleMonitor._asGroupDao, times(1)).listAllNotLocked();
+    }
+
+    @Test
+    public void testIsPolicyValidGivenPolicyHasOneTrueCondition(){
+        ConditionVO condition = new ConditionVO(1L, 30L, 1L, 1L, Condition.Operator.GT);
+        when(autoScaleMonitor._asCounterDao.findById(1L)).thenReturn(new CounterVO(Counter.Source.cpu, "cpu", ""));
+
+        Map<String, Double> avgSummary = new HashMap<>();
+        avgSummary.put("cpu", 50.0);
+        assertTrue(autoScaleMonitor.isPolicyValid(avgSummary, Collections.singletonList(condition), AutoScalePolicy.LogicalOperator.AND));
+    }
+
+    @Test
+    public void testIsPolicyValidGivenPolicyHasOneFalseCondition(){
+        ConditionVO condition = new ConditionVO(1L, 50, 1L, 1L, Condition.Operator.GT);
+        when(autoScaleMonitor._asCounterDao.findById(1L)).thenReturn(new CounterVO(Counter.Source.cpu, "cpu", ""));
+
+        Map<String, Double> avgSummary = new HashMap<>();
+        avgSummary.put("cpu", 1.0);
+        assertFalse(autoScaleMonitor.isPolicyValid(avgSummary, Collections.singletonList(condition), AutoScalePolicy.LogicalOperator.AND));
+    }
+
+    @Test
+    public void testIsPolicyValidGivenPolicyHasTwoTrueConditionsAndLogicalOperatorAND(){
+        ConditionVO condition1 = new ConditionVO(1L, 50, 1L, 1L, Condition.Operator.GT);
+        ConditionVO condition2 = new ConditionVO(2L, 50, 1L, 1L, Condition.Operator.GT);
+        when(autoScaleMonitor._asCounterDao.findById(1L)).thenReturn(new CounterVO(Counter.Source.cpu, "cpu", ""));
+        when(autoScaleMonitor._asCounterDao.findById(2L)).thenReturn(new CounterVO(Counter.Source.memory, "memory", ""));
+
+        Map<String, Double> avgSummary = new HashMap<>();
+        avgSummary.put("cpu", 100.0);
+        avgSummary.put("memory", 100.0);
+        assertTrue(autoScaleMonitor.isPolicyValid(avgSummary, Arrays.asList(condition1, condition2), AutoScalePolicy.LogicalOperator.AND));
+    }
+    @Test
+    public void testIsPolicyValidGivenPolicyHasTwoFalseConditionsAndLogicalOperatorAND(){
+        ConditionVO condition1 = new ConditionVO(1L, 50, 1L, 1L, Condition.Operator.GT);
+        ConditionVO condition2 = new ConditionVO(2L, 50, 1L, 1L, Condition.Operator.GT);
+        when(autoScaleMonitor._asCounterDao.findById(1L)).thenReturn(new CounterVO(Counter.Source.cpu, "cpu", ""));
+        when(autoScaleMonitor._asCounterDao.findById(2L)).thenReturn(new CounterVO(Counter.Source.memory, "memory", ""));
+
+        Map<String, Double> avgSummary = new HashMap<>();
+        avgSummary.put("cpu", 1.0);
+        avgSummary.put("memory", 1.0);
+        assertFalse(autoScaleMonitor.isPolicyValid(avgSummary, Arrays.asList(condition1, condition2), AutoScalePolicy.LogicalOperator.AND));
+    }
+
+    @Test
+    public void testIsPolicyValidGivenPolicyHasTrueAndFalseConditionsAndLogicalOperatorAND(){
+        ConditionVO condition1 = new ConditionVO(1L, 50, 1L, 1L, Condition.Operator.GT);
+        ConditionVO condition2 = new ConditionVO(2L, 50, 1L, 1L, Condition.Operator.GT);
+        when(autoScaleMonitor._asCounterDao.findById(1L)).thenReturn(new CounterVO(Counter.Source.cpu, "cpu", ""));
+        when(autoScaleMonitor._asCounterDao.findById(2L)).thenReturn(new CounterVO(Counter.Source.memory, "memory", ""));
+
+        Map<String, Double> avgSummary = new HashMap<>();
+        avgSummary.put("cpu", 1.0);
+        avgSummary.put("memory", 100.0);
+        assertFalse(autoScaleMonitor.isPolicyValid(avgSummary, Arrays.asList(condition1, condition2), AutoScalePolicy.LogicalOperator.AND));
+    }
+
+    @Test
+    public void testIsPolicyValidGivenPolicyHasTwoTrueConditionsAndLogicalOperatorOR(){
+        ConditionVO condition1 = new ConditionVO(1L, 50, 1L, 1L, Condition.Operator.GT);
+        ConditionVO condition2 = new ConditionVO(2L, 50, 1L, 1L, Condition.Operator.GT);
+        when(autoScaleMonitor._asCounterDao.findById(1L)).thenReturn(new CounterVO(Counter.Source.cpu, "cpu", ""));
+        when(autoScaleMonitor._asCounterDao.findById(2L)).thenReturn(new CounterVO(Counter.Source.memory, "memory", ""));
+
+        Map<String, Double> avgSummary = new HashMap<>();
+        avgSummary.put("cpu", 100.0);
+        avgSummary.put("memory", 100.0);
+        assertTrue(autoScaleMonitor.isPolicyValid(avgSummary, Arrays.asList(condition1, condition2), AutoScalePolicy.LogicalOperator.OR));
+    }
+    @Test
+    public void testIsPolicyValidGivenPolicyHasTwoFalseConditionsAndLogicalOperatorOR(){
+        ConditionVO condition1 = new ConditionVO(1L, 50, 1L, 1L, Condition.Operator.GT);
+        ConditionVO condition2 = new ConditionVO(2L, 50, 1L, 1L, Condition.Operator.GT);
+        when(autoScaleMonitor._asCounterDao.findById(1L)).thenReturn(new CounterVO(Counter.Source.cpu, "cpu", ""));
+        when(autoScaleMonitor._asCounterDao.findById(2L)).thenReturn(new CounterVO(Counter.Source.memory, "memory", ""));
+
+        Map<String, Double> avgSummary = new HashMap<>();
+        avgSummary.put("cpu", 1.0);
+        avgSummary.put("memory", 1.0);
+        assertFalse(autoScaleMonitor.isPolicyValid(avgSummary, Arrays.asList(condition1, condition2), AutoScalePolicy.LogicalOperator.OR));
+    }
+
+    @Test
+    public void testIsPolicyValidGivenPolicyHasTrueAndFalseConditionsAndLogicalOperatorOR(){
+        ConditionVO condition1 = new ConditionVO(1L, 50, 1L, 1L, Condition.Operator.GT);
+        ConditionVO condition2 = new ConditionVO(2L, 50, 1L, 1L, Condition.Operator.GT);
+        when(autoScaleMonitor._asCounterDao.findById(1L)).thenReturn(new CounterVO(Counter.Source.cpu, "cpu", ""));
+        when(autoScaleMonitor._asCounterDao.findById(2L)).thenReturn(new CounterVO(Counter.Source.memory, "memory", ""));
+
+        Map<String, Double> avgSummary = new HashMap<>();
+        avgSummary.put("cpu", 1.0);
+        avgSummary.put("memory", 100.0);
+        assertTrue(autoScaleMonitor.isPolicyValid(avgSummary, Arrays.asList(condition1, condition2), AutoScalePolicy.LogicalOperator.OR));
+    }
+
+    @Test
+    public void testIsConditionValidGreaterThanOperator(){
+        assertTrue(autoScaleMonitor.isConditionValid(50, 60.0, Condition.Operator.GT));
+        assertFalse(autoScaleMonitor.isConditionValid(50, 50.0, Condition.Operator.GT));
+        assertFalse(autoScaleMonitor.isConditionValid(50, 49.0, Condition.Operator.GT));
+    }
+
+    @Test
+    public void testIsConditionValidGreaterThanEqualsOperator(){
+        assertTrue(autoScaleMonitor.isConditionValid(50, 60.0, Condition.Operator.GE));
+        assertTrue(autoScaleMonitor.isConditionValid(50, 50.0, Condition.Operator.GE));
+        assertFalse(autoScaleMonitor.isConditionValid(50, 49.0, Condition.Operator.GE));
+    }
+
+    @Test
+    public void testIsConditionValidEqualsOperator(){
+        assertFalse(autoScaleMonitor.isConditionValid(50, 60.0, Condition.Operator.EQ));
+        assertTrue(autoScaleMonitor.isConditionValid(50, 50.0, Condition.Operator.EQ));
+        assertFalse(autoScaleMonitor.isConditionValid(50, 49.0, Condition.Operator.EQ));
+    }
+
+    @Test
+    public void testIsConditionValidLesserThanOperator(){
+        assertFalse(autoScaleMonitor.isConditionValid(50, 60.0, Condition.Operator.LT));
+        assertFalse(autoScaleMonitor.isConditionValid(50, 50.0, Condition.Operator.LT));
+        assertTrue(autoScaleMonitor.isConditionValid(50, 49.0, Condition.Operator.LT));
+    }
+
+    @Test
+    public void testIsConditionValidLesserThanEqualsOperator(){
+        assertFalse(autoScaleMonitor.isConditionValid(50, 60.0, Condition.Operator.LE));
+        assertTrue(autoScaleMonitor.isConditionValid(50, 50.0, Condition.Operator.LE));
+        assertTrue(autoScaleMonitor.isConditionValid(50, 49.0, Condition.Operator.LE));
     }
 
     protected void mockAutoScaleGroupDao(){

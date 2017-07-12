@@ -56,6 +56,7 @@ import com.globo.globonetwork.cloudstack.commands.GetPoolLBByIdCommand;
 import com.globo.globonetwork.cloudstack.commands.ListExpectedHealthchecksCommand;
 import com.globo.globonetwork.cloudstack.commands.ListPoolLBCommand;
 import com.globo.globonetwork.cloudstack.commands.UpdatePoolCommand;
+import com.globo.globonetwork.cloudstack.commands.ValidateVipUpdateCommand;
 import com.globo.globonetwork.cloudstack.response.CheckDSREnabledResponse;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkExpectHealthcheckResponse;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
@@ -203,13 +204,9 @@ import com.globo.globonetwork.cloudstack.api.AcquireNewIpForLbInGloboNetworkCmd;
 import com.globo.globonetwork.cloudstack.api.AddGloboNetworkEnvironmentCmd;
 import com.globo.globonetwork.cloudstack.api.AddGloboNetworkHostCmd;
 import com.globo.globonetwork.cloudstack.api.AddGloboNetworkLBEnvironmentCmd;
-import com.globo.globonetwork.cloudstack.api.AddGloboNetworkRealToVipCmd;
-import com.globo.globonetwork.cloudstack.api.AddGloboNetworkVipToAccountCmd;
 import com.globo.globonetwork.cloudstack.api.AddNetworkViaGloboNetworkCmd;
-import com.globo.globonetwork.cloudstack.api.DelGloboNetworkRealFromVipCmd;
 import com.globo.globonetwork.cloudstack.api.DeleteNetworkInGloboNetworkCmd;
 import com.globo.globonetwork.cloudstack.api.DisassociateIpAddrFromGloboNetworkCmd;
-import com.globo.globonetwork.cloudstack.api.GenerateUrlForEditingVipCmd;
 import com.globo.globonetwork.cloudstack.api.ImportGloboNetworkLoadBalancerCmd;
 import com.globo.globonetwork.cloudstack.api.ListAllEnvironmentsFromGloboNetworkCmd;
 import com.globo.globonetwork.cloudstack.api.ListGloboNetworkCapabilitiesCmd;
@@ -219,15 +216,11 @@ import com.globo.globonetwork.cloudstack.api.ListGloboNetworkRealsCmd;
 import com.globo.globonetwork.cloudstack.api.ListGloboNetworkVipsCmd;
 import com.globo.globonetwork.cloudstack.api.RemoveGloboNetworkEnvironmentCmd;
 import com.globo.globonetwork.cloudstack.api.RemoveGloboNetworkLBEnvironmentCmd;
-import com.globo.globonetwork.cloudstack.api.RemoveGloboNetworkVipCmd;
 import com.globo.globonetwork.cloudstack.commands.AcquireNewIpForLbCommand;
 import com.globo.globonetwork.cloudstack.commands.ActivateNetworkCommand;
-import com.globo.globonetwork.cloudstack.commands.AddAndEnableRealInGloboNetworkCommand;
 
 import com.globo.globonetwork.cloudstack.commands.CreateNewVlanInGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.commands.DeallocateVlanFromGloboNetworkCommand;
-import com.globo.globonetwork.cloudstack.commands.DisableAndRemoveRealInGloboNetworkCommand;
-import com.globo.globonetwork.cloudstack.commands.GenerateUrlForEditingVipCommand;
 import com.globo.globonetwork.cloudstack.commands.GetVipInfoFromGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.commands.GetVlanInfoFromGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.commands.GloboNetworkErrorAnswer;
@@ -1045,13 +1038,9 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         cmdList.add(AddGloboNetworkEnvironmentCmd.class);
         cmdList.add(AddGloboNetworkHostCmd.class);
         cmdList.add(AddGloboNetworkLBEnvironmentCmd.class);
-        cmdList.add(AddGloboNetworkRealToVipCmd.class);
-        cmdList.add(AddGloboNetworkVipToAccountCmd.class);
         cmdList.add(AddNetworkViaGloboNetworkCmd.class);
         cmdList.add(DeleteNetworkInGloboNetworkCmd.class);
-        cmdList.add(DelGloboNetworkRealFromVipCmd.class);
         cmdList.add(DisassociateIpAddrFromGloboNetworkCmd.class);
-        cmdList.add(GenerateUrlForEditingVipCmd.class);
         cmdList.add(ImportGloboNetworkLoadBalancerCmd.class);
         cmdList.add(ListAllEnvironmentsFromGloboNetworkCmd.class);
         cmdList.add(ListGloboNetworkCapabilitiesCmd.class);
@@ -1062,8 +1051,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         cmdList.add(ListGloboNetworkVipsCmd.class);
         cmdList.add(RemoveGloboNetworkEnvironmentCmd.class);
         cmdList.add(RemoveGloboNetworkLBEnvironmentCmd.class);
-        cmdList.add(RemoveGloboNetworkVipCmd.class);
-        cmdList.add(ListGloboNetworkLBCacheGroupsCmd.class);
+        cmdList.add(ListGloboNetworkLBCacheGroupsCmd .class);
         cmdList.add(ListGloboNetworkPoolsCmd.class);
         cmdList.add(ListGloboNetworkExpectedHealthchecksCmd.class);
         cmdList.add(GetGloboNetworkPoolCmd.class);
@@ -1497,90 +1485,6 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
     }
 
     @Override
-    public GloboNetworkVipAccVO addGloboNetworkVipToAcc(Long globoNetworkVipId, Long networkId) {
-
-        Account caller = CallContext.current().getCallingAccount();
-        Network network = null;
-        if (networkId != null) {
-            network = _ntwkDao.findById(networkId);
-            if (network == null) {
-                throw new InvalidParameterValueException("Unable to find a network having the specified network id");
-            }
-        } else {
-            throw new InvalidParameterValueException("Invalid networkId: " + networkId);
-        }
-        // Perform account permission check on network
-        _accountMgr.checkAccess(caller, null, true, network);
-
-        boolean isv6 = this.isNetworkv6(network);
-
-        GetVipInfoFromGloboNetworkCommand cmd = new GetVipInfoFromGloboNetworkCommand(globoNetworkVipId, isv6);
-        Answer answer = this.callCommand(cmd, network.getDataCenterId());
-        String msg = "Could not validate VIP id with GloboNetwork";
-        if (answer == null || !answer.getResult()) {
-            msg = answer == null ? msg : answer.getDetails();
-            throw new CloudRuntimeException(msg);
-        }
-
-        // TODO Remove accountId
-        Long accountId = network.getAccountId();
-        GloboNetworkVipAccVO globoNetworkVipAcc = _globoNetworkVipAccDao.findGloboNetworkVipAcc(globoNetworkVipId, accountId, networkId);
-        if (globoNetworkVipAcc != null) {
-            // Already exists, continue
-            s_logger.info("Association between VIP " + globoNetworkVipId + " and network " + networkId + " already exists");
-        } else {
-            globoNetworkVipAcc = new GloboNetworkVipAccVO(globoNetworkVipId, accountId, networkId);
-            _globoNetworkVipAccDao.persist(globoNetworkVipAcc);
-        }
-
-        return globoNetworkVipAcc;
-    }
-
-    @Override
-    public void associateNicToVip(Long vipId, Nic nic) {
-        VMInstanceVO vm = _vmDao.findById(nic.getInstanceId());
-        if (vm == null) {
-            throw new CloudRuntimeException("There is no VM that belongs to nic " + nic);
-        }
-
-        GloboNetworkVipAccVO globoNetworkVipVO = _globoNetworkVipAccDao.findGloboNetworkVip(vipId, nic.getNetworkId());
-        if (globoNetworkVipVO == null) {
-            throw new InvalidParameterValueException("Vip " + vipId + " is not associated with Cloudstack");
-        }
-
-        Network network = _ntwkDao.findById(nic.getNetworkId());
-        if (network == null) {
-            throw new InvalidParameterValueException("Network " + nic.getNetworkId() + " doesn't exist in Cloudstack");
-        }
-
-        AddAndEnableRealInGloboNetworkCommand cmd = new AddAndEnableRealInGloboNetworkCommand();
-        cmd.setEquipName(getEquipNameFromUuid(vm.getUuid()));
-        cmd.setIp((nic.getIp4Address() != null ? nic.getIp4Address() : nic.getIp6Address()));
-        cmd.setVipId(vipId);
-        Answer answer = callCommand(cmd, network.getDataCenterId());
-        if (answer == null || !answer.getResult()) {
-            throw new CloudRuntimeException("Error associating nic " + nic + " to vip " + vipId + ": " + (answer == null ? null : answer.getDetails()));
-        }
-    }
-
-    @Override
-    public void disassociateNicFromVip(Long vipId, Nic nic) {
-        DisableAndRemoveRealInGloboNetworkCommand cmd = new DisableAndRemoveRealInGloboNetworkCommand();
-        VMInstanceVO vm = _vmDao.findById(nic.getInstanceId());
-        if (vm == null) {
-            throw new CloudRuntimeException("There is no VM that belongs to nic " + nic);
-        }
-        cmd.setEquipName(getEquipNameFromUuid(vm.getUuid()));
-        cmd.setIp((nic.getIp4Address() != null ? nic.getIp4Address() : nic.getIp6Address()));
-        cmd.setVipId(vipId);
-        Network network = _ntwkDao.findById(nic.getNetworkId());
-        Answer answer = callCommand(cmd, network.getDataCenterId());
-        if (answer == null || !answer.getResult()) {
-            throw new CloudRuntimeException("Error removing nic " + nic + " from vip " + vipId + ": " + (answer == null ? null : answer.getDetails()));
-        }
-    }
-
-    @Override
     public List<GloboNetworkVipResponse> listGloboNetworkVips(Long projectId) {
 
         Account caller = CallContext.current().getCallingAccount();
@@ -1659,56 +1563,6 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
         }
         return new ArrayList<GloboNetworkVipResponse>(vips.values());
-    }
-
-    @Override
-    public String generateUrlForEditingVip(Long vipId, Network network) {
-
-        GenerateUrlForEditingVipCommand cmd = new GenerateUrlForEditingVipCommand(vipId, GloboNetworkVIPServerUrl.value());
-        Answer answer = callCommand(cmd, network.getDataCenterId());
-        String msg = "Could not list VIPs from GloboNetwork";
-        if (answer == null || !answer.getResult()) {
-            msg = answer == null ? msg : answer.getDetails();
-            throw new CloudRuntimeException(msg);
-        }
-        return answer.getDetails();
-    }
-
-    @Override
-    public void removeGloboNetworkVip(Long napiVipId) {
-
-        Account caller = CallContext.current().getCallingAccount();
-
-        List<GloboNetworkVipAccVO> globoNetworkVipList = _globoNetworkVipAccDao.findByVipId(napiVipId);
-
-        if (globoNetworkVipList == null || globoNetworkVipList.isEmpty()) {
-            throw new InvalidParameterValueException("Unable to find an association for VIP " + napiVipId);
-        }
-
-        Network network = null;
-        for (GloboNetworkVipAccVO globoNetworkVipAccVO : globoNetworkVipList) {
-            network = _ntwkDao.findById(globoNetworkVipAccVO.getNetworkId());
-            if (network == null) {
-                throw new InvalidParameterValueException("Unable to find a network having the specified network id");
-            }
-            // Perform account permission check on network
-            _accountMgr.checkAccess(caller, null, true, network);
-
-            _globoNetworkVipAccDao.remove(globoNetworkVipAccVO.getId());
-
-        }
-
-        RemoveVipFromGloboNetworkCommand cmd = new RemoveVipFromGloboNetworkCommand();
-        cmd.setVipId(napiVipId);
-        cmd.setKeepIp(false);
-
-        Answer answer = this.callCommand(cmd, network.getDataCenterId());
-
-        String msg = "Could not remove VIP " + napiVipId + " from GloboNetwork";
-        if (answer == null || !answer.getResult()) {
-            msg = answer == null ? msg : answer.getDetails();
-            throw new CloudRuntimeException(msg);
-        }
     }
 
     @Override
@@ -2371,32 +2225,10 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
         // Get VIP info
         if (gnIpDetail.getGloboNetworkVipId() != null) {
-            boolean isv6 = this.isNetworkv6(network);
-
-            GetVipInfoFromGloboNetworkCommand cmd = new GetVipInfoFromGloboNetworkCommand(gnIpDetail.getGloboNetworkVipId(), isv6);
+            ValidateVipUpdateCommand cmd = new ValidateVipUpdateCommand(gnIpDetail.getGloboNetworkVipId(), rule.getName(), rule.getSourceIp().addr());
             Answer answer = this.callCommand(cmd, network.getDataCenterId(), false);
-            if (answer != null && answer.getResult()) {
-                GloboNetworkVipResponse globoNetworkVip = (GloboNetworkVipResponse)answer;
-                // TODO Store ref between lb id and globonetwork vip id to solve this situation.
-                // String port = String.format("%d:%d", rule.getSourcePortStart(), rule.getDefaultPortStart());
-                // if (!port.equals(globoNetworkVip.getPorts().get(0))) {
-                if (!rule.getSourceIp().equals(globoNetworkVip.getIp())) {
-                    throw new InvalidParameterValueException("You can create only 1 lb rule per IP.");
-                }
-                String method = globoNetworkVip.getMethod();
-                // Translating to GloboNetwork balancing methods
-                if ("least-conn".equals(method)) {
-                    method = "leastconn";
-                } else if ("round-robin".equals(method)) {
-                    method = "roundrobin";
-                }
-                if (globoNetworkVip.getCreated() && !rule.getAlgorithm().equals(method)) {
-                    throw new InvalidParameterValueException("It is not allowed to change balancing method in GloboNetwork.");
-                }
-
-                if (!globoNetworkVip.getName().equals(rule.getName())) {
-                    throw new InvalidParameterValueException("It is not allowed to change load balancer name in GloboNetwork");
-                }
+            if(!answer.getResult()){
+                throw new InvalidParameterValueException(answer.getDetails());
             }
         }
 

@@ -6,7 +6,6 @@ import com.globo.globonetwork.client.api.GloboNetworkAPI;
 import com.globo.globonetwork.client.api.OptionVipV3API;
 import com.globo.globonetwork.client.api.VipV3API;
 import com.globo.globonetwork.client.exception.GloboNetworkException;
-import com.globo.globonetwork.client.model.VipJson;
 import com.globo.globonetwork.client.model.VipPoolMap;
 import com.globo.globonetwork.client.model.VipV3;
 import com.globo.globonetwork.client.model.OptionVipV3;
@@ -290,13 +289,6 @@ public class VipAPIFacadeTest {
         vip.setId(vipId);
         vip.setCreated(created);
         vip.setOptions(new VipV3.VipOptions());
-        return vip;
-    }
-
-    private VipJson buildFakeVipV2(Long vipId, Boolean created) throws GloboNetworkException {
-        VipJson vip = new VipJson();
-        vip.setId(vipId);
-        vip.setCreated(created);
         return vip;
     }
 

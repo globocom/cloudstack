@@ -78,6 +78,11 @@ public class UpdateAutoScalePolicyCmd extends BaseAsyncCmd {
             description = "the number of vms that will be created/destroyed")
     private Integer step = 1;
 
+    @Parameter(name = ApiConstants.LOGICAL_OPERATOR,
+            type = CommandType.STRING,
+            description = "logical operator to be used between all of the conditions")
+    private String logicalOperator;
+
     @Override
     public void execute() {
         CallContext.current().setEventDetails("AutoScale Policy Id: " + getId());
@@ -113,6 +118,10 @@ public class UpdateAutoScalePolicyCmd extends BaseAsyncCmd {
 
     public Integer getStep() {
         return step;
+    }
+
+    public String getLogicalOperator() {
+        return logicalOperator;
     }
 
     @Override

@@ -42,13 +42,11 @@ import com.cloud.network.Network;
 import com.cloud.network.addr.PublicIp;
 import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.network.rules.LoadBalancer;
-import com.cloud.vm.Nic;
 import com.cloud.vm.NicProfile;
 import com.cloud.vm.VirtualMachineProfile;
 import com.globo.globonetwork.client.model.Vlan;
 import com.globo.globonetwork.cloudstack.GloboNetworkEnvironmentVO;
 import com.globo.globonetwork.cloudstack.GloboNetworkLoadBalancerEnvironment;
-import com.globo.globonetwork.cloudstack.GloboNetworkVipAccVO;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkAllEnvironmentResponse.Environment;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkVipResponse;
 import org.apache.cloudstack.globoconfig.GloboResourceConfigurationVO;
@@ -228,36 +226,6 @@ public interface GloboNetworkService {
     public List<String> listAllowedLbSuffixes();
 
     public boolean destroyGloboNetwork(long networkId, boolean forced);
-
-    /**
-    * Associate GloboNetwork VIP to an account and network in Cloudstack
-    * @param networkId
-    * @param globoNetworkVipId
-     * @return
-     */
-    public GloboNetworkVipAccVO addGloboNetworkVipToAcc(Long networkId, Long globoNetworkVipId);
-
-    /**
-     * Associate nic (real) to GloboNetwork Vip.
-     * @param vipId
-     * @param nicId
-     */
-    public void associateNicToVip(Long vipId, Nic nic);
-
-    /**
-     * Deassociate nic (real) from GloboNetwork Vip.
-     * @param vipId
-     * @param nicId
-     */
-    public void disassociateNicFromVip(Long vipId, Nic nic);
-
-    public String generateUrlForEditingVip(Long vipId, Network network);
-
-    /**
-     * Remove Load Balancer (VIP) from GloboNetwork
-     * @param globoNetworkVipId
-     */
-    public void removeGloboNetworkVip(Long globoNetworkVipId);
 
     public List<GloboNetworkVipResponse.Real> listGloboNetworkReals(Long vipId);
 

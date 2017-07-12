@@ -55,7 +55,6 @@ import com.cloud.utils.db.TransactionCallbackWithException;
 import com.cloud.utils.db.TransactionStatus;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.vm.NicProfile;
-import com.cloud.vm.NicVO;
 import com.cloud.vm.ReservationContext;
 import com.cloud.vm.VirtualMachineProfile;
 import com.globo.globonetwork.cloudstack.GloboNetworkVipAccVO;
@@ -218,15 +217,7 @@ public class GloboNetworkGuru extends GuestNetworkGuru {
 
     @Override
     public void deallocate(Network network, NicProfile nic, VirtualMachineProfile vm) {
-
         s_logger.debug("Asking GuestNetworkGuru to deallocate NIC " + nic.toString() + " from VM " + vm.getInstanceName());
-
-        long networkId = nic.getNetworkId();
-        List<GloboNetworkVipAccVO> vips = _globoNetworkVipDao.findByNetwork(networkId);
-        for (GloboNetworkVipAccVO vip : vips) {
-            NicVO nicVO = _nicDao.findById(nic.getId());
-            _globoNetworkService.disassociateNicFromVip(vip.getGloboNetworkVipId(), nicVO);
-        }
 
         // Remove vm from any load balancer prior to deallocating it
         if (_globoNetworkService.removeVmFromLoadBalancer(vm)) {

@@ -17,6 +17,7 @@
 package com.cloud.server.as;
 
 import com.cloud.hypervisor.Hypervisor;
+import com.cloud.network.as.AutoScalePolicy;
 import com.cloud.network.as.AutoScalePolicyConditionMapVO;
 import com.cloud.network.as.AutoScalePolicyVO;
 import com.cloud.network.as.AutoScaleVmGroupPolicyMapVO;
@@ -276,6 +277,6 @@ public class AutoScaleCounterCollectorTest {
     }
 
     private AutoScalePolicyVO createAutoScalePolicy() {
-        return new AutoScalePolicyVO(1, 1, 1, 120, new Date(), "scaleup", 1);
+        return new AutoScalePolicyVO(1, 1, 1, 120, new Date(), "scaleup", 1, AutoScalePolicy.LogicalOperator.AND);
     }
 }

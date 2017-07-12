@@ -231,35 +231,10 @@ public class AutoScaleMonitor extends ManagedContextRunnable implements Configur
 
                 // check quite time for this policy
                 if (now - lastQuietTime >= quietTime) {
-                    // list all condition of this policy
-                    boolean isPolicyValid = true;
                     List<ConditionVO> conditions = getConditionsByPolicyId(policy.getId());
 
                     if (conditions != null && !conditions.isEmpty()) {
-                        // check whole conditions of this policy
-                        for (ConditionVO conditionVO : conditions) {
-                            long thresholdValue = conditionVO.getThreshold();
-                            CounterVO counter = _asCounterDao.findById(conditionVO.getCounterid());
-
-                            Double avg = counterSummary.get(counter.getSource().name());
-                            if(avg == null){
-                                isPolicyValid = false;
-                                break;
-                            }
-                            Condition.Operator op = conditionVO.getRelationalOperator();
-
-                            boolean isConditionValid = ((op == Condition.Operator.EQ) && (thresholdValue == avg))
-                                    || ((op == Condition.Operator.GE) && (avg >= thresholdValue))
-                                    || ((op == Condition.Operator.GT) && (avg > thresholdValue))
-                                    || ((op == Condition.Operator.LE) && (avg <= thresholdValue))
-                                    || ((op == Condition.Operator.LT) && (avg < thresholdValue));
-
-                            if (!isConditionValid) {
-                                isPolicyValid = false;
-                                break;
-                            }
-                        }
-                        if (isPolicyValid) {
+                        if (isPolicyValid(counterSummary, conditions, policy.getLogicalOperator())) {
                             return policy;
                         }
                     }
@@ -267,6 +242,46 @@ public class AutoScaleMonitor extends ManagedContextRunnable implements Configur
             }
         }
         return null;
+    }
+
+    protected boolean isPolicyValid(Map<String, Double> counterSummary, List<ConditionVO> conditions, AutoScalePolicy.LogicalOperator logicalOperator) {
+        Boolean isPolicyValid = null;
+        for (ConditionVO conditionVO : conditions) {
+            long counterThresholdValue = conditionVO.getThreshold();
+            CounterVO counter = _asCounterDao.findById(conditionVO.getCounterid());
+
+            Double counterAverageValue = counterSummary.get(counter.getSource().name());
+            if(counterAverageValue == null){
+                return false;
+            }
+
+            boolean isConditionValid = isConditionValid(counterThresholdValue, counterAverageValue, conditionVO.getRelationalOperator());
+
+            if(isPolicyValid == null){
+                isPolicyValid = isConditionValid;
+            }
+
+            if(logicalOperator == AutoScalePolicy.LogicalOperator.OR){
+                isPolicyValid = isPolicyValid || isConditionValid;
+            }else {
+                isPolicyValid = isPolicyValid && isConditionValid;
+            }
+        }
+        return isPolicyValid;
+    }
+
+    protected boolean isConditionValid(long counterThresholdValue, Double counterAverageValue, Condition.Operator operator) {
+        if(operator == Condition.Operator.EQ)
+            return counterAverageValue == counterThresholdValue;
+        if(operator == Condition.Operator.GE)
+            return counterAverageValue >=  counterThresholdValue;
+        if(operator == Condition.Operator.GT)
+            return counterAverageValue > counterThresholdValue;
+        if(operator == Condition.Operator.LE)
+            return counterAverageValue <= counterThresholdValue;
+        if(operator == Condition.Operator.LT)
+            return counterAverageValue < counterThresholdValue;
+        return false;
     }
 
     private List<ConditionVO> getConditionsByPolicyId(long policyId) {

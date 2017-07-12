@@ -54,6 +54,10 @@ public class AutoScalePolicyResponse extends BaseResponse implements ControlledE
     @Param(description = "the list of IDs of the conditions that are being evaluated on every interval")
     private List<ConditionResponse> conditions;
 
+    @SerializedName(ApiConstants.LOGICAL_OPERATOR)
+    @Param(description = "logical operator to be used between all of the conditions")
+    private String logicalOperator;
+
     @SerializedName(ApiConstants.ACCOUNT)
     @Param(description = "the account owning the autoscale policy")
     private String accountName;
@@ -101,6 +105,10 @@ public class AutoScalePolicyResponse extends BaseResponse implements ControlledE
 
     public void setConditions(List<ConditionResponse> conditions) {
         this.conditions = conditions;
+    }
+
+    public void setLogicalOperator(String logicalOperator) {
+        this.logicalOperator = logicalOperator;
     }
 
     @Override

@@ -1018,6 +1018,7 @@ $.extend(dictionary, {
 'label.duration.in.sec': '<fmt:message key="label.duration.in.sec" />',
 'label.scaleup.step': '<fmt:message key="label.scaleup.step" />',
 'label.scaledown.step': '<fmt:message key="label.scaledown.step" />',
+'label.scale.logicaloperator': '<fmt:message key="label.scale.logicaloperator" />',
 'state.detached': '<fmt:message key="state.detached" />',
 'label.na': '<fmt:message key="label.na" />',
 'label.added.network.offering': '<fmt:message key="label.added.network.offering" />',
