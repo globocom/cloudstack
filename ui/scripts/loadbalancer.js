@@ -468,7 +468,7 @@
                             }
                         }
                     },
-                    // see loadbalancer/vms.js
+                    // see loadbalancer/tabVms.js
                     vms: {},
                     pools: {
                         title: 'Pools',

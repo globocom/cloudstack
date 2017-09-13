@@ -649,10 +649,6 @@
                     });
                 }
 
-
-                /*     $input.blur(function() {
-                 console.log('tooltip remove->' + $input.attr('name'));
-                 });*/
             });
 
 
@@ -711,8 +707,6 @@
             var after = args.after;
             var context = args.context;
             var $listView = $('<div>');
-
-            console.log(args);
             listView.actions = {};
 
             if ( typeof(hideSelectAction) == 'undefined' ||
@@ -752,9 +746,9 @@
             $listView.dialog({
                 dialogClass: 'multi-edit-add-list panel',
                 width: 825,
-                title: _l('Select VM'),
+                title: args.listView.title ? args.listView.title : _l('Select VM'),
                 buttons: [{
-                    text: _l('label.apply'),
+                    text: args.listView.applyButton ? args.listView.applyButton : _l('label.apply'),
                     'class': 'ok',
                     click: function() {
                         if (!$listView.find(
