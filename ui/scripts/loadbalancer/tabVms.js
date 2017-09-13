@@ -90,7 +90,7 @@
                             var data = {};
                             listViewDataProvider(args, data);
                             data['id'] = args.context.loadbalancers[0].id;
-                            data['pagesize'] = 999;
+                            data['pagesize'] = 499;
                             //data['applied'] = false;
                             $.ajax({
                                 url: createURL("listLoadBalancerRuleInstances"),
@@ -173,7 +173,7 @@
                             listViewDataProvider(args, data);
                             data['id'] = args.context.loadbalancers[0].id;
                             data['applied'] = false;
-                            data['pagesize'] = 999;
+                            data['pagesize'] = 499;
                             $.ajax({
                                 url: createURL("listLoadBalancerRuleInstances"),
                                 data: data,
