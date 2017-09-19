@@ -39,11 +39,17 @@ import static org.mockito.Mockito.when;
 import com.cloud.exception.ResourceUnavailableException;
 import com.cloud.host.Status;
 import com.cloud.hypervisor.Hypervisor;
+import com.cloud.network.dao.IPAddressDao;
 import com.cloud.network.dao.IPAddressVO;
+import com.cloud.network.dao.LoadBalancerDao;
 import com.cloud.network.dao.LoadBalancerOptionsDao;
 import com.cloud.network.dao.LoadBalancerOptionsVO;
 import com.cloud.network.dao.LoadBalancerPortMapDao;
 import com.cloud.network.dao.LoadBalancerPortMapVO;
+import com.cloud.network.dao.LoadBalancerVO;
+import com.cloud.network.dao.NetworkVO;
+import com.cloud.network.dao.PhysicalNetworkDao;
+import com.cloud.network.dao.PhysicalNetworkVO;
 import com.cloud.network.rules.FirewallRule;
 import com.cloud.network.rules.LoadBalancer;
 import com.cloud.utils.net.Ip;
@@ -68,8 +74,6 @@ import java.util.Collections;
 import java.util.List;
 
 import com.cloud.network.Network;
-import com.cloud.network.dao.LoadBalancerVO;
-import com.cloud.network.dao.NetworkVO;
 import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.globo.globonetwork.client.model.Vlan;
@@ -114,9 +118,6 @@ import com.cloud.host.HostVO;
 import com.cloud.host.dao.HostDao;
 import com.cloud.network.Network.Provider;
 import com.cloud.network.NetworkModel;
-import com.cloud.network.dao.IPAddressDao;
-import com.cloud.network.dao.PhysicalNetworkDao;
-import com.cloud.network.dao.PhysicalNetworkVO;
 import com.cloud.network.lb.LoadBalancingRulesManager;
 import com.cloud.network.lb.LoadBalancingRulesService;
 import com.cloud.resource.ResourceManager;
@@ -1128,6 +1129,87 @@ public class GloboNetworkManagerTest {
         LoadBalancingRule rule = createMockLbRule("dummy.test.com", false);
         when(_ipAddrDao.findByIpAndNetworkId(anyLong(), anyString())).thenReturn(null);
         assertTrue(_globoNetworkService.applyLbRuleInGloboNetwork(new NetworkVO(), rule));
+    }
+
+
+    @Test(expected = CloudRuntimeException.class)
+    public void testListLinkableLoadBalancersWhenLBDoesNotExist() {
+        _globoNetworkService._loadBalancerDao = mock(LoadBalancerDao.class);
+        when(_globoNetworkService._loadBalancerDao.findById(123L)).thenReturn(null);
+
+        List<LoadBalancerVO> loadBalancerVOS = _globoNetworkService.listLinkableLoadBalancers(123L, 45L);
+    }
+
+    @Test(expected = CloudRuntimeException.class)
+    public void testListLinkableLoadBalancersWhenLBAlreadyLinked() {
+        _globoNetworkService._loadBalancerDao = mock(LoadBalancerDao.class);
+        LoadBalancerVO lbVo = new LoadBalancerVO();
+        lbVo.setUuid("123123");
+        lbVo.setName("test.lb.com");
+        when(_globoNetworkService._loadBalancerDao.findById(123L)).thenReturn(lbVo);
+
+
+        _globoNetworkService._globoResourceConfigurationDao = mock(GloboResourceConfigurationDao.class);
+        List<GloboResourceConfigurationVO> globoConfigurations = new ArrayList<>();
+        globoConfigurations.add(new GloboResourceConfigurationVO(GloboResourceType.LOAD_BALANCER, "123123", GloboResourceKey.linkedLoadBalancer, "333"));
+        when(_globoNetworkService._globoResourceConfigurationDao.getConfiguration(GloboResourceType.LOAD_BALANCER,"123123", GloboResourceKey.linkedLoadBalancer)).thenReturn(globoConfigurations);
+
+        when(_globoNetworkService._loadBalancerDao.findByUuid("333")).thenReturn(lbVo);
+
+        _globoNetworkService.listLinkableLoadBalancers(123L, 45L);
+    }
+
+
+    @Test
+    public void testListLinkableLoadBalancersEmpty() {
+        _globoNetworkService._loadBalancerDao = mock(LoadBalancerDao.class);
+        LoadBalancerVO lbVo = new LoadBalancerVO(null, "test.lb.com", "lb test", 90L, 80, 8080, "leastcon", 511L, 66L, 1L, "HTTP");
+        lbVo.setUuid("123123");
+
+
+        when(_globoNetworkService._loadBalancerDao.findById(123L)).thenReturn(lbVo);
+
+        _globoNetworkService._globoNetworkNetworkDao = mock(GloboNetworkNetworkDao.class);
+        GloboNetworkNetworkVO globonetworkRef = new GloboNetworkNetworkVO(111L, 511L, 120);
+        when(_globoNetworkService._globoNetworkNetworkDao.findByNetworkId(511L)).thenReturn(globonetworkRef);
+
+        List<LoadBalancerVO> linkablesLBs = new ArrayList<>();
+
+        when(_globoNetworkService._loadBalancerDao.listLinkables("123123", 120L, 66L)).thenReturn(linkablesLBs);
+
+
+        List<LoadBalancerVO> loadBalancerVOS = _globoNetworkService.listLinkableLoadBalancers(123L, 45L);
+        assertNotNull(loadBalancerVOS);
+        assertTrue(loadBalancerVOS.isEmpty());
+        assertEquals(0, loadBalancerVOS.size());
+
+    }
+
+
+    @Test
+    public void testListLinkableLoadBalancersNotEmpty() {
+        _globoNetworkService._loadBalancerDao = mock(LoadBalancerDao.class);
+        LoadBalancerVO lbVo = new LoadBalancerVO(null, "test.lb.com", "lb test", 90L, 80, 8080, "leastcon", 511L, 66L, 1L, "HTTP");
+        lbVo.setUuid("123123");
+
+
+        when(_globoNetworkService._loadBalancerDao.findById(123L)).thenReturn(lbVo);
+
+        _globoNetworkService._globoNetworkNetworkDao = mock(GloboNetworkNetworkDao.class);
+        GloboNetworkNetworkVO globonetworkRef = new GloboNetworkNetworkVO(111L, 511L, 120);
+        when(_globoNetworkService._globoNetworkNetworkDao.findByNetworkId(511L)).thenReturn(globonetworkRef);
+
+        List<LoadBalancerVO> linkablesLBs = new ArrayList<>();
+        LoadBalancerVO linkablesLB = new LoadBalancerVO(null, "linkable.lb.com", "lb linkable", 90L, 80, 8080, "leastcon", 511L, 66L, 1L, "HTTP");
+        linkablesLBs.add(linkablesLB);
+        when(_globoNetworkService._loadBalancerDao.listLinkables("123123", 120L, 66L)).thenReturn(linkablesLBs);
+
+
+        List<LoadBalancerVO> loadBalancerVOS = _globoNetworkService.listLinkableLoadBalancers(123L, 45L);
+        assertNotNull(loadBalancerVOS);
+        assertFalse(loadBalancerVOS.isEmpty());
+        assertEquals(1, loadBalancerVOS.size());
+
     }
 
     @Test

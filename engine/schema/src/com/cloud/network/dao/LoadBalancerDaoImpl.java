@@ -16,11 +16,17 @@
 // under the License.
 package com.cloud.network.dao;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.ejb.Local;
 import javax.inject.Inject;
 
+import com.cloud.utils.db.TransactionLegacy;
+import com.cloud.utils.exception.CloudRuntimeException;
+import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
 import com.cloud.network.rules.FirewallRule.State;
@@ -33,6 +39,8 @@ import com.cloud.utils.db.SearchCriteria.Op;
 @Component
 @Local(value = {LoadBalancerDao.class})
 public class LoadBalancerDaoImpl extends GenericDaoBase<LoadBalancerVO, Long> implements LoadBalancerDao {
+    public static final Logger s_logger = Logger.getLogger(LoadBalancerDaoImpl.class);
+
     private final SearchBuilder<LoadBalancerVO> ListByIp;
     protected final SearchBuilder<LoadBalancerVO> TransitionStateSearch;
 
@@ -75,6 +83,39 @@ public class LoadBalancerDaoImpl extends GenericDaoBase<LoadBalancerVO, Long> im
         sc.setParameters("state", State.Add.toString(), State.Revoke.toString());
         sc.setParameters("scheme", scheme);
         return listBy(sc);
+    }
+
+
+    @Override
+    public List<LoadBalancerVO> listLinkables(String uuid, long networkEnvId, long accountId) {
+        try {
+            TransactionLegacy txn = TransactionLegacy.currentTxn();
+            String sql = "SELECT f.uuid, l.name, ref.globonetwork_environment_id, f.* FROM firewall_rules f " +
+                    " INNER JOIN load_balancing_rules l on f.id = l.id " +
+                    " INNER JOIN globonetwork_network_ref ref on f.network_id = ref.network_id " +
+                    " WHERE f.uuid != ? " +
+                    " AND ref.globonetwork_environment_id = ? " +
+                    " AND f.account_id = ?; ";
+            PreparedStatement pstmt = txn.prepareAutoCloseStatement(sql);
+            pstmt.setString(1, uuid);
+            pstmt.setLong(2, networkEnvId);
+            pstmt.setLong(3, accountId);
+
+            List<LoadBalancerVO> result = new ArrayList<>();
+
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                LoadBalancerVO lb = new LoadBalancerVO();
+                lb.setUuid(rs.getString(1));
+                lb.setName(rs.getString(2));
+                result.add(lb);
+            }
+            return result;
+        } catch (Exception e) {
+            s_logger.error("Error trying list linkable load balancers, uuid: " + uuid + ", networkEnvId: " + networkEnvId + ", accountId: ", e);
+            throw new CloudRuntimeException("Unexpected error during list linkable load balalncers.", e);
+        }
+
     }
 
 }

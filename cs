@@ -108,7 +108,7 @@ case "$1" in
     mvn -Dnonoss -Pdeveloper,systemvm -Djava.awt.headless=true -Dsimulator install -DskipTests
     ;;
   compile-quick)
-    mvn -Dnonoss -Pdeveloper,systemvm -Djava.awt.headless=true -Dsimulator -pl :cloud-framework-config,:cloud-utils,:cloud-server,:cloud-api,:cloud-engine-components-api,:cloud-plugin-network-globonetwork,:cloud-plugin-network-globodns,:cloud-plugin-network-globoaclapi,:cloud-plugin-user-authenticator-oauth2,:cloud-client-ui install -DskipTests
+    mvn -Dnonoss -Pdeveloper,systemvm -Djava.awt.headless=true -Dsimulator -pl :cloud-framework-config,:cloud-utils,:cloud-engine-schema,:cloud-engine,:cloud-server,:cloud-api,:cloud-engine-components-api,:cloud-plugin-network-globonetwork,:cloud-plugin-network-globodns,:cloud-plugin-network-globoaclapi,:cloud-plugin-user-authenticator-oauth2,:cloud-client-ui install -DskipTests
     ;;
   update-js)
     rm -R $STATIC_TARGET/*.js.gz ; rm -R $STATIC_TARGET/../css/*.css.gz ; rm -R $STATIC_TARGET/loadbalancer/*.js.gz ; rm -R $STATIC_TARGET/ui/*.js.gz ; rm -R $STATIC_TARGET/ui-custom/*.js.gz ; rm -R $STATIC_TARGET/ui/widgets/*.js.gz ; cp -R ui/scripts client/target/generated-webapp/ ; rm -R $STATIC_TARGET/../plugins/globoNetworkVipPlugin/*.js.gz ; cp -R ui/css  client/target/generated-webapp/ ; cp -R ui/plugins client/target/generated-webapp/ ; cp -R ui/scripts client/target/generated-webapp/

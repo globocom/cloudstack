@@ -29,4 +29,9 @@ public interface LoadBalancerDao extends GenericDao<LoadBalancerVO, Long> {
 
     List<LoadBalancerVO> listInTransitionStateByNetworkIdAndScheme(long networkId, Scheme scheme);
 
+    /*
+        @param lbUUId -  lb uuid that will be linked will others, this will exclude from result list
+     */
+    List<LoadBalancerVO> listLinkables(String lbUUId, long networkEnvId, long accountId);
+
 }

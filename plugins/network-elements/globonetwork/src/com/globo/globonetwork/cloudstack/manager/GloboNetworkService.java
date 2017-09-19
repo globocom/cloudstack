@@ -17,6 +17,7 @@
 package com.globo.globonetwork.cloudstack.manager;
 
 import com.cloud.exception.InsufficientVirtualNetworkCapacityException;
+import com.cloud.network.dao.LoadBalancerVO;
 import com.cloud.utils.Pair;
 import com.globo.globonetwork.cloudstack.api.CreateGloboNetworkPoolCmd;
 import com.globo.globonetwork.cloudstack.api.DeleteGloboNetworkPoolCmd;
@@ -264,4 +265,6 @@ public interface GloboNetworkService {
     GloboNetworkPoolResponse.Pool createPool(CreateGloboNetworkPoolCmd createGloboNetworkPoolCmd);
 
     void deletePool(DeleteGloboNetworkPoolCmd deleteGloboNetworkPoolCmd);
+
+    List<LoadBalancerVO> listLinkableLoadBalancers(Long lbid, Long projectId);
 }

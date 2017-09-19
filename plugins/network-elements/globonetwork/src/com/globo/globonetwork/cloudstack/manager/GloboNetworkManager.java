@@ -48,6 +48,7 @@ import com.globo.globonetwork.cloudstack.api.ListGloboNetworkPoolsCmd;
 import com.globo.globonetwork.cloudstack.api.UpdateGloboNetworkPoolCmd;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.CreateGloboLoadBalancerCmd;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.DeleteGloboLoadBalancerCmd;
+import com.globo.globonetwork.cloudstack.api.loadbalancer.ListGloboLinkableLoadBalancersCmd;
 import com.globo.globonetwork.cloudstack.commands.ApplyVipInGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.commands.CheckDSREnabled;
 import com.globo.globonetwork.cloudstack.commands.CreatePoolCommand;
@@ -1061,6 +1062,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         cmdList.add(ListGloboLbNetworksCmd.class);
         cmdList.add(RegisterDnsForResourceCmd.class);
         cmdList.add(GetGloboResourceConfigurationCmd.class);
+        cmdList.add(ListGloboLinkableLoadBalancersCmd.class);
         return cmdList;
     }
 
@@ -2846,5 +2848,32 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         }
 
         return new Pair<List<? extends Network>, Integer>(networksToReturn, networksToReturn.size());
+    }
+
+
+    @Inject
+    NetworkDao _networksDao = null;
+
+    @Override
+    public List<LoadBalancerVO> listLinkableLoadBalancers(Long lbid, Long projectId) {
+        LoadBalancer lb = _loadBalancerDao.findById(lbid);
+        if (lb == null) {
+            throw new CloudRuntimeException("Load balancer that you would like to link with another does not exist!");
+        }
+
+        GloboResourceConfigurationVO resource = getGloboResourceConfiguration(lb.getUuid(), GloboResourceType.LOAD_BALANCER, GloboResourceKey.linkedLoadBalancer);
+
+        if (resource != null) {
+            String lbUuid = resource.getValue();
+            LoadBalancer lblinked = _loadBalancerDao.findByUuid(lbUuid);
+            throw new CloudRuntimeException("This load balancer is already linked with load balancer: " + lblinked.getName());
+        }
+
+        GloboNetworkNetworkVO globoNetworkNetworkVO = _globoNetworkNetworkDao.findByNetworkId(lb.getNetworkId());
+        Long envId = globoNetworkNetworkVO.getGloboNetworkEnvironmentId();
+
+        List<LoadBalancerVO> lbs = _loadBalancerDao.listLinkables(lb.getUuid(), envId, lb.getAccountId());
+
+        return lbs;
     }
 }
