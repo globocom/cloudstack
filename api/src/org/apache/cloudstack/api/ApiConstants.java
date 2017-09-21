@@ -164,6 +164,9 @@ public class ApiConstants {
     public static final String LOCK = "lock";
     public static final String LUN = "lun";
     public static final String LBID = "lbruleid";
+    public static final String LB_SOURCE_LBID = "sourcelbid";
+    public static final String LB_TARGET_LBID = "targetlbid";
+    public static final String LB_LINKED_LOAD_BALANCER = "linkedloadbalancer";
     public static final String MAX = "max";
     public static final String MAX_SNAPS = "maxsnaps";
     public static final String MEMORY = "memory";

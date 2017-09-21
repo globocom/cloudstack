@@ -267,4 +267,6 @@ public interface GloboNetworkService {
     void deletePool(DeleteGloboNetworkPoolCmd deleteGloboNetworkPoolCmd);
 
     List<LoadBalancerVO> listLinkableLoadBalancers(Long lbid, Long projectId);
+
+    LoadBalancerVO createLinkLoadBalancer(Long sourcelbid, Long targetlbid);
 }

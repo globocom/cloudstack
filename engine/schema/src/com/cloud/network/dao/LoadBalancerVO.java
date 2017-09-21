@@ -28,6 +28,8 @@ import com.cloud.network.rules.FirewallRuleVO;
 import com.cloud.network.rules.LoadBalancer;
 import com.cloud.utils.net.NetUtils;
 
+import java.util.Objects;
+
 /**
  * This VO represent Public Load Balancer
  * It references source ip address by its Id.
@@ -127,4 +129,24 @@ public class LoadBalancerVO extends FirewallRuleVO implements LoadBalancer {
     public Scheme getScheme() {
         return scheme;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        LoadBalancerVO that = (LoadBalancerVO) o;
+        return defaultPortStart == that.defaultPortStart &&
+                defaultPortEnd == that.defaultPortEnd &&
+                Objects.equals(name, that.name) &&
+                Objects.equals(description, that.description) &&
+                Objects.equals(algorithm, that.algorithm) &&
+                scheme == that.scheme &&
+                Objects.equals(lbProtocol, that.lbProtocol);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, description, algorithm, defaultPortStart, defaultPortEnd, scheme, lbProtocol);
+    }
+
 }

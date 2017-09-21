@@ -48,7 +48,6 @@ import com.globo.globonetwork.cloudstack.api.ListGloboNetworkPoolsCmd;
 import com.globo.globonetwork.cloudstack.api.UpdateGloboNetworkPoolCmd;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.CreateGloboLoadBalancerCmd;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.DeleteGloboLoadBalancerCmd;
-import com.globo.globonetwork.cloudstack.api.loadbalancer.ListGloboLinkableLoadBalancersCmd;
 import com.globo.globonetwork.cloudstack.commands.ApplyVipInGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.commands.CheckDSREnabled;
 import com.globo.globonetwork.cloudstack.commands.CreatePoolCommand;
@@ -1062,7 +1061,6 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         cmdList.add(ListGloboLbNetworksCmd.class);
         cmdList.add(RegisterDnsForResourceCmd.class);
         cmdList.add(GetGloboResourceConfigurationCmd.class);
-        cmdList.add(ListGloboLinkableLoadBalancersCmd.class);
         return cmdList;
     }
 
@@ -2875,5 +2873,10 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         List<LoadBalancerVO> lbs = _loadBalancerDao.listLinkables(lb.getUuid(), envId, lb.getAccountId());
 
         return lbs;
+    }
+
+    @Override
+    public LoadBalancerVO createLinkLoadBalancer(Long sourcelbid, Long targetlbid) {
+        return null;
     }
 }

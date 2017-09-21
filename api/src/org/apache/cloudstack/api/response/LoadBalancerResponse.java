@@ -18,6 +18,7 @@ package org.apache.cloudstack.api.response;
 
 import java.util.List;
 
+import com.cloud.network.rules.LoadBalancer;
 import org.apache.cloudstack.acl.RoleType;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseResponse;
@@ -133,6 +134,11 @@ public class LoadBalancerResponse extends BaseResponse implements ControlledEnti
     @Param(description = "list with globo resource configuration")
     private List<GloboResourceConfigurationResponse> globoResourceConfigs;
 
+
+    @SerializedName(ApiConstants.LB_LINKED_LOAD_BALANCER)
+    @Param(description = "load balancer that this is linked")
+    private LinkedLoadBalancer linkedLoadBalancer;
+
     public void setId(String id) {
         this.id = id;
     }
@@ -240,6 +246,52 @@ public class LoadBalancerResponse extends BaseResponse implements ControlledEnti
         this.forDisplay = forDisplay;
     }
 
+    public String getName() {
+        return name;
+    }
+
+    public LinkedLoadBalancer getLinkedLoadBalancer() {
+        return linkedLoadBalancer;
+    }
+
+    public void setLinkedLoadBalancer(LoadBalancer targetLb, GloboResourceConfiguration linkedConfig) {
+        this.linkedLoadBalancer = new LinkedLoadBalancer();
+        linkedLoadBalancer.setName(targetLb.getName());
+        linkedLoadBalancer.setUuid(targetLb.getUuid());
+        linkedLoadBalancer.setConfigId(linkedConfig.getId());
+
+    }
+
+    @EntityReference(value = LoadBalancer.class)
+    public static class LinkedLoadBalancer {
+        private String name;
+        private String uuid;
+        private Long configId;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getUuid() {
+            return uuid;
+        }
+
+        public void setUuid(String uuid) {
+            this.uuid = uuid;
+        }
+
+        public Long getConfigId() {
+            return configId;
+        }
+
+        public void setConfigId(Long configId) {
+            this.configId = configId;
+        }
+    }
 
     @EntityReference(value = GloboResourceConfiguration.class)
     public static class GloboResourceConfigurationResponse {

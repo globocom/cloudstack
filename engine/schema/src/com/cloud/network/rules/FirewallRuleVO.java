@@ -286,4 +286,8 @@ public class FirewallRuleVO implements FirewallRule {
     public Class<?> getEntityType() {
         return FirewallRule.class;
     }
+
+    public void setId(long id) {
+        this.id = id;
+    }
 }

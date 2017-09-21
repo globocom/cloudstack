@@ -164,6 +164,7 @@ public class EventTypes {
     public static final String EVENT_LB_REGISTER_DNS = "LB.DNS.REGISTRY";
     public static final String EVENT_LB_CREATE_POOL = "LB.POOL.CREATE";
     public static final String EVENT_LB_REMOVE_POOL = "LB.POOL.REMOVE";
+    public static final String EVENT_LB_LINK = "LB.LINK";
 
     // Global Load Balancer rules
     public static final String EVENT_ASSIGN_TO_GLOBAL_LOAD_BALANCER_RULE = "GLOBAL.LB.ASSIGN";

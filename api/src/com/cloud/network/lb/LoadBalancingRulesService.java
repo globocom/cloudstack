@@ -158,6 +158,8 @@ public interface LoadBalancingRulesService {
 
     LoadBalancer findById(long loadBalancer);
 
+    LoadBalancer findByUuid(String uuid);
+
     public void updateLBHealthChecks(Scheme scheme) throws ResourceUnavailableException;
 
     Map<Ip, UserVm> getLbInstances(long lbId);

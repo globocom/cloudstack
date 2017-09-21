@@ -136,4 +136,12 @@ public abstract class BaseListCmd extends BaseCmd {
             throw new ServerApiException(ApiErrorCode.PARAM_ERROR, "\"pagesize\" parameter is required when \"page\" is specified");
         }
     }
+
+    public void setPage(Integer page) {
+        this.page = page;
+    }
+
+    public void setPageSize(Integer pageSize) {
+        this.pageSize = pageSize;
+    }
 }

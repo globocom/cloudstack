@@ -8,8 +8,7 @@ import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
-
-
+import java.util.Objects;
 
 
 /**
@@ -86,5 +85,27 @@ public class GloboResourceConfigurationVO implements GloboResourceConfiguration 
 
     public void setBoolValue(boolean value) {
         this.setValue(Boolean.toString(value));
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        GloboResourceConfigurationVO that = (GloboResourceConfigurationVO) o;
+        return Objects.equals(id, that.id) &&
+                resourceType == that.resourceType &&
+                Objects.equals(resourceUuid, that.resourceUuid) &&
+                key == that.key &&
+                Objects.equals(value, that.value);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, resourceType, resourceUuid, key, value);
     }
 }

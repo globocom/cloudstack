@@ -2662,6 +2662,11 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
     }
 
     @Override
+    public LoadBalancerVO findByUuid(String uuid) {
+        return _lbDao.findByUuid(uuid);
+    }
+
+    @Override
     public LoadBalancerVO findLbByStickinessId(long stickinessPolicyId) {
         LBStickinessPolicyVO stickinessPolicy = _lb2stickinesspoliciesDao.findById(stickinessPolicyId);
 
