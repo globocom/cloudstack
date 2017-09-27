@@ -71,7 +71,7 @@ class VipAPIFacade {
         vip.setIpv4Id(ip.getId());
         vip.setOptions(buildVipOptions(cmd));
 
-        OptionVipV3 l7Rule = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l7_rule", "default_vip").get(0);
+        OptionVipV3 l7Rule = getProtocolOption(vipEnvironment.getId(), "l7_rule", "default_vip");
         List<VipV3.Port> ports = new ArrayList<>();
         for(VipPoolMap vipPoolMap : vipPoolMapping){
             ports.add(createPort(vipEnvironment, vipPoolMap.getPoolId(), vipPoolMap.getPort(), cmd.getHealthcheckType(), l7Rule));
@@ -102,8 +102,8 @@ class VipAPIFacade {
             l7ProtocolString = "Outros";
         }
 
-        OptionVipV3 l4Protocol = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l4_protocol", l4ProtocolString).get(0);
-        OptionVipV3 l7Protocol = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l7_protocol", l7ProtocolString).get(0);
+        OptionVipV3 l4Protocol = getProtocolOption(vipEnvironment.getId(), "l4_protocol", l4ProtocolString);
+        OptionVipV3 l7Protocol = getProtocolOption(vipEnvironment.getId(), "l7_protocol", l7ProtocolString);
 
         VipV3.Port port = new VipV3.Port();
         port.setPort(vipPort);
@@ -114,11 +114,22 @@ class VipAPIFacade {
         return port;
     }
 
+    private OptionVipV3 getProtocolOption(Long vipid, String protocol, String protocolString) throws GloboNetworkException {
+
+        List<OptionVipV3> optionsByTypeAndName = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipid, protocol, protocolString);
+
+        if (optionsByTypeAndName.size() == 0) {
+            throw new GloboNetworkException("Integration problem, could not find option '"+ protocolString + "' for protocol '" + protocol + "' in environment vip '" + vipid + "' in NetworkAPI. Please, contact you system administrator to register that option in NetworkAPI." );
+        }
+
+        return optionsByTypeAndName.get(0);
+    }
+
     public VipAPIFacade update(ApplyVipInGloboNetworkCommand cmd, Ip ip, List<VipPoolMap> vipPoolMapping) throws GloboNetworkException {
         this.ip = ip;
         VipV3 result;
         String lbPersistence = getPersistenceMethod(cmd.getPersistencePolicy());
-        OptionVipV3 persistence = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(cmd.getVipEnvironmentId(), "Persistencia", lbPersistence).get(0);
+        OptionVipV3 persistence = getProtocolOption(cmd.getVipEnvironmentId(), "Persistencia", lbPersistence);
 
         if (vip.getCreated()) {
             if(!persistence.getId().equals(vip.getOptions().getPersistenceId())) {
@@ -164,7 +175,7 @@ class VipAPIFacade {
     }
 
     void addPool(VipEnvironment vipEnvironment, Integer vipPort, String healthcheckType, PoolV3 poolV3) throws GloboNetworkException {
-        OptionVipV3 l7Rule = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l7_rule", "default_vip").get(0);
+        OptionVipV3 l7Rule = getProtocolOption(vipEnvironment.getId(), "l7_rule", "default_vip");
         vip.getPorts().add(createPort(vipEnvironment, poolV3.getId(), vipPort, healthcheckType, l7Rule));
         globoNetworkAPI.getVipV3API().deployUpdate(vip);
     }
@@ -195,17 +206,17 @@ class VipAPIFacade {
         String lbPersistence = getPersistenceMethod(cmd.getPersistencePolicy());
         Long environment = cmd.getVipEnvironmentId();
 
-        OptionVipV3 cacheGroup = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(environment, "cache", cache).get(0);
-        OptionVipV3 trafficReturn = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(environment, "Retorno de trafego", cmd.isDsr() ? DSR_TRAFFIC_RETURN : DEFAULT_TRAFFIC_RETURN).get(0);
-        OptionVipV3 timeout = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(environment, "timeout", String.valueOf(DEFAULT_TIMEOUT)).get(0);
-        OptionVipV3 persistence = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(environment, "Persistencia", lbPersistence).get(0);
+        OptionVipV3 cacheGroup = getProtocolOption(environment, "cache", cache);
+        OptionVipV3 trafficReturn = getProtocolOption(environment, "Retorno de trafego", cmd.isDsr() ? DSR_TRAFFIC_RETURN : DEFAULT_TRAFFIC_RETURN);
+        OptionVipV3 timeout = getProtocolOption(environment, "timeout", String.valueOf(DEFAULT_TIMEOUT));
+        OptionVipV3 persistence = getProtocolOption(environment, "Persistencia", lbPersistence);
 
         return new VipV3.VipOptions(cacheGroup.getId(), trafficReturn.getId(), timeout.getId(), persistence.getId());
     }
 
     List<Long> getPoolIds() throws GloboNetworkException {
         if(vip != null) {
-            Long defaultVipL7Rule = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vip.getEnvironmentVipId(), "l7_rule", "default_vip").get(0).getId();
+            Long defaultVipL7Rule = getProtocolOption(vip.getEnvironmentVipId(), "l7_rule", "default_vip").getId();
             Set<Long> poolIdSet = new HashSet<>();
             for (VipV3.Port port : vip.getPorts()) {
                 for (VipV3.Pool pool : port.getPools()) {
