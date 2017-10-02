@@ -24,6 +24,7 @@ import com.globo.globonetwork.client.model.OptionVipV3;
 import com.globo.globonetwork.client.model.VipV3;
 import com.globo.globonetwork.cloudstack.commands.CreatePoolCommand;
 import com.globo.globonetwork.cloudstack.commands.DeletePoolCommand;
+import com.globo.globonetwork.cloudstack.commands.GloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.commands.ValidateVipUpdateCommand;
 import com.globo.globonetwork.cloudstack.response.CheckDSREnabledResponse;
 import com.globo.globonetwork.client.api.ExpectHealthcheckAPI;
@@ -40,7 +41,6 @@ import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkExpectHealthcheckResponse;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -76,7 +76,6 @@ import com.cloud.host.Host;
 import com.cloud.host.Host.Type;
 import com.cloud.resource.ServerResource;
 import com.cloud.utils.component.ManagerBase;
-import com.globo.globonetwork.client.exception.GloboNetworkErrorCodeException;
 import com.globo.globonetwork.client.exception.GloboNetworkException;
 import com.globo.globonetwork.client.model.Environment;
 import com.globo.globonetwork.client.model.Equipment;
@@ -251,6 +250,10 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
 
     @Override
     public Answer executeRequest(Command cmd) {
+        if (cmd instanceof GloboNetworkCommand) {
+            return ((GloboNetworkCommand)cmd).execute(getNewGloboNetworkAPI());
+        }
+
         if (cmd instanceof ReadyCommand) {
             return new ReadyAnswer((ReadyCommand)cmd);
         } else if (cmd instanceof MaintainCommand) {
@@ -586,14 +589,7 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
     }
 
     private Answer handleGloboNetworkException(Command cmd, GloboNetworkException e) {
-        if (e instanceof GloboNetworkErrorCodeException) {
-            GloboNetworkErrorCodeException ex = (GloboNetworkErrorCodeException)e;
-            s_logger.error("Error accessing GloboNetwork: " + ex.getCode() + " - " + ex.getDescription(), ex);
-            return new GloboNetworkErrorAnswer(cmd, ex.getCode(), getUtf8(ex.getDescription()));
-        } else {
-            s_logger.error("Generic error accessing GloboNetwork", e);
-            return new Answer(cmd, false, e.getMessage());
-        }
+        return GloboNetworkCommand.handleGloboNetworkException(cmd, e);
     }
 
     public Answer execute(RemoveVipFromGloboNetworkCommand cmd) {
@@ -1266,17 +1262,6 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
 
     protected VipAPIFacade createVipAPIFacade(Long vipId, GloboNetworkAPI api) throws GloboNetworkException {
         return new VipAPIFacade(vipId, api);
-    }
-
-    public String getUtf8(String value) {
-        try {
-            Charset charsetISO = Charset.forName("ISO_8859_1");
-            byte text[] = value.getBytes(charsetISO);
-            return new String(text, Charset.defaultCharset());
-        } catch (Exception e) {
-            s_logger.warn("could not convert message: " + value + " error:" + e.getMessage());
-        }
-        return value;
     }
 
     public GloboNetworkAPI getNewGloboNetworkAPI(){

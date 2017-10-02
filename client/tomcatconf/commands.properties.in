@@ -182,6 +182,7 @@ createGloboLoadBalancer=15
 deleteGloboLoadBalancer=15
 listGloboLinkableLoadBalancers=15
 linkGloboLoadBalancer=15
+unlinkGloboLoadBalancer=15
 deleteLoadBalancerRule=15
 removeFromLoadBalancerRule=15
 assignToLoadBalancerRule=15

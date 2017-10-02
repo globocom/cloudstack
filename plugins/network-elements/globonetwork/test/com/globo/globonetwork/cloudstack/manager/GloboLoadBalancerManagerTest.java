@@ -3,13 +3,10 @@ package com.globo.globonetwork.cloudstack.manager;
 import com.cloud.network.dao.LoadBalancerVMMapDao;
 import com.cloud.network.dao.LoadBalancerVMMapVO;
 import com.cloud.network.dao.LoadBalancerVO;
+import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.network.lb.LoadBalancingRulesService;
 import com.cloud.network.rules.LoadBalancer;
-import com.cloud.uservm.UserVm;
-import com.cloud.utils.Ternary;
 import com.cloud.utils.exception.CloudRuntimeException;
-import com.cloud.vm.UserVmVO;
-import org.apache.cloudstack.api.command.user.loadbalancer.ListLoadBalancerRuleInstancesCmd;
 import org.apache.cloudstack.globoconfig.GloboResourceConfiguration;
 import org.apache.cloudstack.globoconfig.GloboResourceConfigurationDao;
 import org.apache.cloudstack.globoconfig.GloboResourceConfigurationVO;
@@ -19,10 +16,13 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class GloboLoadBalancerManagerTest {
+
     GloboLoadBalancerManager service;
     @Before
     public void setup() {
@@ -135,5 +136,88 @@ public class GloboLoadBalancerManagerTest {
 
         verify(service.resourceConfigDao, times(1)).persist(any(GloboResourceConfigurationVO.class));
 
+    }
+
+    @Test
+    public void testGetNetworksToAddIntoSourceAllLbsWithOneNetwork() {
+        LoadBalancerVO sourceLb = new LoadBalancerVO();
+        sourceLb.setNetworkId(12L);
+        LoadBalancerVO targetLb = new LoadBalancerVO();
+        targetLb.setNetworkId(12L);
+
+        LoadBalancingRule lbRule = new LoadBalancingRule(sourceLb, null, null, null, null);
+        lbRule.setAdditionalNetworks(new ArrayList<Long>());
+
+        LoadBalancingRule targetRule = new LoadBalancingRule(targetLb, null, null, null ,null);
+        targetRule.setAdditionalNetworks(new ArrayList<Long>());
+
+        List<Long> diffNetworks = this.service.getNetworksToAddIntoSource(lbRule, targetRule);
+
+        assertTrue(diffNetworks.isEmpty());
+    }
+
+    @Test
+    public void testGetNetworksToAddIntoSourceLbWith2NetworksAndTargetWithOne() {
+        LoadBalancerVO sourceLb = new LoadBalancerVO();
+        sourceLb.setNetworkId(12L);
+
+        LoadBalancerVO targetLb = new LoadBalancerVO();
+        targetLb.setNetworkId(12L);
+
+        LoadBalancingRule lbRule = new LoadBalancingRule(sourceLb, null, null, null, null);
+        List<Long> additionalNetworks = new ArrayList<>(Arrays.asList(5L));
+        lbRule.setAdditionalNetworks(additionalNetworks);
+
+        LoadBalancingRule targetRule = new LoadBalancingRule(targetLb, null, null, null ,null);
+        targetRule.setAdditionalNetworks(new ArrayList<Long>());
+        List<Long> diffNetworks = this.service.getNetworksToAddIntoSource(lbRule, targetRule);
+
+        //it is not necessery to add networks into sourceLb
+        assertTrue(diffNetworks.isEmpty());
+    }
+
+    @Test
+    public void testGetNetworksToAddIntoSourceLbWith2NetworksAndTargetWith2() {
+        LoadBalancerVO sourceLb = new LoadBalancerVO();
+        sourceLb.setNetworkId(12L);
+
+        LoadBalancerVO targetLb = new LoadBalancerVO();
+        targetLb.setNetworkId(12L);
+
+        LoadBalancingRule lbRule = new LoadBalancingRule(sourceLb, null, null, null, null);
+        List<Long> additionalNetworks = new ArrayList<>(Arrays.asList(5L,6L));
+        lbRule.setAdditionalNetworks(additionalNetworks);
+
+        LoadBalancingRule targetRule = new LoadBalancingRule(targetLb, null, null, null ,null);
+        targetRule.setAdditionalNetworks(new ArrayList<Long>(Arrays.asList(8L, 6L)));
+        List<Long> diffNetworks = this.service.getNetworksToAddIntoSource(lbRule, targetRule);
+
+        //only need to add network 8L
+        assertFalse(diffNetworks.isEmpty());
+        assertEquals(1, diffNetworks.size());
+        assertTrue(diffNetworks.contains(8L));
+    }
+
+    @Test
+    public void testGetNetworksToAddIntoSourceLbFirstNetworkIsDifferent() {
+        LoadBalancerVO sourceLb = new LoadBalancerVO();
+        sourceLb.setNetworkId(15L);
+
+        LoadBalancerVO targetLb = new LoadBalancerVO();
+        targetLb.setNetworkId(12L);
+
+        LoadBalancingRule lbRule = new LoadBalancingRule(sourceLb, null, null, null, null);
+        List<Long> additionalNetworks = new ArrayList<>(Arrays.asList(5L,6L));
+        lbRule.setAdditionalNetworks(additionalNetworks);
+
+        LoadBalancingRule targetRule = new LoadBalancingRule(targetLb, null, null, null ,null);
+        targetRule.setAdditionalNetworks(new ArrayList<Long>(Arrays.asList(8L, 6L)));
+        List<Long> diffNetworks = this.service.getNetworksToAddIntoSource(lbRule, targetRule);
+
+        //only need to add network 8L
+        assertFalse(diffNetworks.isEmpty());
+        assertEquals(2, diffNetworks.size());
+        assertTrue(diffNetworks.contains(8L));
+        assertTrue(diffNetworks.contains(12L));
     }
 }

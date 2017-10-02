@@ -16,9 +16,13 @@
 */
 package com.globo.globonetwork.cloudstack.manager;
 
+import com.cloud.agent.api.Answer;
+import com.cloud.agent.api.Command;
 import com.cloud.exception.InsufficientVirtualNetworkCapacityException;
+import com.cloud.host.HostVO;
 import com.cloud.network.dao.LoadBalancerVO;
 import com.cloud.utils.Pair;
+import com.globo.globonetwork.cloudstack.GloboNetworkIpDetailVO;
 import com.globo.globonetwork.cloudstack.api.CreateGloboNetworkPoolCmd;
 import com.globo.globonetwork.cloudstack.api.DeleteGloboNetworkPoolCmd;
 import com.globo.globonetwork.cloudstack.api.ListGloboLbNetworksCmd;
@@ -268,5 +272,10 @@ public interface GloboNetworkService {
 
     List<LoadBalancerVO> listLinkableLoadBalancers(Long lbid, Long projectId);
 
-    LoadBalancerVO createLinkLoadBalancer(Long sourcelbid, Long targetlbid);
+    GloboNetworkIpDetailVO getNetworkApiVipIp(LoadBalancer lb);
+
+    HostVO getGloboNetworkHost(Long zoneId);
+
+    Answer callCommand(Command cmd, Long zoneId);
+
 }

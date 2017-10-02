@@ -27,6 +27,7 @@ import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
 import com.cloud.network.as.AutoScaleCounter;
+import com.cloud.network.dao.NetworkDao;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
@@ -96,6 +97,13 @@ public class GloboNetworkElement extends ExternalLoadBalancerDeviceManagerImpl i
     ResourceManager _resourceMgr;
     @Inject
     HostDao _hostDao;
+
+    @Inject
+    NetworkDao networkDao;
+
+    @Inject
+    LoadBalancingRulesManager _lbMgr;
+
     @Inject
     PhysicalNetworkDao _physicalNetworkDao;
 

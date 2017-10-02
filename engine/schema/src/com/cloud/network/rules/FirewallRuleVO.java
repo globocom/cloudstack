@@ -290,4 +290,8 @@ public class FirewallRuleVO implements FirewallRule {
     public void setId(long id) {
         this.id = id;
     }
+
+    public void setNetworkId(Long networkId) {
+        this.networkId = networkId;
+    }
 }

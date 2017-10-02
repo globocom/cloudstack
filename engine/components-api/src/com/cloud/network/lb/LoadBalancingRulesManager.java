@@ -16,6 +16,7 @@
 // under the License.
 package com.cloud.network.lb;
 
+import com.cloud.network.dao.LoadBalancerVO;
 import com.cloud.utils.net.Ip;
 import java.util.List;
 
@@ -76,4 +77,6 @@ public interface LoadBalancingRulesManager {
     Nic getLbInstanceNic(long lbid, long vmid);
 
     public Ip getSourceIp(LoadBalancer lb);
+
+    LoadBalancingRule getLoadBalancerRuleToApply(LoadBalancerVO lb);
 }

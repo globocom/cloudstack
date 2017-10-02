@@ -2050,7 +2050,8 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         return handled;
     }
 
-    private LoadBalancingRule getLoadBalancerRuleToApply(LoadBalancerVO lb) {
+    @Override
+    public LoadBalancingRule getLoadBalancerRuleToApply(LoadBalancerVO lb) {
 
         List<LbStickinessPolicy> policyList = getStickinessPolicies(lb.getId());
         Ip sourceIp = getSourceIp(lb);

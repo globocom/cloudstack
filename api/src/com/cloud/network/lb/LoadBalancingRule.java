@@ -16,6 +16,7 @@
 // under the License.
 package com.cloud.network.lb;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.cloud.network.as.AutoScalePolicy;
@@ -67,6 +68,13 @@ public class LoadBalancingRule {
         this.sourceIp = sourceIp;
         this.sslCert = sslCert;
         this.lbProtocol = lbProtocol;
+    }
+
+    public List<Long> getAllNetworks() {
+        List<Long> ids = new ArrayList<>(additionalNetworks);
+        ids.add(getNetworkId());
+
+        return ids;
     }
 
     public long getId() {

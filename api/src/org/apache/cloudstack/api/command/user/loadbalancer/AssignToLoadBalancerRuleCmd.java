@@ -187,4 +187,9 @@ public class AssignToLoadBalancerRuleCmd extends BaseAsyncCmd {
         }
         return lb.getNetworkId();
     }
+
+
+    public void setVirtualMachineIds(List<Long> virtualMachineIds) {
+        this.virtualMachineIds = virtualMachineIds;
+    }
 }

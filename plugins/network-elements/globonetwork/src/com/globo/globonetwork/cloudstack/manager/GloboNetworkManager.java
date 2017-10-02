@@ -705,8 +705,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
         return (GloboNetworkVlanResponse)callCommand(cmd, zoneId);
     }
-
-    protected Answer callCommand(Command cmd, Long zoneId) {
+    @Override
+    public Answer callCommand(Command cmd, Long zoneId) {
         return callCommand(cmd, zoneId, true);
     }
 
@@ -733,8 +733,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
         return answer;
     }
-
-    private HostVO getGloboNetworkHost(Long zoneId) {
+    @Override
+    public HostVO getGloboNetworkHost(Long zoneId) {
         return _hostDao.findByTypeNameAndZoneId(zoneId, Provider.GloboNetwork.getName(), Type.L2Networking);
     }
 
@@ -2764,7 +2764,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
             throw new CloudRuntimeException(msg);
         }
     }
-
+    @Override
     public GloboNetworkIpDetailVO getNetworkApiVipIp(LoadBalancer lb) {
         Ip sourceIp = _lbMgr.getSourceIp(lb);
 
@@ -2875,8 +2875,5 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         return lbs;
     }
 
-    @Override
-    public LoadBalancerVO createLinkLoadBalancer(Long sourcelbid, Long targetlbid) {
-        return null;
-    }
+
 }
