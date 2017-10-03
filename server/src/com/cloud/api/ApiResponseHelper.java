@@ -43,6 +43,11 @@ import com.cloud.network.as.Condition;
 import com.cloud.network.as.ConditionVO;
 import com.cloud.network.as.Counter;
 import com.cloud.network.dao.LoadBalancerOptionsVO;
+import com.cloud.network.lb.LoadBalancingRulesService;
+import org.apache.cloudstack.globoconfig.GloboResourceConfigurationDao;
+import org.apache.cloudstack.globoconfig.GloboResourceConfigurationVO;
+import org.apache.cloudstack.globoconfig.GloboResourceKey;
+import org.apache.cloudstack.globoconfig.GloboResourceType;
 import org.apache.log4j.Logger;
 import org.apache.cloudstack.acl.ControlledEntity;
 import org.apache.cloudstack.acl.ControlledEntity.ACLType;
@@ -333,6 +338,12 @@ public class ApiResponseHelper implements ResponseGenerator {
     SnapshotDataFactory snapshotfactory;
     @Inject
     AutoScaleVmGroupVmMapDao _autoScaleVmGroupVmMapDao;
+
+    @Inject
+    GloboResourceConfigurationDao globoResourceConfig;
+
+    @Inject
+    protected LoadBalancingRulesService lbService;
 
     @Override
     public UserResponse createUserResponse(User user) {
@@ -831,6 +842,13 @@ public class ApiResponseHelper implements ResponseGenerator {
                     lbResponse.setServiceDownAction(lbOption.getServiceDownAction());
                 }
             }
+        }
+
+        List<GloboResourceConfigurationVO> configs = globoResourceConfig.getConfiguration(GloboResourceType.LOAD_BALANCER, loadBalancer.getUuid(), GloboResourceKey.linkedLoadBalancer);
+        if (!configs.isEmpty()){
+            GloboResourceConfigurationVO linkedConfig = configs.get(0);
+            LoadBalancer target = lbService.findByUuid(linkedConfig.getValue());
+            lbResponse.setLinkedLoadBalancer(target, linkedConfig);
         }
 
         lbResponse.setObjectName("loadbalancer");
