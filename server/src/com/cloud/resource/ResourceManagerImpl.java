@@ -30,6 +30,7 @@ import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
+import com.cloud.utils.component.ComponentContext;
 import com.cloud.vm.VirtualMachine;
 
 import org.apache.cloudstack.api.ApiConstants;
@@ -44,6 +45,9 @@ import org.apache.cloudstack.api.command.admin.host.UpdateHostCmd;
 import org.apache.cloudstack.api.command.admin.host.UpdateHostPasswordCmd;
 import org.apache.cloudstack.context.CallContext;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
+import org.apache.cloudstack.framework.events.EventBus;
+import org.apache.cloudstack.framework.events.EventBusException;
+import org.apache.cloudstack.framework.messagebus.MessageBus;
 import org.apache.cloudstack.storage.datastore.db.PrimaryDataStoreDao;
 import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
 import org.apache.cloudstack.utils.identity.ManagementServerNode;
@@ -264,6 +268,9 @@ public class ResourceManagerImpl extends ManagerBase implements ResourceManager,
     private GenericSearchBuilder<HostVO, String> _hypervisorsInDC;
 
     private SearchBuilder<HostGpuGroupsVO> _gpuAvailability;
+
+    @Inject
+    MessageBus _messageBus;
 
     private void insertListener(Integer event, ResourceListener listener) {
         List<ResourceListener> lst = _lifeCycleListeners.get(event);
@@ -804,6 +811,7 @@ public class ResourceManagerImpl extends ManagerBase implements ResourceManager,
     }
 
     @DB
+    @ActionEvent(eventType = EventTypes.EVENT_HOST_DELETE, eventDescription = "deleting host")
     protected boolean doDeleteHost(final long hostId, boolean isForced, final boolean isForceDeleteStorage) {
         _accountMgr.getActiveUser(CallContext.current().getCallingUserId());
         // Verify that host exists
@@ -915,6 +923,8 @@ public class ResourceManagerImpl extends ManagerBase implements ResourceManager,
         }
             }
         });
+
+        publishHostEvent(host, EventTypes.EVENT_HOST_DELETE);
 
         return true;
     }
@@ -1277,6 +1287,7 @@ public class ResourceManagerImpl extends ManagerBase implements ResourceManager,
     }
 
     @Override
+    @ActionEvent(eventType = EventTypes.EVENT_HOST_UPDATE, eventDescription = "updating host")
     public Host updateHost(UpdateHostCmd cmd) throws NoTransitionException {
         Long hostId = cmd.getId();
         Long guestOSCategoryId = cmd.getOsCategoryId();
@@ -1337,7 +1348,51 @@ public class ResourceManagerImpl extends ManagerBase implements ResourceManager,
         }
 
         HostVO updatedHost = _hostDao.findById(hostId);
+
+
+        publishHostEvent(host, EventTypes.EVENT_HOST_UPDATE);
+
         return updatedHost;
+    }
+
+    private void publishHostEvent(HostVO host, String eventType) {
+        try {
+            EventBus eventBus = ComponentContext.getComponent(EventBus.class);
+
+
+            Map<String, String> eventDescription = new HashMap<String, String>();
+
+            eventDescription.put("hostId", host.getUuid());
+            eventDescription.put("hostName", host.getName());
+            eventDescription.put("hostResourceState", host.getResourceState().toString());
+            eventDescription.put("hostStatus", host.getStatus().toString());
+            eventDescription.put("hostState", host.getState().toString());
+            eventDescription.put("hostPrivateIp", host.getPrivateIpAddress());
+            eventDescription.put("hostPublicIp", host.getPublicIpAddress());
+
+            org.apache.cloudstack.framework.events.Event event = new org.apache.cloudstack.framework.events.Event(
+                    "management-server",
+                    eventType,
+                    null,
+                    Host.class.getSimpleName(),
+                    host.getUuid());
+
+            event.setDescription(eventDescription);
+
+            try {
+                eventBus.publish(event);
+            } catch (EventBusException evx) {
+                String errMsg = "Failed to publish async job event on the the event bus.";
+                s_logger.warn(errMsg, evx);
+            }
+
+
+
+        } catch (Exception e) {
+            s_logger.error("Error trying to send evento to message bus", e);
+            return; // no provider is configured to provide events bus, so just return
+        }
+
     }
 
     @Override
@@ -1710,6 +1765,8 @@ public class ResourceManagerImpl extends ManagerBase implements ResourceManager,
             }
         }
 
+        publishHostEvent(host, EventTypes.EVENT_HOST_CREATE);
+
         return host;
     }
 
@@ -1814,7 +1871,7 @@ public class ResourceManagerImpl extends ManagerBase implements ResourceManager,
 
         return host;
     }
-
+    @ActionEvent(eventType = EventTypes.EVENT_HOST_CREATE, eventDescription = "host creating", async = false)
     private Host createHostAndAgentDeferred(ServerResource resource, Map<String, String> details, boolean old, List<String> hostTags, boolean forRebalance) {
         HostVO host = null;
         StartupCommand[] cmds = null;
@@ -1916,6 +1973,7 @@ public class ResourceManagerImpl extends ManagerBase implements ResourceManager,
     }
 
     @Override
+    @ActionEvent(eventType = EventTypes.EVENT_HOST_CREATE, eventDescription = "host creating", async = false)
     public Host createHostAndAgent(Long hostId, ServerResource resource, Map<String, String> details, boolean old, List<String> hostTags, boolean forRebalance) {
         Host host = createHostAndAgent(resource, details, old, hostTags, forRebalance);
         return host;
