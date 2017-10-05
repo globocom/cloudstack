@@ -957,7 +957,7 @@ public class AgentManagerImpl extends ManagerBase implements AgentManager, Handl
 
         host = _hostDao.findById(hostId);
         if (host == null || host.getRemoved() != null) {
-            s_logger.warn("Unable to find host " + hostId);
+            s_logger.error("Unable to find host=" + hostId);
             return false;
         }
 
@@ -967,13 +967,13 @@ public class AgentManagerImpl extends ManagerBase implements AgentManager, Handl
         }
 
         if (host.getStatus() != Status.Up && host.getStatus() != Status.Alert && host.getStatus() != Status.Rebalancing) {
-            s_logger.info("Unable to disconnect host because it is not in the correct state: host=" + hostId + "; Status=" + host.getStatus());
+            s_logger.error("Unable to disconnect host because it is not in the correct state: host=" + hostId + "; Status=" + host.getStatus());
             return false;
         }
 
         AgentAttache attache = findAttache(hostId);
         if (attache == null) {
-            s_logger.info("Unable to disconnect host because it is not connected to this server: " + hostId);
+            s_logger.error("Unable to disconnect host because it is not connected to this server: host=" + hostId);
             return false;
         }
 
