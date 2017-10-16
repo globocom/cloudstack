@@ -2605,6 +2605,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
             command.setBalacingAlgorithm(lb.getAlgorithm());
             command.setReals(reals);
             command.setRegion(GloboNetworkRegion.value());
+            command.setL4protocol(cmd.getL4Protocol());
+            command.setL7protocol(cmd.getL7Protocol());
             if(options != null && !options.isEmpty()){
                 command.setServiceDownAction(options.get(0).getServiceDownAction());
             }

@@ -632,6 +632,8 @@ public class ApiConstants {
     public static final String PHYSICAL_SIZE = "physicalsize";
     public static final String GURU_NAME = "guruname";
     public static final String GLOBO_RESOURCE_CONFIG = "globoresourceconfig";
+    public static final String L4_PROTOCOL = "l4protocol";
+    public static final String L7_PROTOCOL = "l7protocol";
 
     public enum HostDetails {
         all, capacity, events, stats, min;

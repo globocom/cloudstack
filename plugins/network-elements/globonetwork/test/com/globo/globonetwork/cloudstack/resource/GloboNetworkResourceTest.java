@@ -558,6 +558,7 @@ public class GloboNetworkResourceTest {
         pool1.setDefaultPort(80);
         poolsNetworkApi.add(pool1);
 
+
         PoolV3 pool2 = new PoolV3();
         pool2.setId(22L);
         pool2.setIdentifier("my_pool_2");
@@ -567,6 +568,14 @@ public class GloboNetworkResourceTest {
 
         when(gnAPI.getPoolAPI().getById(33L)).thenReturn(pool1);
         when(gnAPI.getPoolAPI().getById(22L)).thenReturn(pool2);
+
+
+        List<OptionVipV3> options = new ArrayList<>();
+        OptionVipV3 opitionTCP = new OptionVipV3(123L, "l4_protocol", "TCP");
+        options.add(opitionTCP);
+        OptionVipV3 opitionHTTP = new OptionVipV3(321L, "l7_protocol", "HTTP");
+        options.add(opitionHTTP);
+        when(gnAPI.getOptionVipV3API().listOptions(333L)).thenReturn(options);
 
         VipAPIFacade facadeMock = mock(VipAPIFacade.class);
         doReturn(facadeMock).when(_resource).createVipAPIFacade(123L, gnAPI);
@@ -595,14 +604,24 @@ public class GloboNetworkResourceTest {
         VipV3.Pool p1 = new VipV3.Pool();
         p1.setPoolId(poolId1);
         port1.setPools(Collections.singletonList(p1));
+        VipV3.PortOptions options = new VipV3.PortOptions();
+        options.setL4ProtocolId(123L);
+        options.setL7ProtocolId(321L);
+        port1.setOptions(options);
 
         VipV3.Port port2 = new VipV3.Port();
         port1.setPort(80);
         VipV3.Pool p2 = new VipV3.Pool();
         p2.setPoolId(poolId2);
         port2.setPools(Collections.singletonList(p2));
+        VipV3.PortOptions options2 = new VipV3.PortOptions();
+        options2.setL4ProtocolId(123L);
+        options2.setL7ProtocolId(321L);
+        port2.setOptions(options);
 
         vip.setPorts(Arrays.asList(port1, port2));
+
+        vip.setEnvironmentVipId(333L);
         return vip;
     }
 
@@ -612,6 +631,7 @@ public class GloboNetworkResourceTest {
         PoolV3 pool = new PoolV3();
         pool.setDefaultPort(80);
         mockGetVipInfos();
+        command.setL4protocol("TCP");
 
         VipAPIFacade facadeMock = mock(VipAPIFacade.class);
         when(facadeMock.hasVip()).thenReturn(true);
@@ -623,7 +643,7 @@ public class GloboNetworkResourceTest {
         assertTrue(answer.getResult());
         assertNotNull(answer.getPool());
         verify(gnAPI.getPoolAPI()).save(any(PoolV3.class));
-        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), any(PoolV3.class));
+        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq((String)null), any(PoolV3.class));
     }
 
     @Test
@@ -641,7 +661,7 @@ public class GloboNetworkResourceTest {
         assertFalse(answer.getResult());
         verify(gnAPI.getPoolAPI()).save(any(PoolV3.class));
         verify(gnAPI.getPoolAPI(), times(0)).deleteV3(any(Long.class));
-        verify(facadeMock, times(0)).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), any(PoolV3.class));
+        verify(facadeMock, times(0)).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq((String)null), any(PoolV3.class));
     }
 
     @Test
@@ -655,14 +675,14 @@ public class GloboNetworkResourceTest {
         VipAPIFacade facadeMock = mock(VipAPIFacade.class);
         when(facadeMock.hasVip()).thenReturn(true);
         doReturn(facadeMock).when(_resource).createVipAPIFacade(1L, gnAPI);
-        doThrow(new GloboNetworkException("")).when(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), any(PoolV3.class));
+        doThrow(new GloboNetworkException("")).when(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq((String)null),  any(PoolV3.class));
         when(gnAPI.getPoolAPI().save(any(PoolV3.class))).thenReturn(pool);
 
         Answer answer = _resource.executeRequest(command);
 
         assertFalse(answer.getResult());
         verify(gnAPI.getPoolAPI()).save(any(PoolV3.class));
-        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), any(PoolV3.class));
+        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq((String)null), any(PoolV3.class));
         verify(gnAPI.getPoolAPI()).deleteV3(any(Long.class));
     }
 
@@ -677,7 +697,7 @@ public class GloboNetworkResourceTest {
         GloboNetworkPoolResponse answer = (GloboNetworkPoolResponse) _resource.executeRequest(command);
 
         assertTrue(answer.getResult());
-        verify(facadeMock, times(0)).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), any(PoolV3.class));
+        verify(facadeMock, times(0)).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq((String)null), any(PoolV3.class));
     }
 
     @Test
@@ -745,7 +765,7 @@ public class GloboNetworkResourceTest {
         verify(poolAPI).deleteV3(1L);
         // verify rollback
         verify(gnAPI.getVipEnvironmentAPI()).search(99L, null, null, null);
-        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq(pool.getHealthcheck().getHealthcheckType()), eq(pool));
+        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq(pool.getHealthcheck().getHealthcheckType()), eq((String)null), eq(pool));
     }
 
     private void mockGetVipInfos() throws GloboNetworkException {
@@ -761,6 +781,7 @@ public class GloboNetworkResourceTest {
 
     private CreatePoolCommand createMockCreatePoolCommand() {
         CreatePoolCommand command = new CreatePoolCommand();
+        command.setL4protocol("TCP");
         command.setVipId(1L);
         command.setVipName("dummy.lb.com");
         command.setVipIp("192.168.10.4");

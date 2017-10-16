@@ -44,6 +44,12 @@ public class PoolResponse extends BaseResponse {
     @Param(description = "Expected healthcheck")
     private String expectedHealthcheck;
 
+    @SerializedName("l4protocol")
+    private String l4Protocol;
+
+    @SerializedName("l7protocol")
+    private String l7Protocol;
+
     public String getHealthcheckType() {
         return healthcheckType;
     }
@@ -114,5 +120,21 @@ public class PoolResponse extends BaseResponse {
 
     public void setVipPort(Integer vipPort) {
         this.vipPort = vipPort;
+    }
+
+    public void setL4Protocol(String l4Protocol) {
+        this.l4Protocol = l4Protocol;
+    }
+
+    public void setL7Protocol(String l7Protocol) {
+        this.l7Protocol = l7Protocol;
+    }
+
+    public String getL4Protocol() {
+        return l4Protocol;
+    }
+
+    public String getL7Protocol() {
+        return l7Protocol;
     }
 }

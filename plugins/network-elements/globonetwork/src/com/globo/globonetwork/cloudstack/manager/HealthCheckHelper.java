@@ -95,6 +95,26 @@ public class HealthCheckHelper implements Serializable{
             return healthCheckHelper.build(healthehckType, healthCheck, expectedHealthCheck);
         }
 
+    public static String getL4Protocol(String healthcheckType, Integer vipPort) {
+        if(HealthCheckType.isLayer7(healthcheckType)){
+            return HealthCheckType.TCP.name();
+        } else{
+            return healthcheckType.toUpperCase();
+        }
+    }
+
+    public static String getL7Protocol(String healthcheckType, Integer vipPort) {
+        if(!HealthCheckType.isLayer7(healthcheckType)){
+            return "Outros";
+        } else if (vipPort == 443 || vipPort == 8443) {
+            return HealthCheckType.HTTPS.name();
+        } else if (vipPort == 80 || vipPort == 8080) {
+            return HealthCheckType.HTTP.name();
+        } else{
+            return healthcheckType.toUpperCase();
+        }
+    }
+
     public enum HealthCheckType {
         HTTP(7), HTTPS(7), TCP(4), UDP(4);
 

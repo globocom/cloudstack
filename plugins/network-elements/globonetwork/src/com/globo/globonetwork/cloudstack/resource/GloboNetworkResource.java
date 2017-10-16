@@ -341,14 +341,14 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
 
                 pool = createPool(
                     cmd.getPublicPort(), cmd.getPrivatePort(), vipInfo.getEnvironment(), cmd.getVipName(),
-                    cmd.getBalacingAlgorithm(), HealthCheckHelper.HealthCheckType.TCP.name(), null, null, null,
+                    cmd.getBalacingAlgorithm(), cmd.getL4protocol(), null, null, null,
                     DEFAULT_MAX_CONN, cmd.getServiceDownAction(), buildPoolMembers(gnAPI, cmd.getReals()), cmd.getRegion()
                 );
 
                 pool = gnAPI.getPoolAPI().save(pool);
 
                 VipEnvironment vipEnv = gnAPI.getVipEnvironmentAPI().search(cmd.getVipEnvironment(), null, null, null);
-                vipAPIFacade.addPool(vipEnv, cmd.getPublicPort(), HealthCheckHelper.HealthCheckType.TCP.name(), pool);
+                vipAPIFacade.addPool(vipEnv, cmd.getPublicPort(), cmd.getL4protocol(), cmd.getL7protocol(), pool);
                 return new GloboNetworkPoolResponse(poolV3FromNetworkApi(pool));
             }
             return new GloboNetworkPoolResponse(cmd, true, "", new GloboNetworkPoolResponse.Pool());
@@ -404,7 +404,7 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             PoolV3 pool = gnAPI.getPoolAPI().getById(poolId);
             if(pool != null) {
                 VipEnvironment vipEnv = gnAPI.getVipEnvironmentAPI().search(vipAPIFacade.getVip().getEnvironmentVipId(), null, null, null);
-                vipAPIFacade.addPool(vipEnv, vipPort, pool.getHealthcheck().getHealthcheckType(), pool);
+                vipAPIFacade.addPool(vipEnv, vipPort, pool.getHealthcheck().getHealthcheckType(), null,  pool);
             }
         } catch (GloboNetworkException e) {
             s_logger.error("Error rollbacking pool removal", e);
@@ -468,15 +468,27 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
     private Answer execute(ListPoolLBCommand cmd) {
         try {
             GloboNetworkAPI globoNetworkAPI = getNewGloboNetworkAPI();
+            PoolAPI poolAPI = globoNetworkAPI.getPoolAPI();
+
             VipAPIFacade apiFacade = this.createVipAPIFacade(cmd.getVipId(), globoNetworkAPI);
+            VipV3 vip = apiFacade.getVip();
+
+            List<OptionVipV3> optionVipV3s = globoNetworkAPI.getOptionVipV3API().listOptions(vip.getEnvironmentVipId());
 
             List<GloboNetworkPoolResponse.Pool> pools = new ArrayList<>();
-            for(VipV3.Port port : apiFacade.getVip().getPorts()){
+            for(VipV3.Port port : vip.getPorts()){
                 Integer vipPort = port.getPort();
+                VipV3.PortOptions options = port.getOptions();
+                String optionL4 = findProtocol(optionVipV3s, options.getL4ProtocolId());
+                String optionL7 = findProtocol(optionVipV3s, options.getL7ProtocolId());
+
                 for(VipV3.Pool p : port.getPools()){
-                    PoolV3 pool = globoNetworkAPI.getPoolAPI().getById(p.getPoolId());
+                    PoolV3 pool = poolAPI.getById(p.getPoolId());
                     GloboNetworkPoolResponse.Pool poolCS = poolFromNetworkApi(pool, vipPort);
+                    poolCS.setL4protocol(optionL4);
+                    poolCS.setL7protocol(optionL7);
                     pools.add(poolCS);
+
                 }
             }
 
@@ -488,6 +500,17 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             s_logger.error("Generic error accessing GloboNetwork", e);
             return new Answer(cmd, false, e.getMessage());
         }
+    }
+
+    private String findProtocol(List<OptionVipV3> optionVipV3s, Long optionId) {
+
+        for (OptionVipV3 option : optionVipV3s) {
+            if (option.getId().equals(optionId)) {
+                return option.getName();
+            }
+        }
+
+        return null;
     }
 
     private static GloboNetworkPoolResponse.Pool poolFromNetworkApi(PoolV3 poolNetworkApi, Integer vipPort) throws GloboNetworkException {

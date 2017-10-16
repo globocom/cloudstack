@@ -21,6 +21,7 @@ import com.cloud.event.EventTypes;
 import com.globo.globonetwork.cloudstack.manager.GloboNetworkManager;
 import javax.inject.Inject;
 
+import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
 import org.apache.cloudstack.api.APICommand;
 import org.apache.cloudstack.api.ApiConstants;
@@ -52,6 +53,12 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
 
     @Parameter(name = ApiConstants.PRIVATE_PORT, type = CommandType.INTEGER, required = true, description = "the private port of the private ip address/virtual machine where the network traffic will be load balanced to")
     private Integer privatePort;
+
+    @Parameter(name = ApiConstants.L4_PROTOCOL, type = CommandType.STRING, description = "layer 4 protocol for connection between vip and pool")
+    private String l4Protocol = HealthCheckHelper.HealthCheckType.TCP.name();
+
+    @Parameter(name = ApiConstants.L7_PROTOCOL, type = CommandType.STRING, description = "layer 7 protocol for connection between vip and pool")
+    private String l7Protocol = "Outros";
 
     @Inject
     GloboNetworkManager _globoNetworkService;
@@ -135,4 +142,19 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
         return "Creates a new pool";
     }
 
+    public String getL4Protocol() {
+        return l4Protocol;
+    }
+
+    public void setL4Protocol(String l4Protocol) {
+        this.l4Protocol = l4Protocol;
+    }
+
+    public String getL7Protocol() {
+        return l7Protocol;
+    }
+
+    public void setL7Protocol(String l7Protocol) {
+        this.l7Protocol = l7Protocol;
+    }
 }
