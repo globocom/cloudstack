@@ -24,6 +24,7 @@ import com.globo.globonetwork.client.model.OptionVipV3;
 import com.globo.globonetwork.client.model.VipV3;
 import com.globo.globonetwork.cloudstack.commands.CreatePoolCommand;
 import com.globo.globonetwork.cloudstack.commands.DeletePoolCommand;
+import com.globo.globonetwork.cloudstack.commands.GloboNetworkResourceCommand;
 import com.globo.globonetwork.cloudstack.commands.ValidateVipUpdateCommand;
 import com.globo.globonetwork.cloudstack.response.CheckDSREnabledResponse;
 import com.globo.globonetwork.client.api.ExpectHealthcheckAPI;
@@ -35,7 +36,6 @@ import com.globo.globonetwork.cloudstack.commands.CheckDSREnabled;
 import com.globo.globonetwork.cloudstack.commands.GetPoolLBByIdCommand;
 import com.globo.globonetwork.cloudstack.commands.ListExpectedHealthchecksCommand;
 import com.globo.globonetwork.cloudstack.commands.ListPoolLBCommand;
-import com.globo.globonetwork.cloudstack.commands.UpdatePoolCommand;
 import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkExpectHealthcheckResponse;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
@@ -251,6 +251,12 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
 
     @Override
     public Answer executeRequest(Command cmd) {
+        if (cmd instanceof GloboNetworkResourceCommand){
+            GloboNetworkAPI api = getNewGloboNetworkAPI();
+            return ((GloboNetworkResourceCommand)cmd).execute(api);
+        }
+
+
         if (cmd instanceof ReadyCommand) {
             return new ReadyAnswer((ReadyCommand)cmd);
         } else if (cmd instanceof MaintainCommand) {
@@ -295,8 +301,6 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             return execute((GetPoolLBByIdCommand) cmd);
         }else if (cmd instanceof ListExpectedHealthchecksCommand) {
             return execute((ListExpectedHealthchecksCommand) cmd);
-        }else if (cmd instanceof UpdatePoolCommand) {
-            return execute((UpdatePoolCommand) cmd);
         }else if (cmd instanceof CreatePoolCommand) {
             return execute((CreatePoolCommand) cmd);
         }else if (cmd instanceof DeletePoolCommand) {
@@ -341,14 +345,14 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
 
                 pool = createPool(
                     cmd.getPublicPort(), cmd.getPrivatePort(), vipInfo.getEnvironment(), cmd.getVipName(),
-                    cmd.getBalacingAlgorithm(), cmd.getL4protocol(), null, null, null,
+                    cmd.getBalacingAlgorithm(), cmd.getL4protocol().name(), null, null, null,
                     DEFAULT_MAX_CONN, cmd.getServiceDownAction(), buildPoolMembers(gnAPI, cmd.getReals()), cmd.getRegion()
                 );
 
                 pool = gnAPI.getPoolAPI().save(pool);
 
                 VipEnvironment vipEnv = gnAPI.getVipEnvironmentAPI().search(cmd.getVipEnvironment(), null, null, null);
-                vipAPIFacade.addPool(vipEnv, cmd.getPublicPort(), cmd.getL4protocol(), cmd.getL7protocol(), pool);
+                vipAPIFacade.addPool(vipEnv, cmd.getPublicPort(), cmd.getL4protocol().getNetworkApiOptionValue(), cmd.getL7protocol().getNetworkApiOptionValue(), pool);
                 return new GloboNetworkPoolResponse(poolV3FromNetworkApi(pool));
             }
             return new GloboNetworkPoolResponse(cmd, true, "", new GloboNetworkPoolResponse.Pool());
@@ -408,43 +412,6 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             }
         } catch (GloboNetworkException e) {
             s_logger.error("Error rollbacking pool removal", e);
-        }
-    }
-
-    private Answer execute(UpdatePoolCommand cmd) {
-        try {
-            PoolAPI poolAPI = getNewGloboNetworkAPI().getPoolAPI();
-
-            List<GloboNetworkPoolResponse.Pool> pools = new ArrayList<GloboNetworkPoolResponse.Pool>();
-            List<PoolV3> poolsV3 = poolAPI.getByIdsV3(cmd.getPoolIds());
-            for (PoolV3 poolv3 : poolsV3) {
-
-                PoolV3.Healthcheck healthCheck = poolv3.getHealthcheck();
-                healthCheck.setHealthcheck(cmd.getHealthcheckType(), cmd.getHealthcheck(), cmd.getExpectedHealthcheck() );
-
-                poolv3.setMaxconn(cmd.getMaxConn());
-            }
-
-            if ( poolsV3.size() > 0 ) {
-                if (poolsV3.get(0).isPoolCreated()) {
-                    poolAPI.updateDeployAll(poolsV3);
-                } else {
-                    poolAPI.updateAll(poolsV3);
-                }
-            }
-
-            for (PoolV3 poolv3 : poolsV3) {
-                pools.add(poolV3FromNetworkApi(poolv3));
-            }
-
-            GloboNetworkPoolResponse answer = new GloboNetworkPoolResponse(cmd, pools, true, "");
-
-            return answer;
-        } catch (GloboNetworkException e) {
-            return handleGloboNetworkException(cmd, e);
-        } catch (Exception e) {
-            s_logger.error("Generic error accessing GloboNetwork while update pool", e);
-            return new Answer(cmd, false, e.getMessage());
         }
     }
 
@@ -534,7 +501,7 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
 
         return pool;
     }
-    private static GloboNetworkPoolResponse.Pool poolV3FromNetworkApi(PoolV3 poolNetworkApi) throws GloboNetworkException {
+    public static GloboNetworkPoolResponse.Pool poolV3FromNetworkApi(PoolV3 poolNetworkApi) throws GloboNetworkException {
         GloboNetworkPoolResponse.Pool pool = new GloboNetworkPoolResponse.Pool();
 
         pool.setId(poolNetworkApi.getId());
@@ -608,7 +575,7 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
         }
     }
 
-    private Answer handleGloboNetworkException(Command cmd, GloboNetworkException e) {
+    public static Answer handleGloboNetworkException(Command cmd, GloboNetworkException e) {
         if (e instanceof GloboNetworkErrorCodeException) {
             GloboNetworkErrorCodeException ex = (GloboNetworkErrorCodeException)e;
             s_logger.error("Error accessing GloboNetwork: " + ex.getCode() + " - " + ex.getDescription(), ex);
@@ -1291,7 +1258,7 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
         return new VipAPIFacade(vipId, api);
     }
 
-    public String getUtf8(String value) {
+    public static String getUtf8(String value) {
         try {
             Charset charsetISO = Charset.forName("ISO_8859_1");
             byte text[] = value.getBytes(charsetISO);

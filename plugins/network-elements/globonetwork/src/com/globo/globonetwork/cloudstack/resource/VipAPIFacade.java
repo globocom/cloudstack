@@ -121,7 +121,7 @@ public class VipAPIFacade {
         return this;
     }
 
-    private VipV3.Port createPort(VipEnvironment vipEnvironment, Long poolId, Integer vipPort, String l4ProtocolValue, String l7ProtocolValue, OptionVipV3 defaultL7Rule) throws GloboNetworkException {
+    public VipV3.Port createPort(VipEnvironment vipEnvironment, Long poolId, Integer vipPort, String l4ProtocolValue, String l7ProtocolValue, OptionVipV3 defaultL7Rule) throws GloboNetworkException {
 
         OptionVipV3 l4Protocol = getProtocolOption(vipEnvironment.getId(), "l4_protocol", l4ProtocolValue);
         OptionVipV3 l7Protocol = getProtocolOption(vipEnvironment.getId(), "l7_protocol", l7ProtocolValue);
@@ -135,12 +135,12 @@ public class VipAPIFacade {
         return port;
     }
 
-    private OptionVipV3 getProtocolOption(Long vipid, String protocol, String protocolString) throws GloboNetworkException {
+    public OptionVipV3 getProtocolOption(Long vipEnvid, String protocol, String protocolString) throws GloboNetworkException {
 
-        List<OptionVipV3> optionsByTypeAndName = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipid, protocol, protocolString);
+        List<OptionVipV3> optionsByTypeAndName = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvid, protocol, protocolString);
 
         if (optionsByTypeAndName.size() == 0) {
-            throw new GloboNetworkException("Integration problem, could not find option '"+ protocolString + "' for protocol '" + protocol + "' in environment vip '" + vipid + "' in NetworkAPI. Please, contact you system administrator to register that option in NetworkAPI." );
+            throw new GloboNetworkException("Integration problem, could not find option '"+ protocolString + "' for protocol '" + protocol + "' in environment vip '" + vipEnvid + "' in NetworkAPI. Please, contact you system administrator to register that option in NetworkAPI." );
         }
 
         return optionsByTypeAndName.get(0);
@@ -263,12 +263,13 @@ public class VipAPIFacade {
         return GloboNetworkResource.PersistenceMethod.fromPersistencePolicy(persistencePolicy);
     }
 
+
     @Override
     public String toString() {
         return "VipAPIFacade{" + vip + "}";
     }
 
-    protected VipV3 getVip() {
+    public VipV3 getVip() {
         return vip;
     }
 

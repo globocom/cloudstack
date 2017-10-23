@@ -19,6 +19,33 @@
 
 	var healthcheckTypes = cloudStack.sections.loadbalancer.utils.healthcheck;
 
+	function getPool(poolid, lbid , zoneid) {
+		var data = {
+            lbruleid: lbid,
+            zoneid: zoneid
+        };
+		var pools = [];
+	    $.ajax({
+	        url: createURL("listGloboNetworkPools"),
+	        data: data,
+	        dataType: "json",
+	        async: false,
+	        success: function(data) {
+	            pools = data.listglobonetworkpoolresponse.globonetworkpool;
+	        },
+	        error: function(errorMessage) {
+	            args.response.error(errorMessage);
+	        }
+	    });
+	    var pool;
+	    $(pools).each(function() {
+	    	if (this.id == poolid) {
+	    		pool = this;
+	    	}
+	    });
+	    return pool;
+    }
+
     cloudStack.sections.loadbalancer.listView.detailView.tabs['pools'] = {
         title: 'Pools',
         listView: {
@@ -83,26 +110,19 @@
                             healthcheckexpect: {
                                 label: 'Expected Healthcheck'
                             },
+                            l4protocol: {
+                                label: 'L4 Protocol'
+                            },
+                            l7protocol: {
+                                label: 'L7 Protocol'
+                            }
                         }],
-                        tags: cloudStack.api.tags({
-                            resourceType: 'LoadBalancer',
-                            contextId: 'loadbalancers'
-                        }),
                         dataProvider: function(args) {
-                            $.ajax({
-                                url: createURL("getGloboNetworkPool"),
-                                data: {
-                                    poolid: args.context.pools[0].id,
-                                    zoneid: args.context.loadbalancers[0].zoneid
-                                },
-                                dataType: "json",
-                                async: false,
-                                success: function(data) {
-                                    args.context.pools[0] = data.getglobonetworkpoolresponse.globonetworkpool;
-                                    args.response.success({
-                                        data: data.getglobonetworkpoolresponse.globonetworkpool
-                                    });
-                                }
+							var pool = getPool(args.context.pools[0].id, args.context.loadbalancers[0].id, args.context.loadbalancers[0].zoneid);
+							args.context.poolselected = pool;
+
+							args.response.success({
+                                data: pool
                             });
                         }
                     }
@@ -175,10 +195,86 @@
                                                     }
                                                 })
                                             }
-                                        }
+                                        },
+                                        isPoolAdvanced: {
+			                                label: 'label.show.advanced.settings',
+			                                isBoolean: true,
+			                                defaultValue: false,
+			                                isChecked: false,
+			                            },
+			                            redeploy: {
+			                            	label: 'Redeploy VIP',
+			                                isBoolean: true,
+			                                defaultValue: false,
+			                                isChecked: false,
+			                                dependsOn: ['isPoolAdvanced'],
+			                                isHidden: function (args) {
+			                                   var isAdvancedChecked = $('input[name=isPoolAdvanced]:checked').length > 0;
+			                                   return !isAdvancedChecked;
+			                                }
+			                            },
+			                            l4protocol: {
+			                                id: 'l4protocol',
+			                                label: 'L4 Protocol',
+			                                defaultValue: pool.l4protocol,
+			                                validation: {
+			                                    required: false
+			                                },
+			                                dependsOn: ['isPoolAdvanced'],
+			                                isHidden: function (args) {
+			                                   var isAdvancedChecked = $('input[name=isPoolAdvanced]:checked').length > 0;
+			                                   return !isAdvancedChecked;
+			                                },
+			                                select: function(args) {
+			                                   args.response.success({
+			                                       data: [{id: 'TCP', description: 'TCP'},
+			                                                 {id: 'UDP', description: 'UDP'}]
+			                                   });
+			                                }
+			                            },
+			                            l7protocol: {
+			                                id: 'l7protocol',
+			                                label: 'L7 Protocol',
+			                                defaultValue: pool.l7protocol,
+			                                validation: {
+			                                    required: false
+			                                },
+			                                dependsOn: ['l4protocol', 'isPoolAdvanced'],
+			                                isHidden: function (args) {
+			                                   var isAdvancedChecked = $('input[name=isPoolAdvanced]:checked').length > 0;
+			                                   return !isAdvancedChecked;
+			                                },
+			                                select: function(args) {
+			                                    var data = [];
+			                                    var l4protocol = $('select[name=l4protocol]').val();
+			                                    
+			                                    if (typeof(l4protocol) == 'undefined') {
+													l4protocol = pool.l4protocol
+												}
+
+			                                    if ( l4protocol == 'TCP' ) {
+			                                        data.push({id: 'HTTP', description: 'HTTP'});
+			                                        data.push({id: 'HTTPS', description: 'HTTPS'});
+			                                    }
+			                                    data.push({id: 'OTHERS', description: 'Outros'});
+
+
+			                                   args.response.success({
+			                                       data: data
+			                                   });
+			                                }
+			                            }
                                     }
                                 },
                                 after: function(args2) {
+                                	var hasL4Change = args2.data.l4protocol != pool.l4protocol;
+                                	var hasL7Change = args2.data.l7protocol != pool.l7protocol;
+
+                                	if (args2.data.redeploy != 'on' && (hasL7Change || hasL4Change) ) {
+                                		args.response.error("Only can change l4protocol/l7protocol when 'Redeploy VIP' is checked");
+                                        return;
+                                	}
+
                                     if (args2.data.healthcheck === '' && (healthcheckTypes.isLayer7(args2.data.healthchecktype))) {
                                         args.response.error(msg_validation_healthcheck_http);
                                         return;
@@ -190,19 +286,27 @@
                                         args2.data.healthcheck = '';
                                     }
 
+                                    var data = {
+                                        poolids: pool.id.toString(),
+                                        lbruleid: lb.id,
+                                        zoneid: lb.zoneid,
+                                        healthchecktype: args2.data.healthchecktype,
+                                        healthcheck: args2.data.healthcheck,
+                                        expectedhealthcheck: args2.data.expectedhealthcheck,
+                                        maxconn: args2.data.maxconn 
+                                    };
+
+                                    if (hasL4Change || hasL7Change) {
+                                    	data['l4protocol'] = args2.data.l4protocol;
+                                    	data['l7protocol'] = args2.data.l7protocol;
+                                    	data['redeploy'] = args2.data.redeploy == 'on';
+                                    }
+
                                     $.ajax({
                                         url: createURL('updateGloboNetworkPool'),
                                         dataType: 'json',
                                         async: true,
-                                        data: {
-                                            poolids: pool.id.toString(),
-                                            lbruleid: lb.id,
-                                            zoneid: lb.zoneid,
-                                            healthchecktype: args2.data.healthchecktype,
-                                            healthcheck: args2.data.healthcheck,
-                                            expectedhealthcheck: args2.data.expectedhealthcheck,
-                                            maxconn: args2.data.maxconn,
-                                        },
+                                        data: data,
                                         success: function(json) {
                                             var jid = json.updateglobonetworkpoolresponse.jobid;
                                             args.response.success({
@@ -320,7 +424,7 @@
                                         data.push({id: 'HTTP', description: 'HTTP'});
                                         data.push({id: 'HTTPS', description: 'HTTPS'});
                                     }
-                                    data.push({id: 'Outros', description: 'Outros'});
+                                    data.push({id: 'OTHERS', description: 'Outros'});
 
 
                                    args.response.success({

@@ -59,6 +59,7 @@ import com.globo.globonetwork.cloudstack.commands.ListPoolLBCommand;
 import com.globo.globonetwork.cloudstack.commands.RemoveVipFromGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.commands.UpdatePoolCommand;
 import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper;
+import com.globo.globonetwork.cloudstack.manager.Protocol;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkExpectHealthcheckResponse;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
 import java.io.IOException;
@@ -631,7 +632,8 @@ public class GloboNetworkResourceTest {
         PoolV3 pool = new PoolV3();
         pool.setDefaultPort(80);
         mockGetVipInfos();
-        command.setL4protocol("TCP");
+        command.setL4protocol(Protocol.L4.TCP);
+        command.setL7protocol(Protocol.L7.OTHERS);
 
         VipAPIFacade facadeMock = mock(VipAPIFacade.class);
         when(facadeMock.hasVip()).thenReturn(true);
@@ -643,12 +645,15 @@ public class GloboNetworkResourceTest {
         assertTrue(answer.getResult());
         assertNotNull(answer.getPool());
         verify(gnAPI.getPoolAPI()).save(any(PoolV3.class));
-        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq((String)null), any(PoolV3.class));
+        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq("Outros"), any(PoolV3.class));
     }
 
     @Test
     public void testCreatePoolGivenPoolCreationError() throws GloboNetworkException {
         CreatePoolCommand command = createMockCreatePoolCommand();
+        command.setL4protocol(Protocol.L4.TCP);
+        command.setL7protocol(Protocol.L7.OTHERS);
+
         mockGetVipInfos();
 
         VipAPIFacade facadeMock = mock(VipAPIFacade.class);
@@ -661,12 +666,14 @@ public class GloboNetworkResourceTest {
         assertFalse(answer.getResult());
         verify(gnAPI.getPoolAPI()).save(any(PoolV3.class));
         verify(gnAPI.getPoolAPI(), times(0)).deleteV3(any(Long.class));
-        verify(facadeMock, times(0)).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq((String)null), any(PoolV3.class));
+        verify(facadeMock, times(0)).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq("Outros"), any(PoolV3.class));
     }
 
     @Test
     public void testCreatePoolGivenVipDeployError() throws GloboNetworkException {
         CreatePoolCommand command = createMockCreatePoolCommand();
+        command.setL4protocol(Protocol.L4.TCP);
+        command.setL7protocol(Protocol.L7.OTHERS);
         PoolV3 pool = new PoolV3();
         pool.setId(1L);
         pool.setDefaultPort(80);
@@ -675,14 +682,14 @@ public class GloboNetworkResourceTest {
         VipAPIFacade facadeMock = mock(VipAPIFacade.class);
         when(facadeMock.hasVip()).thenReturn(true);
         doReturn(facadeMock).when(_resource).createVipAPIFacade(1L, gnAPI);
-        doThrow(new GloboNetworkException("")).when(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq((String)null),  any(PoolV3.class));
+        doThrow(new GloboNetworkException("")).when(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq("Outros"),  any(PoolV3.class));
         when(gnAPI.getPoolAPI().save(any(PoolV3.class))).thenReturn(pool);
 
         Answer answer = _resource.executeRequest(command);
 
         assertFalse(answer.getResult());
         verify(gnAPI.getPoolAPI()).save(any(PoolV3.class));
-        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq((String)null), any(PoolV3.class));
+        verify(facadeMock).addPool(any(VipEnvironment.class), eq(80), eq("TCP"), eq("Outros"), any(PoolV3.class));
         verify(gnAPI.getPoolAPI()).deleteV3(any(Long.class));
     }
 
@@ -781,7 +788,7 @@ public class GloboNetworkResourceTest {
 
     private CreatePoolCommand createMockCreatePoolCommand() {
         CreatePoolCommand command = new CreatePoolCommand();
-        command.setL4protocol("TCP");
+        command.setL4protocol(Protocol.L4.TCP);
         command.setVipId(1L);
         command.setVipName("dummy.lb.com");
         command.setVipIp("192.168.10.4");

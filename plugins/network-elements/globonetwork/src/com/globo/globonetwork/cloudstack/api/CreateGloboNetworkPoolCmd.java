@@ -18,10 +18,11 @@
 package com.globo.globonetwork.cloudstack.api;
 
 import com.cloud.event.EventTypes;
+import com.cloud.utils.exception.CloudRuntimeException;
 import com.globo.globonetwork.cloudstack.manager.GloboNetworkManager;
+import com.globo.globonetwork.cloudstack.manager.Protocol;
 import javax.inject.Inject;
 
-import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
 import org.apache.cloudstack.api.APICommand;
 import org.apache.cloudstack.api.ApiConstants;
@@ -50,15 +51,14 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
     @Parameter(name = ApiConstants.PUBLIC_PORT, type = CommandType.INTEGER, required = true, description = "the public port from where the network traffic will be load balanced from")
     private Integer publicPort;
 
-
     @Parameter(name = ApiConstants.PRIVATE_PORT, type = CommandType.INTEGER, required = true, description = "the private port of the private ip address/virtual machine where the network traffic will be load balanced to")
     private Integer privatePort;
 
     @Parameter(name = ApiConstants.L4_PROTOCOL, type = CommandType.STRING, description = "layer 4 protocol for connection between vip and pool")
-    private String l4Protocol = HealthCheckHelper.HealthCheckType.TCP.name();
+    private String l4Protocol = Protocol.L4.TCP.name();
 
     @Parameter(name = ApiConstants.L7_PROTOCOL, type = CommandType.STRING, description = "layer 7 protocol for connection between vip and pool")
-    private String l7Protocol = "Outros";
+    private String l7Protocol = Protocol.L7.OTHERS.name();
 
     @Inject
     GloboNetworkManager _globoNetworkService;
@@ -79,6 +79,7 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() {
+        validateParams();
         GloboNetworkPoolResponse.Pool pool = _globoNetworkService.createPool(this);
         PoolResponse poolResp = new PoolResponse();
         if(pool != null) {
@@ -94,6 +95,23 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
         }
         poolResp.setResponseName(getCommandName());
         this.setResponseObject(poolResp);
+    }
+
+    protected void validateParams() {
+        if (l4Protocol == null) {
+            throw new CloudRuntimeException("l4protocol can not be null.");
+        }
+
+        if (l7Protocol == null) {
+            throw new CloudRuntimeException("l7protocol can not be null.");
+        }
+
+        Protocol.L4 l4 = Protocol.L4.valueOf(l4Protocol);
+        Protocol.L7 l7 = Protocol.L7.valueOf(l7Protocol);
+
+        if (!Protocol.validProtocols(l4, l7)) {
+            throw new CloudRuntimeException("l4protocol with value '" + l4.name() + "' does not match with l7protocol '" + l7.name() + "'. Possible l7 value(s): " + l4.getL7s() + ".");
+        }
     }
 
     // ///////////////////////////////////////////////////
@@ -156,5 +174,13 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
 
     public void setL7Protocol(String l7Protocol) {
         this.l7Protocol = l7Protocol;
+    }
+
+
+    public Protocol.L4 getL4() {
+        return Protocol.L4.valueOf(l4Protocol);
+    }
+    public Protocol.L7 getL7() {
+        return Protocol.L7.valueOf(l7Protocol);
     }
 }

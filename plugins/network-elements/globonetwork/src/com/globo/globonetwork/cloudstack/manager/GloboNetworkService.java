@@ -253,7 +253,8 @@ public interface GloboNetworkService {
     public GloboNetworkPoolResponse.Pool getPoolById(Long poolId, Long zoneId);
 
     public List<GloboNetworkPoolResponse.Pool> updatePools(List<Long> poolIds, Long vipId, Long zoneId, String healthcheckType,
-                                                           String healthcheck, String expectedHealthcheck, Integer maxConn);
+                                                           String healthcheck, String expectedHealthcheck, Integer maxConn,
+                                                           Protocol.L4 l4protocol, Protocol.L7 l7protocol, boolean redeploy);
 
     public List<GloboNetworkExpectHealthcheckResponse.ExpectedHealthcheck> listAllExpectedHealthchecks();
 
