@@ -1,9 +1,12 @@
 package com.globo.globonetwork.cloudstack.api;
 
 import com.cloud.event.EventTypes;
+import com.cloud.utils.exception.CloudRuntimeException;
 import com.globo.globonetwork.cloudstack.manager.GloboNetworkManager;
+import com.globo.globonetwork.cloudstack.manager.Protocol;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import javax.inject.Inject;
 import org.apache.cloudstack.api.APICommand;
@@ -46,6 +49,15 @@ public class UpdateGloboNetworkPoolCmd extends BaseAsyncCmd {
     @Parameter(name = "maxconn", type = CommandType.INTEGER, required = true, description = "Max number of connections")
     private Integer maxConn;
 
+    @Parameter(name = "l4protocol", type = CommandType.STRING, required = false, description = "l4 protocol (TCP or UDP)")
+    private String l4protocol;
+
+    @Parameter(name = "l7protocol", type = CommandType.STRING, required = false, description = "l7 protocol (HTTP, HTTPS or OTHERS)")
+    private String l7protocol;
+
+    @Parameter(name = "redeploy", type = CommandType.BOOLEAN, required = false, description = "force redeploy vip when need to change l4 and l7 protocol")
+    private Boolean redeploy = false;
+
     @Inject
     GloboNetworkManager _globoNetworkService;
 
@@ -65,11 +77,21 @@ public class UpdateGloboNetworkPoolCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() {
+        validateParams();
         ListResponse<PoolResponse> response = new ListResponse<PoolResponse>();
 
 
+        Protocol.L4 l4 = null;
+        if (l4protocol != null){
+            l4 = Protocol.L4.valueOf(l4protocol);
+        }
+        Protocol.L7 l7 = null;
+        if (l7protocol != null) {
+            l7 = Protocol.L7.valueOf(l7protocol);
+        }
+
         List<GloboNetworkPoolResponse.Pool> pools = _globoNetworkService.updatePools(getPoolIds(), getLbId(), getZoneId(),
-                getHealthcheckType(), getHealthcheck(), getExpectedHealthcheck(), getMaxConn());
+                getHealthcheckType(), getHealthcheck(), getExpectedHealthcheck(), getMaxConn(), l4, l7, redeploy);
 
         List<PoolResponse> lbResponses = new ArrayList<>();
 
@@ -94,6 +116,30 @@ public class UpdateGloboNetworkPoolCmd extends BaseAsyncCmd {
         response.setResponses(lbResponses);
         response.setResponseName(getCommandName());
         this.setResponseObject(response);
+    }
+
+    protected void validateParams() {
+        if (l4protocol != null && !Protocol.validValueL4(l4protocol)) {
+            throw new CloudRuntimeException("l4protocol invalid value, possible values: " + Arrays.toString(Protocol.L4.values()) + ".");
+        }
+
+
+        if (l7protocol != null && !Protocol.validValueL7(l7protocol)) {
+            throw new CloudRuntimeException("l7protocol invalid value, possible values: " + Arrays.toString(Protocol.L7.values()) + ".");
+        }
+
+        if (l4protocol != null && l7protocol != null && !redeploy) {
+            throw new CloudRuntimeException("Can not change l4protocol and l7protocol values when redeploy is false!");
+        }
+
+        if (l4protocol != null && l7protocol != null) {
+            Protocol.L4 l4 = Protocol.L4.valueOf(l4protocol);
+            Protocol.L7 l7 = Protocol.L7.valueOf(l7protocol);
+
+            if (!Protocol.validProtocols(l4, l7)) {
+                throw new CloudRuntimeException("l4protocol with value '" + l4.name() + "' does not match with l7protocol '" + l7.name() + "'. Possible l7 value(s): " + l4.getL7s() + ".");
+            }
+        }
     }
 
 
@@ -168,5 +214,30 @@ public class UpdateGloboNetworkPoolCmd extends BaseAsyncCmd {
     @Override
     public String getEventDescription() {
         return "Updating Pool Healthcheck in GloboNetwork";
+    }
+
+
+    public String getL4protocol() {
+        return l4protocol;
+    }
+
+    public void setL4protocol(String l4protocol) {
+        this.l4protocol = l4protocol;
+    }
+
+    public String getL7protocol() {
+        return l7protocol;
+    }
+
+    public void setL7protocol(String l7protocol) {
+        this.l7protocol = l7protocol;
+    }
+
+    public Boolean getRedeploy() {
+        return redeploy;
+    }
+
+    public void setRedeploy(Boolean redeploy) {
+        this.redeploy = redeploy;
     }
 }

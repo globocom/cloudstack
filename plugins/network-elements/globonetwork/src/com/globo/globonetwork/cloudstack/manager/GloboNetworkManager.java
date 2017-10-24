@@ -2605,6 +2605,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
             command.setBalacingAlgorithm(lb.getAlgorithm());
             command.setReals(reals);
             command.setRegion(GloboNetworkRegion.value());
+            command.setL4protocol(cmd.getL4());
+            command.setL7protocol(cmd.getL7());
             if(options != null && !options.isEmpty()){
                 command.setServiceDownAction(options.get(0).getServiceDownAction());
             }
@@ -2715,13 +2717,18 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
     @Override
     public List<GloboNetworkPoolResponse.Pool> updatePools(List<Long> poolIds, Long lbId, Long zoneId, String healthcheckType,
-                                                           String healthcheck, String expectedHealthcheck, Integer maxConn) {
+                                                           String healthcheck, String expectedHealthcheck, Integer maxConn,
+                                                           Protocol.L4 l4protocol, Protocol.L7 l7protocol, boolean redeploy) {
         validateUpdatePool(poolIds, lbId, zoneId, healthcheckType, maxConn );
 
         LoadBalancer loadBalancer = _lbService.findById(lbId);
         if ( loadBalancer == null ){
             throw new CloudRuntimeException("Can not find Load balancer with id: " + lbId);
         }
+
+
+        GloboNetworkIpDetailVO networkApiVipIp = getNetworkApiVipIp(loadBalancer);
+
 
         HealthCheckHelper healthCheckHelper = HealthCheckHelper.build(loadBalancer.getName(), healthcheckType, healthcheck, expectedHealthcheck);
 
@@ -2730,6 +2737,10 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                 healthCheckHelper.getHealthCheck(),
                 healthCheckHelper.getExpectedHealthCheck(), maxConn, loadBalancer.getName());
 
+        command.setL4Protocol(l4protocol);
+        command.setL7Protocol(l7protocol);
+        command.setRedeploy(redeploy);
+        command.setVipId(networkApiVipIp.getGloboNetworkVipId());
         Answer answer =  callCommand(command, zoneId);
         handleAnswerIfFail(answer, "Could not update pools " + poolIds);
 

@@ -58,6 +58,25 @@ public class GloboNetworkPoolResponse extends Answer{
         private Integer maxconn;
         private Integer vipPort;
 
+        private String l4protocol;
+        private String l7protocol;
+
+        public String getL4protocol() {
+            return l4protocol;
+        }
+
+        public void setL4protocol(String l4protocol) {
+            this.l4protocol = l4protocol;
+        }
+
+        public String getL7protocol() {
+            return l7protocol;
+        }
+
+        public void setL7protocol(String l7protocol) {
+            this.l7protocol = l7protocol;
+        }
+
         public String getHealthcheckType() {
             return healthcheckType;
         }

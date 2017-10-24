@@ -17,10 +17,26 @@
 
 package com.globo.globonetwork.cloudstack.commands;
 
-import com.cloud.agent.api.Command;
+import com.cloud.agent.api.Answer;
+import com.cloud.utils.exception.CloudRuntimeException;
+import com.globo.globonetwork.client.api.GloboNetworkAPI;
+import com.globo.globonetwork.client.api.PoolAPI;
+import com.globo.globonetwork.client.api.VipV3API;
+import com.globo.globonetwork.client.exception.GloboNetworkException;
+import com.globo.globonetwork.client.model.OptionVipV3;
+import com.globo.globonetwork.client.model.VipV3;
+import com.globo.globonetwork.client.model.pool.PoolV3;
+import com.globo.globonetwork.cloudstack.manager.Protocol;
+import com.globo.globonetwork.cloudstack.resource.GloboNetworkResource;
+import com.globo.globonetwork.cloudstack.resource.VipAPIFacade;
+import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
+import java.util.ArrayList;
 import java.util.List;
+import org.apache.log4j.Logger;
 
-public class UpdatePoolCommand extends Command{
+public class UpdatePoolCommand extends GloboNetworkResourceCommand{
+
+    private static final Logger s_logger = Logger.getLogger(UpdatePoolCommand.class);
 
     private String expectedHealthcheck;
     private String healthcheck;
@@ -29,6 +45,10 @@ public class UpdatePoolCommand extends Command{
     private Integer maxConn;
 
     private String lbHostname;
+    private Protocol.L4 l4Protocol;
+    private Protocol.L7 l7Protocol;
+    private boolean redeploy;
+    private Long vipId;
 
     public UpdatePoolCommand(List<Long> poolIds) {
         this.poolIds = poolIds;
@@ -52,8 +72,109 @@ public class UpdatePoolCommand extends Command{
     }
 
     @Override
-    public boolean executeInSequence() {
-        return false;
+    public Answer execute(GloboNetworkAPI api) {
+        try {
+            PoolAPI poolAPI = api.getPoolAPI();
+            List<PoolV3> poolsV3 = poolAPI.getByIdsV3(this.getPoolIds());
+
+            changePortsProtocol(api, poolsV3);
+
+            List<GloboNetworkPoolResponse.Pool> pools = new ArrayList<GloboNetworkPoolResponse.Pool>();
+
+            for (PoolV3 poolv3 : poolsV3) {
+
+                PoolV3.Healthcheck healthCheck = poolv3.getHealthcheck();
+                healthCheck.setHealthcheck(this.getHealthcheckType(), this.getHealthcheck(), this.getExpectedHealthcheck() );
+
+                poolv3.setMaxconn(this.getMaxConn());
+            }
+
+            if ( poolsV3.size() > 0 ) {
+                if (poolsV3.get(0).isPoolCreated()) {
+                    poolAPI.updateDeployAll(poolsV3);
+                } else {
+                    poolAPI.updateAll(poolsV3);
+                }
+            }
+
+            for (PoolV3 poolv3 : poolsV3) {
+                pools.add(GloboNetworkResource.poolV3FromNetworkApi(poolv3));
+            }
+
+            GloboNetworkPoolResponse answer = new GloboNetworkPoolResponse(this, pools, true, "");
+
+            return answer;
+        } catch (GloboNetworkException e) {
+            return GloboNetworkResource.handleGloboNetworkException(this, e);
+        } catch (Exception e) {
+            s_logger.error("Generic error accessing GloboNetwork while update pool", e);
+            return new Answer(this, false, e.getMessage());
+        }
+    }
+
+    private void changePortsProtocol(GloboNetworkAPI api, List<PoolV3> poolsV3) throws GloboNetworkException {
+        if (getL4Protocol() == null && getL7Protocol() == null) {
+            s_logger.debug("No changes to do in l4 and l7 protocols");
+            return;
+        }
+
+        VipV3API vipV3API = api.getVipV3API();
+
+
+        VipAPIFacade vipAPIFacade = new VipAPIFacade(this.vipId, api);
+        VipV3 vip = vipAPIFacade.getVip();
+
+        OptionVipV3 l4Protocol = vipAPIFacade.getProtocolOption(vip.getEnvironmentVipId(), "l4_protocol", getL4Protocol().getNetworkApiOptionValue());
+        OptionVipV3 l7Protocol = vipAPIFacade.getProtocolOption(vip.getEnvironmentVipId(), "l7_protocol", getL7Protocol().getNetworkApiOptionValue());
+
+
+        boolean hasPortToChange = false;
+        for (VipV3.Port port : vip.getPorts()) {
+
+            PoolV3 pool = getPoolToChangePort(port.getPools(), poolsV3);
+
+            if (pool != null){
+                VipV3.PortOptions options = port.getOptions();
+
+
+                if (!options.getL4ProtocolId().equals(l4Protocol.getId())) {
+                    options.setL4ProtocolId(l4Protocol.getId());
+                    hasPortToChange = true;
+                }
+
+                if (!options.getL7ProtocolId().equals(l7Protocol.getId())) {
+                    options.setL7ProtocolId(l7Protocol.getId());
+                    hasPortToChange = true;
+                }
+
+            }
+        }
+
+
+        if (hasPortToChange && !redeploy) {
+            throw new CloudRuntimeException("Change ports require undeploy and deploy Vip. Can not change ports protocol if parameter 'redeploy' is false.");
+        }
+
+        if (hasPortToChange) {
+            if (vip.getCreated()) {
+                vipV3API.undeploy(vip.getId());
+            }
+            vipV3API.save(vip);
+            vipV3API.deploy(vip.getId());
+        }
+
+    }
+
+    private PoolV3 getPoolToChangePort(List<VipV3.Pool> pools, List<PoolV3> poolV3s) {
+        for (PoolV3 poolV3 : poolV3s){
+            for(VipV3.Pool pool : pools) {
+                if (poolV3.getId().equals(pool.getPoolId())){
+                    return poolV3;
+                }
+            }
+        }
+
+        return null;
     }
 
     public String getExpectedHealthcheck() {
@@ -99,4 +220,36 @@ public class UpdatePoolCommand extends Command{
     public Integer getMaxConn() { return maxConn; }
 
     public void setMaxConn(Integer maxConn) { this.maxConn = maxConn; }
+
+    public void setL4Protocol(Protocol.L4 l4Protocol) {
+        this.l4Protocol = l4Protocol;
+    }
+
+    public void setL7Protocol(Protocol.L7 l7Protocol) {
+        this.l7Protocol = l7Protocol;
+    }
+
+    public void setRedeploy(boolean redeploy) {
+        this.redeploy = redeploy;
+    }
+
+    public Protocol.L4 getL4Protocol() {
+        return l4Protocol;
+    }
+
+    public Protocol.L7 getL7Protocol() {
+        return l7Protocol;
+    }
+
+    public boolean isRedeploy() {
+        return redeploy;
+    }
+
+    public Long getVipId() {
+        return vipId;
+    }
+
+    public void setVipId(Long vipId) {
+        this.vipId = vipId;
+    }
 }

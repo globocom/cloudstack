@@ -306,6 +306,9 @@ public class EventTypes {
 
     // Host
     public static final String EVENT_HOST_RECONNECT = "HOST.RECONNECT";
+    public static final String EVENT_HOST_CREATE = "HOST.CREATE";
+    public static final String EVENT_HOST_DELETE = "HOST.DELETE";
+    public static final String EVENT_HOST_UPDATE = "HOST.UPDATE";
 
     // Maintenance
     public static final String EVENT_MAINTENANCE_CANCEL = "MAINT.CANCEL";
@@ -731,6 +734,9 @@ public class EventTypes {
 
         // Host
         entityEventDetails.put(EVENT_HOST_RECONNECT, Host.class);
+        entityEventDetails.put(EVENT_HOST_CREATE, Host.class);
+        entityEventDetails.put(EVENT_HOST_DELETE, Host.class);
+        entityEventDetails.put(EVENT_HOST_UPDATE, Host.class);
 
         // Maintenance
         entityEventDetails.put(EVENT_MAINTENANCE_CANCEL, Host.class);

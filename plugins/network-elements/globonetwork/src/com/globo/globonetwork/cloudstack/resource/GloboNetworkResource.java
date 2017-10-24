@@ -41,6 +41,7 @@ import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkExpectHealthcheckResponse;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -76,6 +77,7 @@ import com.cloud.host.Host;
 import com.cloud.host.Host.Type;
 import com.cloud.resource.ServerResource;
 import com.cloud.utils.component.ManagerBase;
+import com.globo.globonetwork.client.exception.GloboNetworkErrorCodeException;
 import com.globo.globonetwork.client.exception.GloboNetworkException;
 import com.globo.globonetwork.client.model.Environment;
 import com.globo.globonetwork.client.model.Equipment;
@@ -250,10 +252,6 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
 
     @Override
     public Answer executeRequest(Command cmd) {
-        if (cmd instanceof GloboNetworkCommand) {
-            return ((GloboNetworkCommand)cmd).execute(getNewGloboNetworkAPI());
-        }
-
         if (cmd instanceof ReadyCommand) {
             return new ReadyAnswer((ReadyCommand)cmd);
         } else if (cmd instanceof MaintainCommand) {
@@ -1263,6 +1261,7 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
     protected VipAPIFacade createVipAPIFacade(Long vipId, GloboNetworkAPI api) throws GloboNetworkException {
         return new VipAPIFacade(vipId, api);
     }
+
 
     public GloboNetworkAPI getNewGloboNetworkAPI(){
         GloboNetworkAPI api = new GloboNetworkAPI(_url, _username, _password);
