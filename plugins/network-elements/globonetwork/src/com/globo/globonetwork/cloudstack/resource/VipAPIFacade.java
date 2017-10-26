@@ -18,7 +18,6 @@ package com.globo.globonetwork.cloudstack.resource;
 
 import com.cloud.agent.api.Answer;
 import com.cloud.network.lb.LoadBalancingRule;
-import com.cloud.utils.exception.CloudRuntimeException;
 import com.globo.globonetwork.client.api.GloboNetworkAPI;
 import com.globo.globonetwork.client.exception.GloboNetworkException;
 import com.globo.globonetwork.client.model.VipEnvironment;
@@ -29,7 +28,6 @@ import com.globo.globonetwork.client.model.Ip;
 import com.globo.globonetwork.client.model.pool.PoolV3;
 import com.globo.globonetwork.cloudstack.commands.ApplyVipInGloboNetworkCommand;
 import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper;
-import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper.HealthCheckType;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkVipResponse;
 import org.apache.log4j.Logger;
 
@@ -40,7 +38,7 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Collections;
 
-class VipAPIFacade {
+public class VipAPIFacade {
 
     private VipV3 vip;
     private Ip ip;
@@ -52,7 +50,7 @@ class VipAPIFacade {
     private static final String DSR_TRAFFIC_RETURN = "DSRL3";
     private static final Logger s_logger = Logger.getLogger(VipAPIFacade.class);
 
-    VipAPIFacade(Long id, GloboNetworkAPI globoNetworkAPI) throws GloboNetworkException {
+    public VipAPIFacade(Long id, GloboNetworkAPI globoNetworkAPI) throws GloboNetworkException {
         this.globoNetworkAPI = globoNetworkAPI;
         if(id != null){
             vip = globoNetworkAPI.getVipV3API().getById(id);
@@ -174,14 +172,11 @@ class VipAPIFacade {
         globoNetworkAPI.getVipV3API().delete(vip.getId(), keepIp);
     }
 
-    void addPool(VipEnvironment vipEnvironment, Integer vipPort, String healthcheckType, PoolV3 poolV3) throws GloboNetworkException {
-        OptionVipV3 l7Rule = globoNetworkAPI.getOptionVipV3API().findOptionsByTypeAndName(vipEnvironment.getId(), "l7_rule", "default_vip").get(0);
+    void addPool(VipEnvironment vipEnvironment, Integer vipPort, String l4protocol,  String l7protocol, PoolV3 poolV3) throws GloboNetworkException {
+        OptionVipV3 l7Rule = getProtocolOption(vipEnvironment.getId(), "l7_rule", "default_vip");
 
-
-        String l4ProtocolString = HealthCheckHelper.getL4Protocol(healthcheckType, vipPort);
-        String l7ProtocolString = HealthCheckHelper.getL7Protocol(healthcheckType, vipPort);
-
-        vip.getPorts().add(createPort(vipEnvironment, poolV3.getId(), vipPort, l4ProtocolString, l7ProtocolString, l7Rule));
+        VipV3.Port port = createPort(vipEnvironment, poolV3.getId(), vipPort, l4protocol, l7protocol, l7Rule);
+        vip.getPorts().add(port);
         globoNetworkAPI.getVipV3API().deployUpdate(vip);
     }
 
@@ -250,7 +245,7 @@ class VipAPIFacade {
         return "VipAPIFacade{" + vip + "}";
     }
 
-    protected VipV3 getVip() {
+    public VipV3 getVip() {
         return vip;
     }
 

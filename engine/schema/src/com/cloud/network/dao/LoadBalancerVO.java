@@ -150,5 +150,11 @@ public class LoadBalancerVO extends FirewallRuleVO implements LoadBalancer {
     }
 
 
+    public void setDefaultPortStart(int defaultPortStart) {
+        this.defaultPortStart = defaultPortStart;
+    }
 
+    public void setDefaultPortEnd(int defaultPortEnd) {
+        this.defaultPortEnd = defaultPortEnd;
+    }
 }

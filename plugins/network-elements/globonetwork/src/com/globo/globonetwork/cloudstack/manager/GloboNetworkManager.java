@@ -296,7 +296,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
     private static final ConfigKey<Integer> maxSubnetMaskInBIts = new ConfigKey<Integer>("Network", Integer.class, "globonetwork.min.subnetinbits", "29",
             "Max subnet mask in bits for allowed to create network in globonetwork, use 29 for a /29 subnet", true, ConfigKey.Scope.Global);
 
-    private static final ConfigKey<String> GloboNetworkRegion = new ConfigKey<String>("Network", String.class, "globonetwork.region", "",
+    public static final ConfigKey<String> GloboNetworkRegion = new ConfigKey<String>("Network", String.class, "globonetwork.region", "",
             "Current region", true, ConfigKey.Scope.Global);
 
 

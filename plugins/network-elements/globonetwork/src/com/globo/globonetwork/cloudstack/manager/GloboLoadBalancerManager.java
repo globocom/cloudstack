@@ -1,5 +1,9 @@
 package com.globo.globonetwork.cloudstack.manager;
 
+import com.cloud.network.dao.FirewallRulesDao;
+import com.cloud.network.dao.LoadBalancerDao;
+import com.cloud.network.dao.LoadBalancerPortMapDao;
+import com.cloud.network.dao.LoadBalancerPortMapVO;
 import com.cloud.network.dao.LoadBalancerVMMapDao;
 import com.cloud.network.dao.LoadBalancerVMMapVO;
 import com.cloud.network.dao.LoadBalancerVO;
@@ -8,14 +12,18 @@ import com.cloud.network.dao.NetworkVO;
 import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.network.lb.LoadBalancingRulesManager;
 import com.cloud.network.lb.LoadBalancingRulesService;
+import com.cloud.network.rules.FirewallRuleVO;
 import com.cloud.network.rules.LoadBalancer;
 import com.cloud.region.ha.GlobalLoadBalancingRulesService;
 import com.cloud.utils.component.PluggableService;
+import com.cloud.utils.db.DB;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.globo.globonetwork.cloudstack.GloboNetworkIpDetailVO;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.LinkGloboLoadBalancerCmd;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.ListGloboLinkableLoadBalancersCmd;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.UnlinkGloboLoadBalancerCmd;
+import com.globo.globonetwork.cloudstack.commands.LinkTargetLbPoolsInSourceLbCommand;
+import com.globo.globonetwork.cloudstack.commands.UnlinkPoolsFromLbCommand;
 import org.apache.cloudstack.api.command.user.loadbalancer.AssignToLoadBalancerRuleCmd;
 import org.apache.cloudstack.globoconfig.GloboResourceConfiguration;
 import org.apache.cloudstack.globoconfig.GloboResourceConfigurationDao;
@@ -57,17 +65,86 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
 
 
     @Inject
+    LoadBalancerPortMapDao _lbPortMapDao;
+    @Inject
     NetworkDao networkDao;
 
+    @Inject
+    LoadBalancerDao lbDao;
+
+    @Inject
+    FirewallRulesDao frDao;
+
     @Override
+    @DB
     public LoadBalancer linkLoadBalancer(Long sourceLbid, Long targetLbid) {
-        LoadBalancer lb = checkIfLBAlreadyIsLinked(sourceLbid);
-        checkIfSourceLBHasVms(lb);
+        LoadBalancer sourceLb = checkIfLBAlreadyIsLinked(sourceLbid);
+        checkIfSourceLBHasVms(sourceLb);
 
         LoadBalancer targetLb = checkIfLBAlreadyIsLinked(targetLbid);
 
-        LoadBalancingRule lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) lb);
+        LoadBalancingRule lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) sourceLb);
         LoadBalancingRule targetRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) targetLb);
+
+        removeUnnecessaryNetworks(lbRule, targetRule);
+        lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) sourceLb);
+        copyNetworksFromTarget(lbRule, targetRule);
+
+
+        LinkTargetLbPoolsInSourceLbCommand command = new LinkTargetLbPoolsInSourceLbCommand();
+
+        Long sourceVipId = getVipIdApplyLbIfNeed(sourceLb);
+        command.setSourceLb(sourceLb.getUuid(), sourceLb.getName(), sourceVipId);
+
+        Long targetVipId = getVipIdApplyLbIfNeed(targetLb);
+        command.setTargetLb(targetLb.getUuid(), targetLb.getName(), targetVipId);
+
+        NetworkVO byId = networkDao.findById(lbRule.getNetworkId());
+        globoNetworkSvc.callCommand(command, byId.getDataCenterId());
+
+        registerLink(sourceLb, targetLb);
+
+
+        copyPorts(targetRule, (LoadBalancerVO)sourceLb);
+
+        return sourceLb;
+    }
+
+    private void copyPorts(LoadBalancingRule fromLb, LoadBalancerVO toLb) {
+        List<LoadBalancerPortMapVO> loadBalancerPortMaps = _lbPortMapDao.listByLoadBalancerId(toLb.getId());
+        for (LoadBalancerPortMapVO lBPortMap : loadBalancerPortMaps) {
+            _lbPortMapDao.remove(lBPortMap.getId());
+        }
+
+        loadBalancerPortMaps = _lbPortMapDao.listByLoadBalancerId(fromLb.getId());
+        for (LoadBalancerPortMapVO lBPortMap : loadBalancerPortMaps) {
+
+            _lbPortMapDao.persist(new LoadBalancerPortMapVO(toLb.getId(), lBPortMap.getPublicPort(), lBPortMap.getPrivatePort()));
+        }
+
+        toLb.setDefaultPortEnd(fromLb.getDefaultPortEnd());
+        toLb.setDefaultPortStart(fromLb.getDefaultPortStart());
+
+        lbDao.update(toLb.getId(), toLb);
+
+        FirewallRuleVO firewall = frDao.findById(toLb.getId());
+        FirewallRuleVO fromFirewall = frDao.findById(fromLb.getId());
+        firewall.setSourcePortEnd(fromFirewall.getSourcePortEnd());
+        firewall.setSourcePortStart(fromFirewall.getSourcePortStart());
+
+        frDao.update(firewall.getId(), firewall);
+
+    }
+
+
+    public LoadBalancer copyVmsAndNetworks(Long fromLbId, Long toLbid) {
+        LoadBalancer lb = checkIfLBAlreadyIsLinked(toLbid);
+        checkIfSourceLBHasVms(lb);
+
+        LoadBalancer fromLb = checkIfLBAlreadyIsLinked(fromLbId);
+
+        LoadBalancingRule lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) lb);
+        LoadBalancingRule targetRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) fromLb);
 
         removeUnnecessaryNetworks(lbRule, targetRule);
         lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) lb);
@@ -76,10 +153,9 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
         lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) lb);
         copyVmsFromTarget(lbRule, targetRule);
 
-        registerLink(lb, targetLb);
-
         return lb;
     }
+
 
     protected void copyVmsFromTarget(LoadBalancingRule lbRule, LoadBalancingRule targetLb) {
 
@@ -127,8 +203,16 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
     }
 
     @Override
+    @DB
     public LoadBalancer unlinkLoadBalancer(Long lbid) {
         LoadBalancer lb = lbService.findById(lbid);
+
+        Long vipId = getVipIdApplyLbIfNeed(lb);
+        String region = GloboNetworkManager.GloboNetworkRegion.value();
+        UnlinkPoolsFromLbCommand command = new UnlinkPoolsFromLbCommand(lbid, vipId, lb.getName(), region);
+
+        NetworkVO byId = networkDao.findById(lb.getNetworkId());
+        globoNetworkSvc.callCommand(command, byId.getDataCenterId());
 
         GloboResourceConfiguration linkedConfig = globoNetworkSvc.getGloboResourceConfiguration(lb.getUuid(), GloboResourceType.LOAD_BALANCER, GloboResourceKey.linkedLoadBalancer);
         resourceConfigDao.remove(linkedConfig.getId().toString());

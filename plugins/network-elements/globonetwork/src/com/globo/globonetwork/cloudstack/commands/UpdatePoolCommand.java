@@ -34,7 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.log4j.Logger;
 
-public class UpdatePoolCommand extends GloboNetworkResourceCommand{
+public class UpdatePoolCommand extends GloboNetworkResourceCommand {
 
     private static final Logger s_logger = Logger.getLogger(UpdatePoolCommand.class);
 
@@ -105,7 +105,7 @@ public class UpdatePoolCommand extends GloboNetworkResourceCommand{
 
             return answer;
         } catch (GloboNetworkException e) {
-            return GloboNetworkResource.handleGloboNetworkException(this, e);
+            return GloboNetworkResourceCommand.handleGloboNetworkException(this, e);
         } catch (Exception e) {
             s_logger.error("Generic error accessing GloboNetwork while update pool", e);
             return new Answer(this, false, e.getMessage());

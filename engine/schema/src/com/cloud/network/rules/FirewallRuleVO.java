@@ -294,4 +294,12 @@ public class FirewallRuleVO implements FirewallRule {
     public void setNetworkId(Long networkId) {
         this.networkId = networkId;
     }
+
+    public void setSourcePortStart(Integer sourcePortStart) {
+        this.sourcePortStart = sourcePortStart;
+    }
+
+    public void setSourcePortEnd(Integer sourcePortEnd) {
+        this.sourcePortEnd = sourcePortEnd;
+    }
 }

@@ -19,7 +19,7 @@ import org.apache.cloudstack.globoconfig.GloboResourceType;
 
 import javax.inject.Inject;
 
-@APICommand(name = "linkGloboLoadBalancer", description = "Link a load balancer with another lb, allow first source lb send connection to second load balancer vms", responseObject = LoadBalancerResponse.class,
+@APICommand(name = "linkGloboLoadBalancer", description = "Link a load balancer with another lb, add target lb pools in source lb", responseObject = LoadBalancerResponse.class,
         requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
 public class LinkGloboLoadBalancerCmd extends BaseAsyncCmd {
 

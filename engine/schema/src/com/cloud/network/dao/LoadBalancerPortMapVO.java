@@ -31,7 +31,7 @@ public class LoadBalancerPortMapVO implements InternalIdentity {
     @Id
     @GeneratedValue(strategy=GenerationType.IDENTITY)
     @Column(name="id")
-    private long id;
+    private Long id;
 
     @Column(name="lb_id")
     private long lbId;
@@ -66,5 +66,13 @@ public class LoadBalancerPortMapVO implements InternalIdentity {
 
     public int getPrivatePort() {
         return privatePort;
+    }
+
+    public void setLbId(long lbId) {
+        this.lbId = lbId;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 }

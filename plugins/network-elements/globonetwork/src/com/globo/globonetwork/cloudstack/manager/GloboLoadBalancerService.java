@@ -4,7 +4,9 @@ import com.cloud.network.rules.LoadBalancer;
 
 public interface GloboLoadBalancerService {
 
-    public LoadBalancer linkLoadBalancer(Long sourceLbid, Long targetLbid);
+    LoadBalancer linkLoadBalancer(Long sourceLbid, Long targetLbid);
 
     LoadBalancer unlinkLoadBalancer(Long lbid);
+
+    LoadBalancer copyVmsAndNetworks(Long fromLbId, Long toLbid);
 }
