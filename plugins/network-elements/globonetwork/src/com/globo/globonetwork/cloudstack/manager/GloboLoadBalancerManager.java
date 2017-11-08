@@ -260,7 +260,7 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
         List<LoadBalancerVMMapVO> loadBalancerVMMapVOS = _lb2VmMapDao.listByLoadBalancerId(lb.getId());
 
         if (loadBalancerVMMapVOS.size() > 0) {
-            throw new CloudRuntimeException("Please, remove all virtual machines(" + loadBalancerVMMapVOS.size() + ") from load balancer " + lb.getName() + " before link to another one.");
+            throw new CloudRuntimeException("Can not link load balancers. Please,remove all virtual machines(" + loadBalancerVMMapVOS.size() + ") from load balancer " + lb.getName() + " before link to another one.");
         }
     }
 

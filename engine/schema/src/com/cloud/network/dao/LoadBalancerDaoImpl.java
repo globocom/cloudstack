@@ -94,6 +94,7 @@ public class LoadBalancerDaoImpl extends GenericDaoBase<LoadBalancerVO, Long> im
                     " INNER JOIN load_balancing_rules l on f.id = l.id " +
                     " INNER JOIN globonetwork_network_ref ref on f.network_id = ref.network_id " +
                     " WHERE f.uuid != ? " +
+                    " AND f.state in ('Active', 'Add') " +
                     " AND ref.globonetwork_environment_id = ? " +
                     " AND f.account_id = ?; ";
             PreparedStatement pstmt = txn.prepareAutoCloseStatement(sql);

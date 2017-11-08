@@ -1024,6 +1024,8 @@ $.extend(dictionary, {
 'label.added.network.offering': '<fmt:message key="label.added.network.offering" />',
 'label.no': '<fmt:message key="label.no" />',
 'label.local.storage.enabled.system.vms': '<fmt:message key="label.local.storage.enabled.system.vms" />',
-'label.max.hosts.supported': '<fmt:message key="label.max.hosts.supported" />'
+'label.max.hosts.supported': '<fmt:message key="label.max.hosts.supported" />',
+'message.action.unlink.loadbalancer': '<fmt:message key="message.action.unlink.loadbalancer" />',
+
 });
 </script>
