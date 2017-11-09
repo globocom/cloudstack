@@ -1026,6 +1026,10 @@ $.extend(dictionary, {
 'label.local.storage.enabled.system.vms': '<fmt:message key="label.local.storage.enabled.system.vms" />',
 'label.max.hosts.supported': '<fmt:message key="label.max.hosts.supported" />',
 'message.action.unlink.loadbalancer': '<fmt:message key="message.action.unlink.loadbalancer" />',
-
+'message.action.link.loadbalancer': '<fmt:message key="message.action.link.loadbalancer" />',
+'label.action.unlink.loadbalancer': '<fmt:message key="label.action.unlink.loadbalancer" />',
+'label.action.link.loadbalancer': '<fmt:message key="label.action.link.loadbalancer" />',
+'label.action.unlink.loadbalancer.processing': '<fmt:message key="label.action.unlink.loadbalancer.processing" />',
+'label.action.link.loadbalancer.processing': '<fmt:message key="label.action.link.loadbalancer.processing" />'
 });
 </script>

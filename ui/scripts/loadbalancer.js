@@ -114,6 +114,46 @@
         process_command(0, {});
     };
 
+    var buildLbs = function(data) {
+        var loadBalancerData = data.listloadbalancerrulesresponse.loadbalancerrule;
+        $(loadBalancerData).each(function() {
+            var that = this;
+            this.ports = this.publicport + ':' + this.privateport + ', ';
+            $(this.additionalportmap).each(function() {
+                that.ports += this + ', ';
+            });
+            this.ports = this.ports.substring(0, this.ports.length - 2); // remove last ', '
+            if (typeof(this.linkedloadbalancer) != 'undefined') {
+                this.linkedlb = this.linkedloadbalancer.name;
+                this.isLinked = true;
+            } else {
+                this.isLinked = false;
+            }
+
+
+        });
+        return loadBalancerData;
+    }
+
+    var getLoadBalancer = function(lbid) {
+        var lb = null;
+        $.ajax({
+            url: createURL("listLoadBalancerRules"),
+            data: {
+                id: lbid
+            },
+            dataType: "json",
+            async: false,
+            success: function(data) {
+                var lbs = buildLbs(data);
+                if (lbs.length > 0) {
+                    lb = lbs[0];
+                }
+            }
+        });
+        return lb;
+    }
+
     var autoscaleActionfilter = function(args) {
         var jsonObj = args.context.item;
 
@@ -171,18 +211,7 @@
                     dataType: "json",
                     async: true,
                     success: function(data) {
-                        var loadBalancerData = data.listloadbalancerrulesresponse.loadbalancerrule;
-                        $(loadBalancerData).each(function() {
-                            var that = this;
-                            this.ports = this.publicport + ':' + this.privateport + ', ';
-                            $(this.additionalportmap).each(function() {
-                                that.ports += this + ', ';
-                            });
-                            this.ports = this.ports.substring(0, this.ports.length - 2); // remove last ', '
-                            if (typeof(this.linkedloadbalancer) != 'undefined') {
-                                this.linkedlb = this.linkedloadbalancer.name;
-                            }
-                        });
+                        var loadBalancerData = buildLbs(data);
                         args.response.success({ data: loadBalancerData });
                     },
                     error: function(errorMessage) {
@@ -194,6 +223,15 @@
                 name: 'Load Balancer Details',
                 isMaximized: true,
                 noCompact: true,
+                tabFilter: function(args) {
+                    console.log("############## tab filter o/");
+                    var hiddenTabs = [];
+                    if (args.context.loadbalancers[0].isLinked) {
+                        hiddenTabs.push("vms");
+                        hiddenTabs.push("autoscale");
+                    }
+                    return hiddenTabs;
+                },
                 tabs: {
                     // see loadbalancer/tabDetails.js
                     details: {},
@@ -959,143 +997,95 @@
                         }
                     },
                     linkloadbalancer: {
-                        label: 'Link load balancer with pools from another load balancer',
-                        custom: {
-                            buttonLabel: 'label.configure'
-                        },
+                        label: 'label.action.link.loadbalancer',
+                        compactLabel: 'label.destroy',
                         preFilter: function(args) {
-                            var linked = args.context.loadbalancers[0].linkedloadbalancer
-                            if ( typeof(linked) == 'undefined') {
-                                return true;
-                            }
-                            return false;
+                            console.log(args.context.loadbalancers[0].isLinked)
+                            console.log("##################")
+                            return !args.context.loadbalancers[0].isLinked
                         },
-                        action: function(args){
-                            var lb = args.context.loadbalancers[0];
-                            var result = [];
-                            cloudStack.dialog.createForm({
-                                form: {
-                                    title: 'Link Load Balancer with pool(s) from',
-                                    fields: {
-                                        linkablelb: {
-                                            label: 'LB',
-                                            select: function(args) {
-                                                $.ajax({
-                                                    url: createURL("listGloboLinkableLoadBalancers"),
-                                                    data: {
-                                                        lbruleid: lb.id
-                                                    },
-                                                    async: false,
-                                                    success: function(data) {
-                                                        $(data.listlinkableloadbalancerresponse.linkableloadbalancerresponse).each(function(){
-                                                            result.push({
-                                                                         id:   this.uuid, 
-                                                                         name: this.name, 
-                                                                         description: this.name
-                                                                     });
-                                                        });
-                                                    }
-                                                });
-
-                                                args.response.success({
-                                                    data: result
+                        createForm: {
+                            title: 'label.action.link.loadbalancer', 
+                            desc: 'message.action.link.loadbalancer',
+                            isWarning: true,
+                            fields: {
+                                linkablelb: {
+                                    label: 'LB',
+                                    select: function(args) {
+                                        var lb = args.context.loadbalancers[0];
+                                        var result = [];
+                                        $.ajax({
+                                            url: createURL("listGloboLinkableLoadBalancers"),
+                                            data: {
+                                                lbruleid: lb.id
+                                            },
+                                            async: false,
+                                            success: function(data) {
+                                                $(data.listlinkableloadbalancerresponse.linkableloadbalancerresponse).each(function(){
+                                                    result.push({
+                                                                 id:   this.uuid, 
+                                                                 name: this.name, 
+                                                                 description: this.name
+                                                             });
                                                 });
                                             }
-                                        }
+                                        });
+
+                                        args.response.success({
+                                            data: result
+                                        });
                                     }
+                                }
+                            }
+                        },                        
+                        messages: {                            
+                            notification: function(args) {
+                                return 'label.action.link.loadbalancer.processing';
+                            }
+                        },
+                        action: function(args) {                            
+                            var lastJobId;
+                            var lb = args.context.loadbalancers[0];
+                            $.ajax({
+                                url: createURL("linkGloboLoadBalancer"),
+                                async: false,
+                                data: {
+                                    sourcelbid: lb.id,
+                                    targetlbid: args.data.linkablelb
                                 },
-                                after: function(args2) {
-                                    var lastJobId;
-
-                                    $.ajax({
-                                        url: createURL("linkGloboLoadBalancer"),
-                                        async: false,
-                                        data: {
-                                            sourcelbid: lb.id,
-                                            targetlbid: args2.data.linkablelb
-                                        },
-                                        success: function(data, jobId) {
-                                            console.log(data)
-                                            
-                                            lastJobId = data.linkgloboloadbalancerresponse.jobid;
-                                        },
-                                        error: function(message) {
-                                            lastJobId = -1;
-                                            args.response.error(message);
-                                        }
-
-                                    })
+                                success: function(data, jobId) {
+                                    lastJobId = data.linkgloboloadbalancerresponse.jobid;
+                                    
                                     args.response.success({
                                         _custom: {
-                                            getLastJobId: function() { return lastJobId; },
+                                            jobId: lastJobId,
                                             getUpdatedItem: function() {
-                                                var loadbalancer = null;
-                                                $.ajax({
-                                                    url: createURL("listLoadBalancerRules"),
-                                                    data: {
-                                                        id: lb.id
-                                                    },
-                                                    dataType: "json",
-                                                    async: false,
-                                                    success: function(data) {
-                                                        var loadBalancerData = data.listloadbalancerrulesresponse.loadbalancerrule;
-                                                        $(loadBalancerData).each(function() {
-                                                            var that = this;
-                                                            this.ports = this.publicport + ':' + this.privateport + ', ';
-                                                            $(this.additionalportmap).each(function() {
-                                                                that.ports += this + ', ';
-                                                            });
-                                                            this.ports = this.ports.substring(0, this.ports.length - 2); // remove last ', '
-                                                        });
-                                                        loadbalancer = loadBalancerData[0];
+                                                var loadbalancer = getLoadBalancer(lb.id);
 
-                                                        if (typeof(loadbalancer.linkedloadbalancer) != 'undefined') {
-                                                            loadbalancer.linkedlb = loadbalancer.linkedloadbalancer.name;
-                                                        }
-                                                    }
-                                                });
                                                 return loadbalancer;
                                             }
                                         }
                                     });
-
-
-                                    
+                                },
+                                error: function(message) {
+                                    lastJobId = -1;
+                                    args.response.error(message);
                                 }
-                            });
-                        },
-                        messages: {
-                            notification: function() {
-                                return 'Link Load Balancer';
-                            }
+
+                            })
+                            
                         },
                         notification: {
-                            poll: function(args) {
-                                var lastJobId = args._custom.getLastJobId();
-                                if (lastJobId === undefined) {
-                                    return;
-                                } else if (lastJobId === null) {
-                                    args.complete({
-                                        data: args._custom.getUpdatedItem()
-                                    });
-                                    return;
-                                }
-                                args._custom.jobId = lastJobId;
-                                return pollAsyncJobResult(args);
-                            }
+                            poll: pollAsyncJobResult
                         }
                     },
                     unlinkloadbalancer: {
-                        label: 'Unlink load balancer, creating new pools',
+                        label: 'label.action.unlink.loadbalancer',
                         custom: {
-                            buttonLabel: 'label.configure'
+                            buttonLabel: 'label.action.unlink.loadbalancer'
                         },
                         preFilter: function(args) {
-                            var linked = args.context.loadbalancers[0].linkedloadbalancer
-                            if ( typeof(linked) == 'undefined') {
-                                return false;
-                            }
-                            return true;
+                            return args.context.loadbalancers[0].isLinked
                         },
                         action: function(args) {
                             var lastJobId;
@@ -1108,6 +1098,17 @@
                                 },
                                 success: function(data, jobId) {
                                     lastJobId = data.unlinkgloboloadbalancerresponse.jobid;
+
+                                    args.response.success({
+                                        _custom: {
+                                            jobId: lastJobId,
+                                            getUpdatedItem: function() {
+                                                var loadbalancer = getLoadBalancer(lb.id);
+                                                
+                                                return loadbalancer;
+                                            }
+                                        }
+                                    });
                                 },
                                 error: function(message) {
                                     lastJobId = -1;
@@ -1115,63 +1116,17 @@
                                 }
 
                             })
-                            args.response.success({
-                                _custom: {
-                                    getLastJobId: function() { return lastJobId; },
-                                    getUpdatedItem: function() {
-                                        var loadbalancer = null;
-                                        $.ajax({
-                                            url: createURL("listLoadBalancerRules"),
-                                            data: {
-                                                id: lb.id
-                                            },
-                                            dataType: "json",
-                                            async: false,
-                                            success: function(data) {
-                                                var loadBalancerData = data.listloadbalancerrulesresponse.loadbalancerrule;
-                                                $(loadBalancerData).each(function() {
-                                                    var that = this;
-                                                    this.ports = this.publicport + ':' + this.privateport + ', ';
-                                                    $(this.additionalportmap).each(function() {
-                                                        that.ports += this + ', ';
-                                                    });
-                                                    this.ports = this.ports.substring(0, this.ports.length - 2); // remove last ', '
-                                                });
-                                                loadbalancer = loadBalancerData[0];
-                                                if (typeof(loadbalancer.linkedloadbalancer) != 'undefined') {
-                                                    loadbalancer.linkedlb = loadbalancer.linkedloadbalancer.name;
-                                                }
-                                                
-                                            }
-                                        });
-                                        return loadbalancer;
-                                    }
-                                }
-                            });
-
                         },
                         messages: {
                             confirm: function(args) {
                                 return 'message.action.unlink.loadbalancer';
                             },
                             notification: function(args) {
-                                return 'label.action.unlink.loadbalancer';
+                                return 'label.action.unlink.loadbalancer.processing';
                             }
                         },
                         notification: {
-                            poll: function(args) {
-                                var lastJobId = args._custom.getLastJobId();
-                                if (lastJobId === undefined) {
-                                    return;
-                                } else if (lastJobId === null) {
-                                    args.complete({
-                                        data: args._custom.getUpdatedItem()
-                                    });
-                                    return;
-                                }
-                                args._custom.jobId = lastJobId;
-                                return pollAsyncJobResult(args);
-                            }
+                            poll: pollAsyncJobResult
                         }
                     }
                 }
