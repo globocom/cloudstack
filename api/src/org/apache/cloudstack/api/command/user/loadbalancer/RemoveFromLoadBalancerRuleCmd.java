@@ -156,6 +156,7 @@ public class RemoveFromLoadBalancerRuleCmd extends BaseAsyncCmd {
 
     @Override
     public void execute()  {
+        _lbService.throwExceptionIfIsChildLoadBalancer(id, getActualCommandName());
         CallContext.current().setEventDetails("Load balancer Id: " + getId() + " VmIds: " + StringUtils.join(getVirtualMachineIds(), ","));
         Map<Long, List<String>> vmIdIpsMap = getVmIdIpListMap();
         try {

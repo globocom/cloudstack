@@ -23,4 +23,7 @@ public interface GloboResourceConfigurationDao extends GenericDao<GloboResourceC
     public void removeConfigurations(String uuid, GloboResourceType loadBalancer);
 
     public boolean updateValue(GloboResourceConfiguration config);
+
+
+    public List<GloboResourceConfigurationVO> getConfigsByValue(GloboResourceType type, GloboResourceKey key, String value);
 }

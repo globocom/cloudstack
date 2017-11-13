@@ -79,6 +79,8 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() {
+        _lbService.throwExceptionIfIsChildLoadBalancer(lbId, getActualCommandName());
+
         validateParams();
         GloboNetworkPoolResponse.Pool pool = _globoNetworkService.createPool(this);
         PoolResponse poolResp = new PoolResponse();

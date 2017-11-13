@@ -162,6 +162,7 @@ public class AssignToLoadBalancerRuleCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() {
+        _lbService.throwExceptionIfIsChildLoadBalancer(id, getActualCommandName());
         CallContext.current().setEventDetails("Load balancer Id: " + getLoadBalancerId() + " VmIds: " + StringUtils.join(getVirtualMachineIds(), ","));
 
         Map<Long, List<String>> vmIdIpsMap = getVmIdIpListMap();

@@ -12,35 +12,35 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.log4j.Logger;
 
-public class LinkTargetLbPoolsInSourceLbCommand extends GloboNetworkResourceCommand {
+public class LinkParentLbPoolsInChildLbCommand extends GloboNetworkResourceCommand {
 
-    private static final Logger s_logger = Logger.getLogger(LinkTargetLbPoolsInSourceLbCommand.class);
+    private static final Logger s_logger = Logger.getLogger(LinkParentLbPoolsInChildLbCommand.class);
 
 
-    private String sourceLbId;
-    private String sourceLbName;
-    private Long sourceVipId;
+    private String childLbId;
+    private String childLbName;
+    private Long childVipId;
 
-    private String targetLbId;
-    private Long targetVipId;
-    private String targetLbName;
+    private String parentLbId;
+    private Long parentVipId;
+    private String parentLbName;
 
     @Override
     public Answer execute(GloboNetworkAPI api) {
         try {
-            s_logger.debug("[LinkLBPools " + targetVipId + ":" + sourceVipId + "] adding pools from lb '" + targetLbName + "'(" + targetVipId + ") in source lb '" + sourceLbName + "'(" + sourceVipId + ").");
+            s_logger.debug("[LinkLBPools " + parentVipId + ":" + childVipId + "] adding pools from parent lb '" + parentLbName + "'(" + parentVipId + ") in bhild lb '" + childLbName + "'(" + childVipId + ").");
 
-            VipAPIFacade targetFacade = new VipAPIFacade(targetVipId, api);
-            VipAPIFacade sourceFacade = new VipAPIFacade(sourceVipId, api);
+            VipAPIFacade parentFacade = new VipAPIFacade(parentVipId, api);
+            VipAPIFacade childFacade = new VipAPIFacade(childVipId, api);
 
-            VipV3 targetVip = targetFacade.getVip();
+            VipV3 targetVip = parentFacade.getVip();
 
-            VipV3 vip = sourceFacade.getVip();
+            VipV3 vip = childFacade.getVip();
             List<Long> poolsToDelete = getPoolsToDelete(vip);
 
             updateSourceVipWithNewPorts(api, targetVip.getPorts(), vip);
 
-            s_logger.debug("[LinkLBPools " + targetVipId + ":" + sourceVipId + "] removing pools: " + poolsToDelete);
+            s_logger.debug("[LinkLBPools " + parentVipId + ":" + childVipId + "] removing pools: " + poolsToDelete);
             deleteSourcePools(api, poolsToDelete);
 
             return new Answer(this, true, "Foi");
@@ -96,15 +96,15 @@ public class LinkTargetLbPoolsInSourceLbCommand extends GloboNetworkResourceComm
         return poolsIds;
     }
 
-    public void setTargetLb(String uuid, String name, Long vipId) {
-        this.targetLbId = uuid;
-        this.targetLbName = name;
-        this.targetVipId = vipId;
+    public void setParentLb(String uuid, String name, Long vipId) {
+        this.parentLbId = uuid;
+        this.parentLbName = name;
+        this.parentVipId = vipId;
     }
 
-    public void setSourceLb(String uuid, String name, Long vipId) {
-        this.sourceLbId = uuid;
-        this.sourceLbName = name;
-        this.sourceVipId = vipId;
+    public void setChildLb(String uuid, String name, Long vipId) {
+        this.childLbId = uuid;
+        this.childLbName = name;
+        this.childVipId = vipId;
     }
 }

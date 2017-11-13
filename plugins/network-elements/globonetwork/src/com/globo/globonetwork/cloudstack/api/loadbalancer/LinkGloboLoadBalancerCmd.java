@@ -3,6 +3,7 @@ package com.globo.globonetwork.cloudstack.api.loadbalancer;
 import com.cloud.event.EventTypes;
 
 import com.cloud.network.rules.LoadBalancer;
+import com.cloud.user.Account;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.globo.globonetwork.cloudstack.manager.GloboLoadBalancerService;
 import com.globo.globonetwork.cloudstack.manager.GloboNetworkService;
@@ -19,7 +20,7 @@ import org.apache.cloudstack.globoconfig.GloboResourceType;
 
 import javax.inject.Inject;
 
-@APICommand(name = "linkGloboLoadBalancer", description = "Link a load balancer with another lb, add target lb pools in source lb", responseObject = LoadBalancerResponse.class,
+@APICommand(name = "linkGloboLoadBalancer", description = "Link a load balancer with another lb, it will add pool's load balancer parent in load balancer child ", responseObject = LoadBalancerResponse.class,
         requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
 public class LinkGloboLoadBalancerCmd extends BaseAsyncCmd {
 
@@ -31,21 +32,20 @@ public class LinkGloboLoadBalancerCmd extends BaseAsyncCmd {
     @Inject
     protected GloboLoadBalancerService globoLBService;
 
-    @Parameter(name = ApiConstants.LB_SOURCE_LBID,
+    @Parameter(name = ApiConstants.LB_CHILD_LBID,
             type = CommandType.UUID,
             entityType = FirewallRuleResponse.class,
             required = true,
-            description = "the ID of the load balancer rule")
-    private Long sourcelbid;
+            description = "Load Balancer Child Id")
+    private Long childlbid;
 
 
-    @Parameter(name = ApiConstants.LB_TARGET_LBID,
+    @Parameter(name = ApiConstants.LB_PARENT_LBID,
             type = CommandType.UUID,
             entityType = FirewallRuleResponse.class,
             required = true,
-            description = "the ID of the load balancer rule")
-    private Long targetlbid;
-
+            description = "Load Balancer Parent  Id")
+    private Long parentlbid;
 
     @Override
     public String getEventType() {
@@ -54,12 +54,12 @@ public class LinkGloboLoadBalancerCmd extends BaseAsyncCmd {
 
     @Override
     public String getEventDescription() {
-        return EventTypes.EVENT_LB_LINK;
+        return "link load balancer child in parent";
     }
 
     @Override
     public void execute() throws CloudRuntimeException {
-        LoadBalancer lb = globoLBService.linkLoadBalancer(sourcelbid, targetlbid);
+        LoadBalancer lb = globoLBService.linkLoadBalancer(childlbid, parentlbid);
 
         LoadBalancerResponse lbResponse = _responseGenerator.createLoadBalancerResponse(lb);
 
@@ -68,7 +68,7 @@ public class LinkGloboLoadBalancerCmd extends BaseAsyncCmd {
         if (linkedConfig != null) {
             LoadBalancer targetLb = _lbService.findByUuid(linkedConfig.getValue());
 
-            lbResponse.setLinkedLoadBalancer(targetLb, linkedConfig);
+            lbResponse.setLinkedParentLoadBalancer(targetLb, linkedConfig);
         }
 
         setResponseObject(lbResponse);
@@ -81,23 +81,27 @@ public class LinkGloboLoadBalancerCmd extends BaseAsyncCmd {
 
     @Override
     public long getEntityOwnerId() {
-        return 0;
+        LoadBalancer lb = _entityMgr.findById(LoadBalancer.class, childlbid);
+        if (lb == null) {
+            return Account.ACCOUNT_ID_SYSTEM; // bad id given, parent this command to SYSTEM so ERROR events are tracked
+        }
+        return lb.getAccountId();
     }
 
 
-    public Long getSourcelbid() {
-        return sourcelbid;
+    public Long getChildlbid() {
+        return childlbid;
     }
 
-    public void setSourcelbid(Long sourcelbid) {
-        this.sourcelbid = sourcelbid;
+    public void setChildlbid(Long childlbid) {
+        this.childlbid = childlbid;
     }
 
-    public Long getTargetlbid() {
-        return targetlbid;
+    public Long getParentlbid() {
+        return parentlbid;
     }
 
-    public void setTargetlbid(Long targetlbid) {
-        this.targetlbid = targetlbid;
+    public void setParentlbid(Long parentlbid) {
+        this.parentlbid = parentlbid;
     }
 }

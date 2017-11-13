@@ -24,8 +24,8 @@ public class LinkGloboLoadBalancerCmdTest {
     public void execute() throws Exception {
         //mocks
         LinkGloboLoadBalancerCmd cmd =  new LinkGloboLoadBalancerCmd();
-        cmd.setSourcelbid(123L);
-        cmd.setTargetlbid(456L);
+        cmd.setChildlbid(123L);
+        cmd.setParentlbid(456L);
 
         cmd.globoLBService = mock(GloboLoadBalancerService.class);
         LoadBalancerVO lb = new LoadBalancerVO();
@@ -61,7 +61,7 @@ public class LinkGloboLoadBalancerCmdTest {
         LoadBalancerResponse lbResponseReturned = (LoadBalancerResponse) obj;
         assertEquals("test.lb.com", lbResponseReturned.getName());
 
-        LoadBalancerResponse.LinkedLoadBalancer linkedLoadBalancer = lbResponseReturned.getLinkedLoadBalancer();
+        LoadBalancerResponse.LinkedLoadBalancer linkedLoadBalancer = lbResponseReturned.getLinkedparent();
         assertEquals("456456", linkedLoadBalancer.getUuid());
         assertEquals("target.lb.com", linkedLoadBalancer.getName());
 

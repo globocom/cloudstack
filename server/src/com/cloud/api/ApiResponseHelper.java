@@ -848,7 +848,13 @@ public class ApiResponseHelper implements ResponseGenerator {
         if (!configs.isEmpty()){
             GloboResourceConfigurationVO linkedConfig = configs.get(0);
             LoadBalancer target = lbService.findByUuid(linkedConfig.getValue());
-            lbResponse.setLinkedLoadBalancer(target, linkedConfig);
+            lbResponse.setLinkedParentLoadBalancer(target, linkedConfig);
+        }
+
+        List<GloboResourceConfigurationVO> children = globoResourceConfig.getConfigsByValue(GloboResourceType.LOAD_BALANCER, GloboResourceKey.linkedLoadBalancer, loadBalancer.getUuid());
+        for (GloboResourceConfigurationVO configChild : children) {
+            LoadBalancer childUuid = lbService.findByUuid(configChild.getResourceUuid());
+            lbResponse.addLinkChild(childUuid, configChild);
         }
 
         lbResponse.setObjectName("loadbalancer");

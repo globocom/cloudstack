@@ -69,6 +69,8 @@ public class DeleteGloboNetworkPoolCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() {
+        _lbService.throwExceptionIfIsChildLoadBalancer(lbId, getActualCommandName());
+
         _globoNetworkService.deletePool(this);
         setResponseObject(new SuccessResponse(getCommandName()));
     }

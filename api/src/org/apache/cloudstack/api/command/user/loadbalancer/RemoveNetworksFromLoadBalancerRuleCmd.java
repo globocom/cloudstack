@@ -94,6 +94,7 @@ public class RemoveNetworksFromLoadBalancerRuleCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() {
+        _lbService.throwExceptionIfIsChildLoadBalancer(id, getActualCommandName());
         CallContext.current().setEventDetails("Load balancer Id: " + getLoadBalancerId() + " NetworkIds: " + StringUtils.join(getNetworkIds(), ","));
         boolean result = _lbService.removeNetworksFromLoadBalancer(id, getNetworkIds());
         if (result) {

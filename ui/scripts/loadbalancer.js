@@ -123,14 +123,18 @@
                 that.ports += this + ', ';
             });
             this.ports = this.ports.substring(0, this.ports.length - 2); // remove last ', '
-            if (typeof(this.linkedloadbalancer) != 'undefined') {
-                this.linkedlb = this.linkedloadbalancer.name;
+            if (typeof(this.linkedparent) != 'undefined') {
+                this.linkedlb = this.linkedparent.name;
                 this.isLinked = true;
             } else {
                 this.isLinked = false;
             }
 
-
+            if (typeof(this.linkedchildren) != 'undefined' && this.linkedchildren.length > 0) {
+                this.hasLinkedChildren = true;
+            } else {
+                this.hasLinkedChildren = false;
+            }
         });
         return loadBalancerData;
     }
@@ -205,31 +209,69 @@
                 var data = {};
                 listViewDataProvider(args, data);
 
-                $.ajax({
-                    url: createURL("listLoadBalancerRules"),
-                    data: data,
-                    dataType: "json",
-                    async: true,
-                    success: function(data) {
-                        var loadBalancerData = buildLbs(data);
-                        args.response.success({ data: loadBalancerData });
-                    },
-                    error: function(errorMessage) {
-                        args.response.error(errorMessage);
+                if (typeof(args.context.linkedchildren) != 'undefined') {
+                    console.log('linkedchildren')
+                    var loadBalancerData = []
+                    $(args.context.linkedchildren).each(function() {
+                        var lb = getLoadBalancer(this.uuid)
+                        loadBalancerData.push(lb)
+                    });
+                    args.response.success({ data: loadBalancerData });
+                } else {
+                    console.log('normal')
+                    if (typeof(args.context.linkedlb) != 'undefined') {
+                        data['id'] = args.context.linkedlb.uuid;
                     }
-                });
+
+                    $.ajax({
+                        url: createURL("listLoadBalancerRules"),
+                        data: data,
+                        dataType: "json",
+                        async: true,
+                        success: function(data) {
+                            var loadBalancerData = buildLbs(data);
+                            args.response.success({ data: loadBalancerData });
+                        },
+                        error: function(errorMessage) {
+                            args.response.error(errorMessage);
+                        }
+                    });
+                }
+
+                
             },
             detailView: {
                 name: 'Load Balancer Details',
                 isMaximized: true,
                 noCompact: true,
+                viewAll: [{
+                        path: 'loadbalancer',
+                        label: 'Load Balancer Parent',
+                        updateContext: function(args) {
+                            return { 'linkedlb': args.context.loadbalancers[0].linkedparent};
+                        },
+                        preFilter: function(args) {
+                            return args.context.loadbalancers[0].isLinked;
+                        }
+                    },
+                    {
+                        path: 'loadbalancer',
+                        label: 'Load Balancer Children',
+                        updateContext: function(args) {
+                            return { 'linkedchildren': args.context.loadbalancers[0].linkedchildren};
+                        },
+                        preFilter: function(args) {
+                            return args.context.loadbalancers[0].hasLinkedChildren;
+                        }
+                }],
                 tabFilter: function(args) {
-                    console.log("############## tab filter o/");
                     var hiddenTabs = [];
                     if (args.context.loadbalancers[0].isLinked) {
                         hiddenTabs.push("vms");
                         hiddenTabs.push("autoscale");
-                    }
+                        hiddenTabs.push("networks");
+                        hiddenTabs.push("pools");
+                    } 
                     return hiddenTabs;
                 },
                 tabs: {
@@ -254,7 +296,7 @@
                                     dataType: "json",
                                     async: false,
                                     success: function(json) {
-                                        args.context.loadbalancers[0] = json.listloadbalancerrulesresponse.loadbalancerrule[0];
+                                        args.context.loadbalancers[0] = buildLbs(json)[0];
                                     },
                                     error: function(errorMessage) {
                                         args.response.error(errorMessage);
@@ -285,7 +327,9 @@
                                         }
                                     });
                                 });
-                                args.response.success({ data: networks });
+                                args.response.success({ 
+                                        data: networks
+                                 });
                             },
                             actions: {
                                 remove: {
@@ -998,11 +1042,13 @@
                     },
                     linkloadbalancer: {
                         label: 'label.action.link.loadbalancer',
-                        compactLabel: 'label.destroy',
+                        compactLabel: 'label.action.link.loadbalancer',
                         preFilter: function(args) {
-                            console.log(args.context.loadbalancers[0].isLinked)
-                            console.log("##################")
-                            return !args.context.loadbalancers[0].isLinked
+                            var lb = args.context.loadbalancers[0];
+                            
+                            var show = !lb.isLinked && !lb.hasLinkedChildren
+                            
+                            return show;
                         },
                         createForm: {
                             title: 'label.action.link.loadbalancer', 
@@ -1050,8 +1096,8 @@
                                 url: createURL("linkGloboLoadBalancer"),
                                 async: false,
                                 data: {
-                                    sourcelbid: lb.id,
-                                    targetlbid: args.data.linkablelb
+                                    childlbid: lb.id,
+                                    parentlbid: args.data.linkablelb
                                 },
                                 success: function(data, jobId) {
                                     lastJobId = data.linkgloboloadbalancerresponse.jobid;

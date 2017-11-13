@@ -22,7 +22,7 @@ import com.globo.globonetwork.cloudstack.GloboNetworkIpDetailVO;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.LinkGloboLoadBalancerCmd;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.ListGloboLinkableLoadBalancersCmd;
 import com.globo.globonetwork.cloudstack.api.loadbalancer.UnlinkGloboLoadBalancerCmd;
-import com.globo.globonetwork.cloudstack.commands.LinkTargetLbPoolsInSourceLbCommand;
+import com.globo.globonetwork.cloudstack.commands.LinkParentLbPoolsInChildLbCommand;
 import com.globo.globonetwork.cloudstack.commands.UnlinkPoolsFromLbCommand;
 import org.apache.cloudstack.api.command.user.loadbalancer.AssignToLoadBalancerRuleCmd;
 import org.apache.cloudstack.globoconfig.GloboResourceConfiguration;
@@ -75,39 +75,42 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
     @Inject
     FirewallRulesDao frDao;
 
+    @Inject
+    GloboResourceConfigurationDao configDao;
+
     @Override
     @DB
-    public LoadBalancer linkLoadBalancer(Long sourceLbid, Long targetLbid) {
-        LoadBalancer sourceLb = checkIfLBAlreadyIsLinked(sourceLbid);
-        checkIfSourceLBHasVms(sourceLb);
+    public LoadBalancer linkLoadBalancer(Long childLbid, Long parentLbid) {
+        LoadBalancer childLb = checkIfLBAlreadyIsLinked(childLbid);
+        checkIfSourceLBHasVms(childLb);
 
-        LoadBalancer targetLb = checkIfLBAlreadyIsLinked(targetLbid);
+        LoadBalancer targetLb = checkIfLBAlreadyIsLinked(parentLbid);
 
-        LoadBalancingRule lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) sourceLb);
-        LoadBalancingRule targetRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) targetLb);
+        LoadBalancingRule lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) childLb);
+        LoadBalancingRule parentRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) targetLb);
 
-        removeUnnecessaryNetworks(lbRule, targetRule);
-        lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) sourceLb);
-        copyNetworksFromTarget(lbRule, targetRule);
+        removeUnnecessaryNetworks(lbRule, parentRule);
+        lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) childLb);
+        copyNetworksFromTarget(lbRule, parentRule);
 
 
-        LinkTargetLbPoolsInSourceLbCommand command = new LinkTargetLbPoolsInSourceLbCommand();
+        LinkParentLbPoolsInChildLbCommand command = new LinkParentLbPoolsInChildLbCommand();
 
-        Long sourceVipId = getVipIdApplyLbIfNeed(sourceLb);
-        command.setSourceLb(sourceLb.getUuid(), sourceLb.getName(), sourceVipId);
+        Long sourceVipId = getVipIdApplyLbIfNeed(childLb);
+        command.setChildLb(childLb.getUuid(), childLb.getName(), sourceVipId);
 
         Long targetVipId = getVipIdApplyLbIfNeed(targetLb);
-        command.setTargetLb(targetLb.getUuid(), targetLb.getName(), targetVipId);
+        command.setParentLb(targetLb.getUuid(), targetLb.getName(), targetVipId);
 
-        NetworkVO byId = networkDao.findById(lbRule.getNetworkId());
-        globoNetworkSvc.callCommand(command, byId.getDataCenterId());
+        NetworkVO network = networkDao.findById(lbRule.getNetworkId());
+        globoNetworkSvc.callCommand(command, network.getDataCenterId());
 
-        registerLink(sourceLb, targetLb);
+        registerLink(childLb, targetLb);
 
 
-        copyPorts(targetRule, (LoadBalancerVO)sourceLb);
+        copyPorts(parentRule, (LoadBalancerVO)childLb);
 
-        return sourceLb;
+        return childLb;
     }
 
     private void copyPorts(LoadBalancingRule fromLb, LoadBalancerVO toLb) {
@@ -136,7 +139,6 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
 
     }
 
-
     public LoadBalancer copyVmsAndNetworks(Long fromLbId, Long toLbid) {
         LoadBalancer lb = checkIfLBAlreadyIsLinked(toLbid);
         checkIfSourceLBHasVms(lb);
@@ -155,7 +157,6 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
 
         return lb;
     }
-
 
     protected void copyVmsFromTarget(LoadBalancingRule lbRule, LoadBalancingRule targetLb) {
 
@@ -200,6 +201,12 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
 
         targetNetworks.removeAll(lbRuleNetworks);
         return targetNetworks;
+    }
+
+
+    @Override
+    public List<GloboResourceConfigurationVO> findLoadBalancerChilds(LoadBalancerVO lb) {
+        return configDao.getConfigsByValue(GloboResourceType.LOAD_BALANCER, GloboResourceKey.linkedLoadBalancer, lb.getUuid());
     }
 
     @Override

@@ -48,6 +48,7 @@
 
     cloudStack.sections.loadbalancer.listView.detailView.tabs['pools'] = {
         title: 'Pools',
+
         listView: {
             id: 'pools',
             hideSearchBar: true,
@@ -68,18 +69,22 @@
                     url: createURL("listGloboNetworkPools"),
                     data: data,
                     dataType: "json",
-                    async: false,
+                    async: true,
                     success: function(data) {
                         var lbPools = data.listglobonetworkpoolresponse.globonetworkpool;
                         $(lbPools).each(function() {
                             this.ports = this.vipport + ':' + this.port;
                         });
-                        args.response.success({ data: lbPools });
+                        args.response.success({ 
+                            data: lbPools
+                        });
                     },
                     error: function(errorMessage) {
                         args.response.error(errorMessage);
                     }
                 });
+                
+                
             },
             detailView: {
                 name: 'Pool Details',
@@ -127,6 +132,7 @@
                         }
                     }
                 },
+
                 actions: {
                     editPool: {
                         label: 'Edit Pool',

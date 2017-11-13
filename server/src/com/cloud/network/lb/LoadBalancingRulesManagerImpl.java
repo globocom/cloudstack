@@ -290,6 +290,9 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
     @Inject
     NicSecondaryIpDao _nicSecondaryIpDao;
 
+    @Inject
+    GloboResourceConfigurationDao globoConfigDao;
+
     // Will return a string. For LB Stickiness this will be a json, for
     // autoscale this will be "," separated values
     @Override
@@ -2922,4 +2925,37 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         return true;
     }
 
+
+    @Override
+    public boolean isLinkedChildLoadBalancer(String lbuuid) {
+        List<GloboResourceConfigurationVO> linkedConfig = globoConfigDao.getConfiguration(GloboResourceType.LOAD_BALANCER, lbuuid, GloboResourceKey.linkedLoadBalancer);
+
+        if (linkedConfig != null) {
+            return linkedConfig.size() > 0;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isLinkedParentLoadBalancer(String lbuuid) {
+        List<GloboResourceConfigurationVO> linkedConfig = globoConfigDao.getConfigsByValue(GloboResourceType.LOAD_BALANCER, GloboResourceKey.linkedLoadBalancer, lbuuid);
+
+        if (linkedConfig != null) {
+            return linkedConfig.size() > 0;
+        }
+        return false;
+    }
+
+    @Override
+    public void throwExceptionIfIsChildLoadBalancer(Long id, String operation) {
+        LoadBalancer lb = findById(id);
+        List<GloboResourceConfigurationVO> linkedConfig = globoConfigDao.getConfiguration(GloboResourceType.LOAD_BALANCER, lb.getUuid(), GloboResourceKey.linkedLoadBalancer);
+
+        if (linkedConfig != null && linkedConfig.size() > 0) {
+            GloboResourceConfigurationVO globoResourceConfigurationVO = linkedConfig.get(0);
+            LoadBalancerVO parent = findByUuid(globoResourceConfigurationVO.getValue());
+            throw new CloudRuntimeException("Can not execute '" + operation + "', Load balancer '" +lb.getName() + "' is linked with parent '" + parent.getName() + "'. Unlink lb before try to execute " + operation + "!" );
+        }
+
+    }
 }

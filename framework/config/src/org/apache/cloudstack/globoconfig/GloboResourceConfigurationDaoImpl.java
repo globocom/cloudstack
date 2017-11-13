@@ -30,6 +30,7 @@ public class GloboResourceConfigurationDaoImpl extends GenericDaoBase<GloboResou
         ListByResourceId = createSearchBuilder();
         ListByResourceId.and("resourceUuid", ListByResourceId.entity().getResourceUuid(), SearchCriteria.Op.EQ);
         ListByResourceId.and("resourceType", ListByResourceId.entity().getResourceType(), SearchCriteria.Op.EQ);
+        ListByResourceId.and("value", ListByResourceId.entity().getValue(), SearchCriteria.Op.EQ);
         ListByResourceId.and("key", ListByResourceId.entity().getKey(), SearchCriteria.Op.EQ);
 
         ListByResourceId.done();
@@ -80,6 +81,17 @@ public class GloboResourceConfigurationDaoImpl extends GenericDaoBase<GloboResou
         remove(sc);
     }
 
+    @Override
+    public List<GloboResourceConfigurationVO> getConfigsByValue(GloboResourceType type, GloboResourceKey key, String value) {
+        SearchCriteria<GloboResourceConfigurationVO> sc = ListByResourceId.create();
+        sc.setParameters("resourceType", type);
+        sc.setParameters("value", value);
+        sc.setParameters("key", key);
+
+        List<GloboResourceConfigurationVO> configs = listBy(sc);
+        return configs;
+    }
+
 
     @Override
     @Deprecated
@@ -104,5 +116,6 @@ public class GloboResourceConfigurationDaoImpl extends GenericDaoBase<GloboResou
             }
         }
     }
+
 
 }

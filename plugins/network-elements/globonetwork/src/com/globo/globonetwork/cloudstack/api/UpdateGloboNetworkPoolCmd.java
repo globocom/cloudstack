@@ -77,6 +77,7 @@ public class UpdateGloboNetworkPoolCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() {
+        _lbService.throwExceptionIfIsChildLoadBalancer(lbId, getActualCommandName());
         validateParams();
         ListResponse<PoolResponse> response = new ListResponse<PoolResponse>();
 

@@ -27,7 +27,7 @@
             linkedlb: {
                 label: 'Linked with:',
                 isHidden: function(args) {
-                    if (typeof(args.context.loadbalancers[0].linkedloadbalancer) == 'undefined') {
+                    if (typeof(args.context.loadbalancers[0].isLinked) == 'undefined') {
                         return false;
                     } else {
                         return true;

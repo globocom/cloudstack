@@ -94,6 +94,8 @@ public class AssignNetworksToLoadBalancerRuleCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() {
+        _lbService.throwExceptionIfIsChildLoadBalancer(id, getActualCommandName());
+
         CallContext.current().setEventDetails("Load balancer Id: " + getLoadBalancerId() + " Network ids: " + StringUtils.join(getNetworkIds(), ","));
         boolean result = _lbService.assignNetworksToLoadBalancer(getLoadBalancerId(), getNetworkIds());
         if (result) {

@@ -179,4 +179,10 @@ public interface LoadBalancingRulesService {
     HealthCheckPolicy validateAndPersistLbHealthcheckPolicy(Long lbRuleId, String pingPath, String description, int timeout, int healthcheckInterval, int healthyThreshold, int unhealthyThreshold, Boolean forDisplay);
 
     StickinessPolicy validateAndPersistLbStickinessPolicy(Long lbRuleId, String lbStickinessPolicyName, String lbStickinessMethodName, Map paramList, String description, Boolean forDisplay);
+
+    public boolean isLinkedChildLoadBalancer(String lbuuid);
+
+    public boolean isLinkedParentLoadBalancer(String lbuuid);
+
+    public void throwExceptionIfIsChildLoadBalancer(Long id, String operation);
 }

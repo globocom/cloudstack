@@ -16,6 +16,7 @@
 // under the License.
 package org.apache.cloudstack.api.response;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.cloud.network.rules.LoadBalancer;
@@ -135,9 +136,14 @@ public class LoadBalancerResponse extends BaseResponse implements ControlledEnti
     private List<GloboResourceConfigurationResponse> globoResourceConfigs;
 
 
-    @SerializedName(ApiConstants.LB_LINKED_LOAD_BALANCER)
+    @SerializedName(ApiConstants.LB_LINKED_PARENT_LOAD_BALANCER)
     @Param(description = "load balancer that this is linked")
-    private LinkedLoadBalancer linkedLoadBalancer;
+    private LinkedLoadBalancer linkedparent;
+
+
+    @SerializedName(ApiConstants.LB_LINKED_CHILDREN_LOAD_BALANCER)
+    @Param(description = "load balancer linked children")
+    private List<LinkedLoadBalancer> linkedchildren;
 
     public void setId(String id) {
         this.id = id;
@@ -236,8 +242,6 @@ public class LoadBalancerResponse extends BaseResponse implements ControlledEnti
         this.globoResourceConfigs = configs;
     }
 
-
-
     public void setServiceDownAction(String serviceDownAction) {
         this.serviceDownAction = serviceDownAction;
     }
@@ -250,15 +254,28 @@ public class LoadBalancerResponse extends BaseResponse implements ControlledEnti
         return name;
     }
 
-    public LinkedLoadBalancer getLinkedLoadBalancer() {
-        return linkedLoadBalancer;
+    public LinkedLoadBalancer getLinkedparent() {
+        return linkedparent;
     }
 
-    public void setLinkedLoadBalancer(LoadBalancer targetLb, GloboResourceConfiguration linkedConfig) {
-        this.linkedLoadBalancer = new LinkedLoadBalancer();
-        linkedLoadBalancer.setName(targetLb.getName());
-        linkedLoadBalancer.setUuid(targetLb.getUuid());
-        linkedLoadBalancer.setConfigId(linkedConfig.getId());
+    public void setLinkedParentLoadBalancer(LoadBalancer parentLb, GloboResourceConfiguration linkedConfig) {
+        this.linkedparent = new LinkedLoadBalancer();
+        linkedparent.setName(parentLb.getName());
+        linkedparent.setUuid(parentLb.getUuid());
+        linkedparent.setConfigId(linkedConfig.getId());
+
+    }
+
+    public void addLinkChild(LoadBalancer childlb, GloboResourceConfiguration linkedConfig) {
+        if (linkedchildren == null) {
+            linkedchildren = new ArrayList<>();
+        }
+
+        LinkedLoadBalancer child = new LinkedLoadBalancer();
+        child.setName(childlb.getName());
+        child.setUuid(childlb.getUuid());
+        child.setConfigId(linkedConfig.getId());
+        linkedchildren.add(child);
 
     }
 
@@ -266,7 +283,7 @@ public class LoadBalancerResponse extends BaseResponse implements ControlledEnti
     public static class LinkedLoadBalancer {
         private String name;
         private String uuid;
-        private Long configId;
+        private Long configid;
 
         public String getName() {
             return name;
@@ -285,11 +302,11 @@ public class LoadBalancerResponse extends BaseResponse implements ControlledEnti
         }
 
         public Long getConfigId() {
-            return configId;
+            return configid;
         }
 
         public void setConfigId(Long configId) {
-            this.configId = configId;
+            this.configid = configId;
         }
     }
 
