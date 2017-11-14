@@ -2882,8 +2882,20 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         Long envId = globoNetworkNetworkVO.getGloboNetworkEnvironmentId();
 
         List<LoadBalancerVO> lbs = _loadBalancerDao.listLinkables(lb.getUuid(), envId, lb.getAccountId());
+        removeLinkedLbs(lbs);
 
         return lbs;
+    }
+
+    private void removeLinkedLbs(List<LoadBalancerVO> lbs) {
+        List<LoadBalancerVO> lbsToRemove = new ArrayList<>();
+        for (LoadBalancerVO loadBalancerVO : lbs) {
+            GloboResourceConfigurationVO linkedLbConfig = getGloboResourceConfiguration(loadBalancerVO.getUuid(), GloboResourceType.LOAD_BALANCER, GloboResourceKey.linkedLoadBalancer);
+            if (linkedLbConfig != null) {
+                lbsToRemove.add(loadBalancerVO);
+            }
+        }
+        lbs.removeAll(lbsToRemove);
     }
 
 

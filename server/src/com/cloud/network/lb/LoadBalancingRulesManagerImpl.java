@@ -2947,7 +2947,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
     }
 
     @Override
-    public void throwExceptionIfIsChildLoadBalancer(Long id, String operation) {
+    public void throwExceptionIfIsChildLoadBalancer(Long id, String operation) throws CloudRuntimeException{
         LoadBalancer lb = findById(id);
         List<GloboResourceConfigurationVO> linkedConfig = globoConfigDao.getConfiguration(GloboResourceType.LOAD_BALANCER, lb.getUuid(), GloboResourceKey.linkedLoadBalancer);
 

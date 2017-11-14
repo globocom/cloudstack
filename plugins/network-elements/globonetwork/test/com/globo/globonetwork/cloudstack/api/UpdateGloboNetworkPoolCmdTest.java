@@ -1,5 +1,6 @@
 package com.globo.globonetwork.cloudstack.api;
 
+import com.cloud.network.lb.LoadBalancingRulesService;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.globo.globonetwork.cloudstack.manager.GloboNetworkManager;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
@@ -11,6 +12,7 @@ import org.junit.Test;
 
 
 import static junit.framework.TestCase.assertEquals;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.powermock.api.mockito.PowerMockito.when;
 
@@ -20,6 +22,9 @@ public class UpdateGloboNetworkPoolCmdTest {
     @Test
     public void testExecute() throws Exception {
         UpdateGloboNetworkPoolCmd cmd = new UpdateGloboNetworkPoolCmd();
+        cmd._lbService = mock(LoadBalancingRulesService.class);
+        doNothing().when(cmd._lbService).throwExceptionIfIsChildLoadBalancer(123L, "teste");
+
 
         List<GloboNetworkPoolResponse.Pool> lbResponses = new ArrayList<GloboNetworkPoolResponse.Pool>();
         GloboNetworkPoolResponse.Pool pool1 = new GloboNetworkPoolResponse.Pool();
