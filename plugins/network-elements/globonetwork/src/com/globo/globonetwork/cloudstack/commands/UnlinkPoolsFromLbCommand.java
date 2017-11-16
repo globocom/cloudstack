@@ -32,7 +32,7 @@ public class UnlinkPoolsFromLbCommand extends GloboNetworkResourceCommand{
     @Override
     public Answer execute(GloboNetworkAPI api) {
         try {
-            s_logger.debug("[Unlink " + lbId + "] unlink lb "+ lbName  );
+            s_logger.debug("[Unlink " + lbName + "] lbid:+ " + lbId + "unlink lb "+ lbName);
             VipAPIFacade sourceFacade = new VipAPIFacade(vipId, api);
             PoolAPI poolAPI = api.getPoolAPI();
             VipV3 vip = sourceFacade.getVip();
@@ -40,9 +40,11 @@ public class UnlinkPoolsFromLbCommand extends GloboNetworkResourceCommand{
             for (VipV3.Port port : vip.getPorts()) {
                 for (VipV3.Pool poolPort : port.getPools()) {
                     PoolV3 pool = poolAPI.getById(poolPort.getPoolId());
+                    pool.setId(null);
+
                     String identifier = GloboNetworkResource.buildPoolName(region, lbName, port.getPort(), pool.getDefaultPort());
                     pool.setIdentifier(identifier);
-                    pool.setId(null);
+
                     pool.setPoolCreated(false);
                     poolAPI.save(pool);
                     poolPort.setPoolId(pool.getId());
@@ -58,7 +60,7 @@ public class UnlinkPoolsFromLbCommand extends GloboNetworkResourceCommand{
                 vipV3API.save(vip);
             }
 
-            return new Answer(this, true, "foi");
+            return new Answer(this, true, "");
         } catch (GloboNetworkException e) {
             return GloboNetworkResourceCommand.handleGloboNetworkException(this, e);
         }

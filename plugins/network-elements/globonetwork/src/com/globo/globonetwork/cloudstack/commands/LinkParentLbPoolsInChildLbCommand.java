@@ -43,7 +43,7 @@ public class LinkParentLbPoolsInChildLbCommand extends GloboNetworkResourceComma
             s_logger.debug("[LinkLBPools " + parentVipId + ":" + childVipId + "] removing pools: " + poolsToDelete);
             deleteSourcePools(api, poolsToDelete);
 
-            return new Answer(this, true, "Foi");
+            return new Answer(this, true, "");
         } catch (GloboNetworkException e) {
             return GloboNetworkResourceCommand.handleGloboNetworkException(this, e);
         }
