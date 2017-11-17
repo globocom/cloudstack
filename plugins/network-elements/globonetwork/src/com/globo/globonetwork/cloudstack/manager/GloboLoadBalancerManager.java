@@ -84,10 +84,17 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
         LoadBalancer childLb = checkIfLBAlreadyIsLinked(childLbid);
         checkIfSourceLBHasVms(childLb);
 
-        LoadBalancer targetLb = checkIfLBAlreadyIsLinked(parentLbid);
+        LoadBalancer parentLb = checkIfLBAlreadyIsLinked(parentLbid);
+
+        if (isLbDsr(childLb)) {
+            throw new CloudRuntimeException("Load balancer " + childLb.getName() + " is dsr! Can not link lb dsr!");
+        }
+        if (isLbDsr(parentLb)) {
+            throw new CloudRuntimeException("Load balancer " + parentLb.getName() + " is dsr! Can not be linked!");
+        }
 
         LoadBalancingRule lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) childLb);
-        LoadBalancingRule parentRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) targetLb);
+        LoadBalancingRule parentRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) parentLb);
 
         removeUnnecessaryNetworks(lbRule, parentRule);
         lbRule = _lbMgr.getLoadBalancerRuleToApply((LoadBalancerVO) childLb);
@@ -99,18 +106,27 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
         Long sourceVipId = getVipIdApplyLbIfNeed(childLb);
         command.setChildLb(childLb.getUuid(), childLb.getName(), sourceVipId);
 
-        Long targetVipId = getVipIdApplyLbIfNeed(targetLb);
-        command.setParentLb(targetLb.getUuid(), targetLb.getName(), targetVipId);
+        Long targetVipId = getVipIdApplyLbIfNeed(parentLb);
+        command.setParentLb(parentLb.getUuid(), parentLb.getName(), targetVipId);
 
         NetworkVO network = networkDao.findById(lbRule.getNetworkId());
         globoNetworkSvc.callCommand(command, network.getDataCenterId());
 
-        registerLink(childLb, targetLb);
+        registerLink(childLb, parentLb);
 
 
         copyPorts(parentRule, (LoadBalancerVO)childLb);
 
         return childLb;
+    }
+
+    private boolean isLbDsr(LoadBalancer lb) {
+        List<GloboResourceConfigurationVO> configs = configDao.getConfiguration(GloboResourceType.LOAD_BALANCER, lb.getUuid(), GloboResourceKey.isDNSRegistered);
+
+        if (configs.size() > 0) {
+            return configs.get(0).getBooleanValue();
+        }
+        return false;
     }
 
     private void copyPorts(LoadBalancingRule fromLb, LoadBalancerVO toLb) {
