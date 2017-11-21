@@ -121,7 +121,7 @@ public class GloboLoadBalancerManager implements GloboLoadBalancerService, Plugg
     }
 
     private boolean isLbDsr(LoadBalancer lb) {
-        List<GloboResourceConfigurationVO> configs = configDao.getConfiguration(GloboResourceType.LOAD_BALANCER, lb.getUuid(), GloboResourceKey.isDNSRegistered);
+        List<GloboResourceConfigurationVO> configs = configDao.getConfiguration(GloboResourceType.LOAD_BALANCER, lb.getUuid(), GloboResourceKey.dsr);
 
         if (configs.size() > 0) {
             return configs.get(0).getBooleanValue();

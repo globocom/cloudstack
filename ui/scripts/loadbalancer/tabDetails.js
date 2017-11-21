@@ -64,6 +64,7 @@
             contextId: 'loadbalancers'
         }),
         dataProvider: function(args) {
+            console.log('data provider detailsfilter link')
             if (!args.jsonObj) {
                 args.jsonObj = args.context.loadbalancers[0];
             }
@@ -123,8 +124,10 @@
                     success: function(json) {
                         if(json.getgloboresourceconfigurationresponse.globoresourceconfiguration.configurationvalue == null){
                             args.jsonObj["dsr"] = "No"
+                            args.context.loadbalancers[0]['dsr'] = "No"
                         } else {
                             args.jsonObj["dsr"] = json.getgloboresourceconfigurationresponse.globoresourceconfiguration.configurationvalue == "true" ? "Yes" : "No";
+                            args.context.loadbalancers[0]['dsr'] = json.getgloboresourceconfigurationresponse.globoresourceconfiguration.configurationvalue == "true" ? "Yes" : "No";
                         }
                 }
             });

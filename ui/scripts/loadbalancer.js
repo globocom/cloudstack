@@ -135,6 +135,7 @@
             } else {
                 this.hasLinkedChildren = false;
             }
+
         });
         return loadBalancerData;
     }
@@ -210,7 +211,6 @@
                 listViewDataProvider(args, data);
 
                 if (typeof(args.context.linkedchildren) != 'undefined') {
-                    console.log('linkedchildren')
                     var loadBalancerData = []
                     $(args.context.linkedchildren).each(function() {
                         var lb = getLoadBalancer(this.uuid)
@@ -218,7 +218,6 @@
                     });
                     args.response.success({ data: loadBalancerData });
                 } else {
-                    console.log('normal')
                     if (typeof(args.context.linkedlb) != 'undefined') {
                         data['id'] = args.context.linkedlb.uuid;
                     }
@@ -1044,9 +1043,10 @@
                         label: 'label.action.link.loadbalancer',
                         compactLabel: 'label.action.link.loadbalancer',
                         preFilter: function(args) {
+                            console.log(args)
                             var lb = args.context.loadbalancers[0];
-                            
-                            var show = !lb.isLinked && !lb.hasLinkedChildren
+
+                            var show = !lb.isLinked && !lb.hasLinkedChildren && (lb.dsr == 'No')
                             
                             return show;
                         },
