@@ -55,10 +55,10 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
     private Integer privatePort;
 
     @Parameter(name = ApiConstants.L4_PROTOCOL, type = CommandType.STRING, description = "layer 4 protocol for connection between vip and pool")
-    private String l4Protocol = Protocol.L4.TCP.name();
+    private String l4Protocol = Protocol.L4.TCP.getNetworkApiOptionValue();
 
     @Parameter(name = ApiConstants.L7_PROTOCOL, type = CommandType.STRING, description = "layer 7 protocol for connection between vip and pool")
-    private String l7Protocol = Protocol.L7.OTHERS.name();
+    private String l7Protocol = Protocol.L7.OTHERS.getNetworkApiOptionValue();
 
     @Inject
     GloboNetworkManager _globoNetworkService;
@@ -108,11 +108,11 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
             throw new CloudRuntimeException("l7protocol can not be null.");
         }
 
-        Protocol.L4 l4 = Protocol.L4.valueOf(l4Protocol);
-        Protocol.L7 l7 = Protocol.L7.valueOf(l7Protocol);
+        Protocol.L4 l4 = Protocol.L4.valueOfFromNetworkAPI(l4Protocol);
+        Protocol.L7 l7 = Protocol.L7.valueOfFromNetworkAPI(l7Protocol);
 
         if (!Protocol.validProtocols(l4, l7)) {
-            throw new CloudRuntimeException("l4protocol with value '" + l4.name() + "' does not match with l7protocol '" + l7.name() + "'. Possible l7 value(s): " + l4.getL7s() + ".");
+            throw new CloudRuntimeException("l4protocol with value '" + l4.getNetworkApiOptionValue() + "' does not match with l7protocol '" + l7.getNetworkApiOptionValue() + "'. Possible l7 value(s): " + l4.getL7s() + ".");
         }
     }
 
