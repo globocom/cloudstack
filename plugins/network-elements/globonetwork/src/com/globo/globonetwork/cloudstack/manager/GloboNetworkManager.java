@@ -1323,7 +1323,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                     + globoNetworkLBEnvironmentId);
         }
 
-        List<GloboNetworkIpDetailVO> ipDetailVOList = _globoNetworkIpDetailDao.listByLBEnvironmentRef(globoNetworkLBEnvironmentVO.getId());
+        List<GloboNetworkIpDetailVO> ipDetailVOList = _globoNetworkIpDetailDao.listByLBEnvironmentRef(globoNetworkLBEnvironmentVO.getGloboNetworkLoadBalancerEnvironmentId());
         if (!ipDetailVOList.isEmpty()) {
             throw new InvalidParameterValueException("There are Load Balancers in environment '" + globoNetworkLBEnvironmentVO.getName() + "'");
         }
