@@ -262,7 +262,7 @@
 			                                        data.push({id: 'HTTP', description: 'HTTP'});
 			                                        data.push({id: 'HTTPS', description: 'HTTPS'});
 			                                    }
-			                                    data.push({id: 'OTHERS', description: 'Outros'});
+			                                    data.push({id: 'Outros', description: 'Outros'});
 
 
 			                                   args.response.success({

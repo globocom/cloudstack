@@ -96,7 +96,7 @@ public class UpdateGloboNetworkPoolCmdTest {
 
         cmd = new UpdateGloboNetworkPoolCmd();
         cmd.setL4protocol("UDP");
-        cmd.setL7protocol("OTHERS");
+        cmd.setL7protocol("Outros");
         cmd.setRedeploy(true);
         cmd.validateParams();
     }

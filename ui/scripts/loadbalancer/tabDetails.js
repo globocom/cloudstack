@@ -64,7 +64,6 @@
             contextId: 'loadbalancers'
         }),
         dataProvider: function(args) {
-            console.log('data provider detailsfilter link')
             if (!args.jsonObj) {
                 args.jsonObj = args.context.loadbalancers[0];
             }
