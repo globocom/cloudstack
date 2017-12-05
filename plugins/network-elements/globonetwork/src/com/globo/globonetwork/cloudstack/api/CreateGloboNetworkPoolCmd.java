@@ -180,9 +180,9 @@ public class CreateGloboNetworkPoolCmd extends BaseAsyncCmd {
 
 
     public Protocol.L4 getL4() {
-        return Protocol.L4.valueOf(l4Protocol);
+        return Protocol.L4.valueOfFromNetworkAPI(l4Protocol);
     }
     public Protocol.L7 getL7() {
-        return Protocol.L7.valueOf(l7Protocol);
+        return Protocol.L7.valueOfFromNetworkAPI(l7Protocol);
     }
 }
