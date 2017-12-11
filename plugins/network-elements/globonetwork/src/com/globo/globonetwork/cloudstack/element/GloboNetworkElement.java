@@ -154,6 +154,7 @@ public class GloboNetworkElement extends ExternalLoadBalancerDeviceManagerImpl i
         counterList.add(new AutoScaleCounter(AutoScaleCounterCpu));
         counterList.add(new AutoScaleCounter(AutoScaleCounterMemory));
         counterList.add(new AutoScaleCounter(AutoScaleCounterConnections));
+        counterList.add(new AutoScaleCounter(AutoScaleCounterMemoryNoCache));
         String autoScaleCounterList = gson.toJson(counterList);
         lbCapabilities.put(Capability.AutoScaleCounters, autoScaleCounterList);
 
