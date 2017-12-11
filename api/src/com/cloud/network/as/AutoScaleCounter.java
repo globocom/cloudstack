@@ -30,6 +30,8 @@ public class AutoScaleCounter {
         public static final AutoScaleCounterType Cpu = new AutoScaleCounterType("cpu");
         public static final AutoScaleCounterType Memory = new AutoScaleCounterType("memory");
         public static final AutoScaleCounterType ActiveConnections = new AutoScaleCounterType("active_connections");
+        public static final AutoScaleCounterType MemoryNoCache = new AutoScaleCounterType("memory_no_cache");
+
 
         public AutoScaleCounterType(String name) {
             _name = name;
