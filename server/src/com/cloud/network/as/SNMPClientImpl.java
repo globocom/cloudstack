@@ -125,7 +125,7 @@ public class SNMPClientImpl implements SNMPClient, Configurable{
         Double memoryTotal = getValueByOID(variableBindings, MEMORY_TOTAL_OID);
         Double memoryCached = getValueByOID(variableBindings, MEMORY_CACHED_OID);
         if(memoryFree != null && memoryTotal != null) {
-            return (1.0 - (memoryFree / memoryTotal - memoryCached )) * 100;
+            return (1.0 - (memoryFree / (memoryTotal - memoryCached))) * 100;
         }else{
             return null;
         }
