@@ -147,7 +147,7 @@ public class GloboNetworkElement extends ExternalLoadBalancerDeviceManagerImpl i
         AutoScaleCounter.AutoScaleCounterType AutoScaleCounterCpu = new AutoScaleCounter.AutoScaleCounterType("cpu_used");
         AutoScaleCounter.AutoScaleCounterType AutoScaleCounterMemory = new AutoScaleCounter.AutoScaleCounterType("memory_used");
         AutoScaleCounter.AutoScaleCounterType AutoScaleCounterConnections = new AutoScaleCounter.AutoScaleCounterType("active_connections");
-        AutoScaleCounter.AutoScaleCounterType AutoScaleCounterMemoryNoCache = new AutoScaleCounter.AutoScaleCounterType("memory_used_no_cache");
+        AutoScaleCounter.AutoScaleCounterType AutoScaleCounterMemoryNoCache = new AutoScaleCounter.AutoScaleCounterType("memory_free");
 
 
         List<AutoScaleCounter> counterList = new ArrayList<AutoScaleCounter>();

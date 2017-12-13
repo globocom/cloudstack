@@ -29,7 +29,7 @@ public interface Counter extends InternalIdentity, Identity {
         memory,
         cpu_used,
         memory_used,
-        memory_used_no_cache,
+        memory_free,
         active_connections
     }
 

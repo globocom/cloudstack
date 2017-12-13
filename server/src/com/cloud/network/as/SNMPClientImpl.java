@@ -43,7 +43,6 @@ public class SNMPClientImpl implements SNMPClient, Configurable{
     protected static final String CPU_USER_OID = "1.3.6.1.4.1.2021.11.9.0";
     protected static final String MEMORY_FREE_OID = "1.3.6.1.4.1.2021.4.6.0";
     protected static final String MEMORY_TOTAL_OID = "1.3.6.1.4.1.2021.4.5.0";
-    protected static final String MEMORY_CACHED_OID = "1.3.6.1.4.1.2021.4.15.0";
 
     private static final ConfigKey<Integer> SnmpTimeout = new ConfigKey<>("Advanced", Integer.class, "autoscale.snmp.timeout", "500", "Auto scale snmp client max timeout", true, ConfigKey.Scope.Global);
     private static final ConfigKey<String> SnmpCommunity = new ConfigKey<>("Advanced", String.class, "autoscale.snmp.community", "DataCenter", "SNMP community", true, ConfigKey.Scope.Global);
@@ -89,8 +88,8 @@ public class SNMPClientImpl implements SNMPClient, Configurable{
                 metrics.put(counterName, calculateCpuUsed(variableBindings));
             }else if(counterName.equals(Counter.Source.memory_used.name())){
                 metrics.put(counterName, calculateMemoryUsed(variableBindings));
-            }else if (counterName.equals(Counter.Source.memory_used_no_cache.name())) {
-                metrics.put(counterName, calculateMemoryUsedNoCache(variableBindings));
+            }else if (counterName.equals(Counter.Source.memory_free.name())) {
+                metrics.put(counterName, calculateMemoryFree(variableBindings));
             }else{
                 metrics.put(counterName, getValueByOID(variableBindings, counters.get(counterName)));
             }
@@ -120,12 +119,11 @@ public class SNMPClientImpl implements SNMPClient, Configurable{
         }
     }
 
-    private Double calculateMemoryUsedNoCache(Vector<VariableBinding> variableBindings) throws SnmpAgentNotReadyException {
+    private Double calculateMemoryFree(Vector<VariableBinding> variableBindings) throws SnmpAgentNotReadyException {
         Double memoryFree = getValueByOID(variableBindings, MEMORY_FREE_OID);
         Double memoryTotal = getValueByOID(variableBindings, MEMORY_TOTAL_OID);
-        Double memoryCached = getValueByOID(variableBindings, MEMORY_CACHED_OID);
         if(memoryFree != null && memoryTotal != null) {
-            return (1.0 - (memoryFree / (memoryTotal - memoryCached))) * 100;
+            return (memoryFree / memoryTotal) * 100;
         }else{
             return null;
         }
@@ -150,10 +148,9 @@ public class SNMPClientImpl implements SNMPClient, Configurable{
             }else if(counterName.equals(Counter.Source.memory_used.name())){
                 pdu.add(createVariable(MEMORY_FREE_OID));
                 pdu.add(createVariable(MEMORY_TOTAL_OID));
-            }else if (counterName.equals(Counter.Source.memory_used_no_cache.name())) {
+            }else if (counterName.equals(Counter.Source.memory_free.name())) {
                 pdu.add(createVariable(MEMORY_FREE_OID));
                 pdu.add(createVariable(MEMORY_TOTAL_OID));
-                pdu.add(createVariable(MEMORY_CACHED_OID));
             }else{
                 pdu.add(createVariable(counters.get(counterName)));
             }
