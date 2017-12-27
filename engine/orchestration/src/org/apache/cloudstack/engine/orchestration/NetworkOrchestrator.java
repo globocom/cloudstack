@@ -2383,7 +2383,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
          for (UserVmVO vm : userVms) {
              if (!(vm.getState() == VirtualMachine.State.Expunging && vm.getRemoved() != null)) {
                  error = true;
-                 builder.append("Vm " + vm + " is in " + vm.getState() + " state. ");
+                 builder.append("Vm " + vm.getDisplayName() + " is in " + vm.getState() + " state. ");
              }
          }
          if (error) {
