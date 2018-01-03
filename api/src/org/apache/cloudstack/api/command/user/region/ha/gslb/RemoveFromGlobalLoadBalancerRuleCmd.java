@@ -117,6 +117,9 @@ public class RemoveFromGlobalLoadBalancerRuleCmd extends BaseAsyncCmd {
     public void execute() {
         CallContext.current().setEventDetails(
             "Global Load balancer rule Id: " + getGlobalLoadBalancerRuleId() + " VmIds: " + StringUtils.join(getLoadBalancerRulesIds(), ","));
+
+        _lbService.throwExceptionIfIsParentLoadBalancer(getLoadBalancerRulesIds(), getActualCommandName());
+
         boolean result = _gslbService.removeFromGlobalLoadBalancerRule(this);
         if (result) {
             SuccessResponse response = new SuccessResponse(getCommandName());

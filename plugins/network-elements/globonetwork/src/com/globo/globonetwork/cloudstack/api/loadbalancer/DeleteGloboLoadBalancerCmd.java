@@ -95,6 +95,8 @@ public class DeleteGloboLoadBalancerCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() {
+        _lbService.throwExceptionIfIsParentLoadBalancer(id, getActualCommandName());
+
         LoadBalancer lb = _lbService.findById(id);
         if (lb == null) {
             throw new CloudRuntimeException("Could not find load balancer " + getId());

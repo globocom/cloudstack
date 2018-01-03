@@ -185,4 +185,7 @@ public interface LoadBalancingRulesService {
     public boolean isLinkedParentLoadBalancer(String lbuuid);
 
     public void throwExceptionIfIsChildLoadBalancer(Long id, String operation);
+
+    void throwExceptionIfIsParentLoadBalancer(Long id, String actualCommandName);
+    void throwExceptionIfIsParentLoadBalancer(List<Long> ids, String operation);
 }

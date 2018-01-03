@@ -2958,4 +2958,29 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         }
 
     }
+
+    @Override
+    public void throwExceptionIfIsParentLoadBalancer(Long id, String operation) {
+        LoadBalancer lb = findById(id);
+        List<GloboResourceConfigurationVO> linkedConfigs = globoConfigDao.getConfigsByValue(GloboResourceType.LOAD_BALANCER, GloboResourceKey.linkedLoadBalancer, lb.getUuid());
+
+        if (linkedConfigs != null && linkedConfigs.size() > 0) {
+            List<String> childs = new ArrayList<>();
+            for (GloboResourceConfigurationVO config : linkedConfigs) {
+                LoadBalancerVO child = findByUuid(config.getValue());
+                if ( child != null) {
+                    childs.add(child.getName());
+                }
+            }
+
+            throw new CloudRuntimeException("Can not execute '" + operation + "', Load balancer '" +lb.getName() + "' is linked with child(s)'" + childs + "'. Unlink childs(s) before try to execute " + operation + "!" );
+        }
+    }
+
+    @Override
+    public void throwExceptionIfIsParentLoadBalancer(List<Long> ids, String operation) {
+        for (Long id : ids) {
+            throwExceptionIfIsParentLoadBalancer(id, operation);
+        }
+    }
 }
