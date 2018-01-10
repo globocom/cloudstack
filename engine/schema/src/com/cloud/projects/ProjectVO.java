@@ -54,6 +54,13 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
     @Column(name = "project_account_id")
     long projectAccountId;
 
+    @Column(name = "business_service_id")
+    private String businessServiceId;
+
+    @Column(name = "client_id")
+    private String clientId;
+
+
     @Column(name = "state")
     @Enumerated(value = EnumType.STRING)
     private State state;
@@ -78,6 +85,12 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
         this.domainId = domainId;
         this.state = State.Disabled;
         this.uuid = UUID.randomUUID().toString();
+    }
+
+    public ProjectVO(String name, String displayText, long domainId, long projectAccountId, String businessServiceId, String clientId) {
+        this(name, displayText, domainId, projectAccountId);
+        this.businessServiceId = businessServiceId;
+        this.clientId = clientId;
     }
 
     @Override
@@ -137,6 +150,22 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
     @Override
     public long getProjectAccountId() {
         return projectAccountId;
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
+
+    public String getBusinessServiceId() {
+        return businessServiceId;
+    }
+
+    public void setBusinessServiceId(String businessServiceId) {
+        this.businessServiceId = businessServiceId;
     }
 
     public void setName(String name) {

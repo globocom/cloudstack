@@ -52,6 +52,14 @@ public class ProjectResponse extends BaseResponse implements ResourceLimitAndCou
     @Param(description = "the domain name where the project belongs to")
     private String domain;
 
+    @SerializedName(ApiConstants.BUSINESS_SERVICE_ID)
+    @Param(description = "the business service id")
+    private String businessServiceId;
+
+    @SerializedName(ApiConstants.CLIENT_ID)
+    @Param(description = "the client id")
+    private String clientId;
+
     @SerializedName(ApiConstants.ACCOUNT)
     @Param(description = "the account name of the project's owner")
     private String ownerName;
@@ -415,4 +423,11 @@ public class ProjectResponse extends BaseResponse implements ResourceLimitAndCou
         this.secondaryStorageAvailable = secondaryStorageAvailable;
     }
 
+    public void setBusinessServiceId(String businessServiceId) {
+        this.businessServiceId = businessServiceId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
 }

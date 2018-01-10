@@ -52,6 +52,12 @@ public class UpdateProjectCmd extends BaseAsyncCmd {
     @Parameter(name = ApiConstants.DISPLAY_TEXT, type = CommandType.STRING, description = "display text of the project")
     private String displayText;
 
+    @Parameter(name = ApiConstants.BUSINESS_SERVICE_ID, type = CommandType.STRING, required = false, description = "business service id")
+    private String businessServiceId;
+
+    @Parameter(name = ApiConstants.CLIENT_ID, type = CommandType.STRING, required = false, description = "client id")
+    private String clientId;
+
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
     /////////////////////////////////////////////////////
@@ -66,6 +72,14 @@ public class UpdateProjectCmd extends BaseAsyncCmd {
 
     public String getDisplayText() {
         return displayText;
+    }
+
+    public String getBusinessServiceId() {
+        return businessServiceId;
+    }
+
+    public String getClientId() {
+        return clientId;
     }
 
     @Override
@@ -91,7 +105,7 @@ public class UpdateProjectCmd extends BaseAsyncCmd {
     @Override
     public void execute() throws ResourceAllocationException {
         CallContext.current().setEventDetails("Project id: " + getId());
-        Project project = _projectService.updateProject(getId(), getDisplayText(), getAccountName());
+        Project project = _projectService.updateProject(getId(), getDisplayText(), getAccountName(), getBusinessServiceId(), getClientId());
         if (project != null) {
             ProjectResponse response = _responseGenerator.createProjectResponse(project);
             response.setResponseName(getCommandName());

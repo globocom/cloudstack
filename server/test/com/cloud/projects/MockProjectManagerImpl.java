@@ -33,7 +33,7 @@ import com.cloud.utils.component.ManagerBase;
 public class MockProjectManagerImpl extends ManagerBase implements ProjectManager {
 
     @Override
-    public Project createProject(String name, String displayText, String accountName, Long domainId) throws ResourceAllocationException {
+    public Project createProject(String name, String displayText, String accountName, Long domainId, String businessServiceId, String clientId) throws ResourceAllocationException {
         // TODO Auto-generated method stub
         return null;
     }
@@ -81,7 +81,7 @@ public class MockProjectManagerImpl extends ManagerBase implements ProjectManage
     }
 
     @Override
-    public Project updateProject(long id, String displayText, String newOwnerName) throws ResourceAllocationException {
+    public Project updateProject(long id, String displayText, String newOwnerName, String businessServiceId, String clientId) throws ResourceAllocationException {
         // TODO Auto-generated method stub
         return null;
     }
