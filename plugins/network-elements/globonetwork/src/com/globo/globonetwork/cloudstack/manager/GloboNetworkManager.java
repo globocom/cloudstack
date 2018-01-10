@@ -1743,8 +1743,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
         Long gnLoadBalancerEnvironment = globoNetworkLBEnvironment.getGloboNetworkLoadBalancerEnvironmentId();
         AcquireNewIpForLbCommand cmd = new AcquireNewIpForLbCommand(gnLoadBalancerEnvironment, isv6);
-        SimpleDateFormat format = new SimpleDateFormat("dd-MM-YYYY-HH:mm:ss");
-        cmd.setDescription("ACS_LB_IP_" + GloboNetworkRegion.value()+ "_"+ format.format(new Date()));
+        String description = getLbIpDescription(projectId, owner);
+        cmd.setDescription(description);
 
         final GloboNetworkAndIPResponse globoNetwork = (GloboNetworkAndIPResponse)this.callCommand(cmd, network.getDataCenterId());
 
@@ -1777,11 +1777,24 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
         } catch (CloudException e) {
             // Exception when allocating new IP in Cloudstack. Roll back transaction in GloboNetwork
-            s_logger.error("Reverting IP allocation in GloboNetwork due to error allocating IP", e);
+            s_logger.error("[LB_PORTABLE_IP] Reverting IP allocation in GloboNetwork due to error allocating IP", e);
             ReleaseIpFromGloboNetworkCommand cmdRelease = new ReleaseIpFromGloboNetworkCommand(globoNetwork.getIp(), gnLoadBalancerEnvironment, globoNetwork.isv6());
             this.callCommand(cmdRelease, network.getDataCenterId());
             throw new ResourceAllocationException(e.getLocalizedMessage(), ResourceType.public_ip);
         }
+    }
+
+    private String getLbIpDescription(Long projectId, Account owner) {
+        SimpleDateFormat format = new SimpleDateFormat("dd-MM-YYYY-HH:mm:ss");
+        String projectName = "";
+        if (projectId != null) {
+            Project pj = _projectMgr.getProject(projectId);
+            if (pj != null) {
+                projectName = pj.getName();
+            }
+        }
+
+        return "ACS_LB_IP_" + GloboNetworkRegion.value()+ "_"+ format.format(new Date()) + "_" + owner.getAccountName() + "_" + projectName;
     }
 
     private String getNetworkGateway(String network, String mask, boolean isv6) {
@@ -2022,7 +2035,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
         final RemoveVipFromGloboNetworkCommand cmd = new RemoveVipFromGloboNetworkCommand();
         cmd.setVipId(globoNetworkIpDetail.getGloboNetworkVipId());
-        cmd.setKeepIp(false);
+        cmd.setKeepIp(true);
         _globoResourceConfigurationDao.removeConfigurations(rule.getUuid(), GloboResourceType.LOAD_BALANCER);
         this.callCommand(cmd, network.getDataCenterId());
 
