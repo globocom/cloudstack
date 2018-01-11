@@ -93,6 +93,7 @@
     <module>network-elements/globonetwork</module>
     <module>network-elements/globodns</module>
     <module>network-elements/globoaclapi</module>
+    <module>globocusteio</module>
   </modules>
 
   <dependencies>

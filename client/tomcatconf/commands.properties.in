@@ -769,6 +769,10 @@ createGloboACLRule=1
 listGloboACLRules=1
 removeGloboACLRule=1
 
+### GloboCusteio commands
+listBusinessServices=15
+listClients=15
+
 ### OpenDaylight plugin commands
 addOpenDaylightController=1
 deleteOpenDaylightController=1
