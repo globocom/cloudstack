@@ -1,13 +1,13 @@
-package com.globo.globocusteio.cloudstack.api;
+package org.apache.cloudstack.api.command.user.globodictionary;
 
 import com.cloud.exception.ConcurrentOperationException;
 import com.cloud.exception.InsufficientCapacityException;
 import com.cloud.exception.NetworkRuleConflictException;
 import com.cloud.exception.ResourceAllocationException;
 import com.cloud.exception.ResourceUnavailableException;
-import com.globo.globocusteio.cloudstack.api.response.ClientResponse;
-import com.globo.globocusteio.cloudstack.client.model.Client;
-import com.globo.globocusteio.cloudstack.manager.GloboCusteioService;
+import com.cloud.globodictionary.GloboDictionaryEntity;
+import org.apache.cloudstack.api.response.ClientResponse;
+import com.cloud.globodictionary.GloboDictionaryService;
 import org.apache.cloudstack.api.APICommand;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseCmd;
@@ -29,7 +29,7 @@ public class ListClientsCmd extends BaseCmd {
     private static final String s_name = "listclientsresponse";
 
     @Inject
-    private GloboCusteioService globoCusteioService;
+    private GloboDictionaryService globoDictionaryService;
 
     /////////////////////////////////////////////////////
     //////////////// API parameters /////////////////////
@@ -48,13 +48,13 @@ public class ListClientsCmd extends BaseCmd {
         List<ClientResponse> clientResponses = new ArrayList<>();
 
         if(id != null){
-            Client client = globoCusteioService.getClient(id);
+            GloboDictionaryEntity client = globoDictionaryService.getClient(id);
             if(client != null){
                 clientResponses.add(createResponse(client));
             }
         }else {
-            List<Client> clients = globoCusteioService.listClients();
-            for (Client client : clients) {
+            List<GloboDictionaryEntity> clients = globoDictionaryService.listClients();
+            for (GloboDictionaryEntity client : clients) {
                 clientResponses.add(createResponse(client));
             }
         }
@@ -64,7 +64,7 @@ public class ListClientsCmd extends BaseCmd {
         this.setResponseObject(response);
     }
 
-    private ClientResponse createResponse(Client client) {
+    private ClientResponse createResponse(GloboDictionaryEntity client) {
         ClientResponse clientResponse = new ClientResponse(client.getId(), client.getName());
         clientResponse.setObjectName("client");
         return clientResponse;

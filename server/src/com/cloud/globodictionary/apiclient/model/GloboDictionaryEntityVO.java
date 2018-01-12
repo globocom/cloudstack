@@ -1,9 +1,10 @@
-package com.globo.globocusteio.cloudstack.client.model;
+package com.cloud.globodictionary.apiclient.model;
 
 
+import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.google.gson.annotations.SerializedName;
 
-public abstract class AbstractCusteioEntity {
+public class GloboDictionaryEntityVO implements GloboDictionaryEntity {
 
     @SerializedName("id_service_now")
     protected String id;
@@ -14,13 +15,7 @@ public abstract class AbstractCusteioEntity {
     @SerializedName("status")
     protected String status;
 
-    public AbstractCusteioEntity() {
-    }
-
-    public AbstractCusteioEntity(String id, String name, String status) {
-        this.id = id;
-        this.name = name;
-        this.status = status;
+    public GloboDictionaryEntityVO() {
     }
 
     public String getId() {

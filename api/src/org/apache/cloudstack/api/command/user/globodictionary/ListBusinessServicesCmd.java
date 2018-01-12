@@ -1,18 +1,18 @@
-package com.globo.globocusteio.cloudstack.api;
+package org.apache.cloudstack.api.command.user.globodictionary;
 
 import com.cloud.exception.ConcurrentOperationException;
 import com.cloud.exception.InsufficientCapacityException;
 import com.cloud.exception.NetworkRuleConflictException;
 import com.cloud.exception.ResourceAllocationException;
 import com.cloud.exception.ResourceUnavailableException;
-import com.globo.globocusteio.cloudstack.api.response.BusinessServiceResponse;
-import com.globo.globocusteio.cloudstack.client.model.BusinessService;
-import com.globo.globocusteio.cloudstack.manager.GloboCusteioService;
+import com.cloud.globodictionary.GloboDictionaryEntity;
+import com.cloud.globodictionary.GloboDictionaryService;
 import org.apache.cloudstack.api.APICommand;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseCmd;
 import org.apache.cloudstack.api.Parameter;
 import org.apache.cloudstack.api.ServerApiException;
+import org.apache.cloudstack.api.response.BusinessServiceResponse;
 import org.apache.cloudstack.api.response.ListResponse;
 import org.apache.cloudstack.context.CallContext;
 import org.apache.log4j.Logger;
@@ -29,7 +29,7 @@ public class ListBusinessServicesCmd extends BaseCmd {
     private static final String s_name = "listbusinessservicesresponse";
 
     @Inject
-    private GloboCusteioService globoCusteioService;
+    private GloboDictionaryService globoDictionaryService;
 
     /////////////////////////////////////////////////////
     //////////////// API parameters /////////////////////
@@ -48,13 +48,13 @@ public class ListBusinessServicesCmd extends BaseCmd {
         List<BusinessServiceResponse> businessServiceResponses = new ArrayList<>();
 
         if(id != null){
-            BusinessService businessService = globoCusteioService.getBusinessService(id);
+            GloboDictionaryEntity businessService = globoDictionaryService.getBusinessService(id);
             if(businessService != null){
                 businessServiceResponses.add(createResponse(businessService));
             }
         }else {
-            List<BusinessService> businessServices = globoCusteioService.listBusinessServices();
-            for (BusinessService businessService : businessServices) {
+            List<GloboDictionaryEntity> businessServices = globoDictionaryService.listBusinessServices();
+            for (GloboDictionaryEntity businessService : businessServices) {
                 businessServiceResponses.add(createResponse(businessService));
             }
         }
@@ -64,7 +64,7 @@ public class ListBusinessServicesCmd extends BaseCmd {
         this.setResponseObject(response);
     }
 
-    private BusinessServiceResponse createResponse(BusinessService businessService) {
+    private BusinessServiceResponse createResponse(GloboDictionaryEntity businessService) {
         BusinessServiceResponse businessServiceResponse = new BusinessServiceResponse(businessService.getId(), businessService.getName());
         businessServiceResponse.setObjectName("businessservice");
         return businessServiceResponse;

@@ -95,6 +95,8 @@ known_categories = {
     'OpenDaylight': 'Network',
     'createServiceInstance': 'Network',
     'addGloboDnsHost': 'Network',
+    'listBusinessService': 'Globo Dictionary',
+    'listClients': 'Globo Dictionary',
     'Vpn': 'VPN',
     'Limit': 'Limit',
     'ResourceCount': 'Limit',

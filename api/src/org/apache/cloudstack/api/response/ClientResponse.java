@@ -1,4 +1,4 @@
-package com.globo.globocusteio.cloudstack.api.response;
+package org.apache.cloudstack.api.response;
 
 
 import com.cloud.serializer.Param;
