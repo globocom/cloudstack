@@ -2,7 +2,9 @@ package com.cloud.globodictionary.manager;
 
 import com.cloud.globodictionary.GloboDictionaryService;
 import com.cloud.globodictionary.GloboDictionaryEntity;
+import com.cloud.globodictionary.exception.InvalidDictionaryAPIResponse;
 import com.cloud.utils.component.PluggableService;
+import com.cloud.utils.exception.CloudRuntimeException;
 import org.apache.cloudstack.api.command.user.globodictionary.ListBusinessServicesCmd;
 import org.apache.cloudstack.api.command.user.globodictionary.ListClientsCmd;
 import com.cloud.globodictionary.apiclient.DictionaryAPIClient;
@@ -21,19 +23,54 @@ public class GloboDictionaryManager implements GloboDictionaryService, Pluggable
     private DictionaryAPIClient dictionaryAPIClient;
 
     public List<GloboDictionaryEntity> listBusinessServices() {
-        return dictionaryAPIClient.listBusinessServices();
+        List<GloboDictionaryEntity> businessServices = null;
+        try {
+            return filterActives(dictionaryAPIClient.listBusinessServices());
+        } catch (InvalidDictionaryAPIResponse e) {
+            throw new CloudRuntimeException("Error listing business services", e);
+        }
     }
 
     public GloboDictionaryEntity getBusinessService(String id) {
-        return dictionaryAPIClient.getBusinessService(id);
+        try {
+            GloboDictionaryEntity businessService = dictionaryAPIClient.getBusinessService(id);
+            if (businessService != null && businessService.isActive()) {
+                return businessService;
+            }
+        } catch (InvalidDictionaryAPIResponse e) {
+            throw new CloudRuntimeException("Error listing business services", e);
+        }
+        return null;
     }
 
     public List<GloboDictionaryEntity> listClients() {
-        return dictionaryAPIClient.listClients();
+        try {
+            return filterActives(dictionaryAPIClient.listClients());
+        } catch (InvalidDictionaryAPIResponse e) {
+            throw new CloudRuntimeException("Error listing clients", e);
+        }
     }
 
     public GloboDictionaryEntity getClient(String id) {
-        return dictionaryAPIClient.getClient(id);
+        try {
+            GloboDictionaryEntity client = dictionaryAPIClient.getClient(id);
+            if(client != null && client.isActive()){
+                return client;
+            }
+        } catch (InvalidDictionaryAPIResponse e) {
+            throw new CloudRuntimeException("Error listing clients", e);
+        }
+        return null;
+    }
+
+    private List<GloboDictionaryEntity> filterActives(List<GloboDictionaryEntity> entities){
+        List<GloboDictionaryEntity> actives = new ArrayList<>();
+        for(GloboDictionaryEntity entity : entities){
+            if(entity.isActive()){
+                actives.add(entity);
+            }
+        }
+        return actives;
     }
 
     public List<Class<?>> getCommands() {

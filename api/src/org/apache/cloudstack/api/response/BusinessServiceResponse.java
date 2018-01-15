@@ -11,7 +11,7 @@ public class BusinessServiceResponse extends BaseResponse {
     @Param(description = "the business service id")
     private String id;
 
-    @SerializedName("name")
+    @SerializedName(ApiConstants.NAME)
     @Param(description = "the business service name")
     private String name;
 

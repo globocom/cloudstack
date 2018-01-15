@@ -12,7 +12,7 @@ public class ClientResponse extends BaseResponse {
     @Param(description = "the client id")
     private String id;
 
-    @SerializedName("name")
+    @SerializedName(ApiConstants.NAME)
     @Param(description = "the client name")
     private String name;
 

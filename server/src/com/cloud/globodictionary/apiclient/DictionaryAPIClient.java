@@ -1,6 +1,8 @@
 package com.cloud.globodictionary.apiclient;
 
 import com.cloud.globodictionary.GloboDictionaryEntity;
+import com.cloud.globodictionary.exception.InvalidDictionaryAPIResponse;
+
 import java.util.List;
 
 public interface DictionaryAPIClient {
@@ -19,12 +21,12 @@ public interface DictionaryAPIClient {
         }
     }
 
-    List<GloboDictionaryEntity> listBusinessServices();
+    List<GloboDictionaryEntity> listBusinessServices() throws InvalidDictionaryAPIResponse;
 
-    GloboDictionaryEntity getBusinessService(String id);
+    GloboDictionaryEntity getBusinessService(String id) throws InvalidDictionaryAPIResponse;
 
-    List<GloboDictionaryEntity> listClients();
+    List<GloboDictionaryEntity> listClients() throws InvalidDictionaryAPIResponse;
 
-    GloboDictionaryEntity getClient(String id);
+    GloboDictionaryEntity getClient(String id) throws InvalidDictionaryAPIResponse;
 
 }

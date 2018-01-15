@@ -39,6 +39,7 @@ import javax.mail.URLName;
 import javax.mail.internet.InternetAddress;
 import javax.naming.ConfigurationException;
 
+import com.cloud.globodictionary.GloboDictionaryService;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
@@ -126,6 +127,8 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     private ProjectInvitationJoinDao _projectInvitationJoinDao;
     @Inject
     protected ResourceTagDao _resourceTagDao;
+    @Inject
+    protected GloboDictionaryService _globoDictionaryManager;
 
     protected boolean _invitationRequired = false;
     protected long _invitationTimeOut = 86400000;
@@ -194,6 +197,18 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
 
         if (accountName != null) {
             owner = _accountMgr.finalizeOwner(caller, accountName, domainId, null);
+        }
+
+        if(businessServiceId != null){
+            if(_globoDictionaryManager.getBusinessService(businessServiceId) == null){
+                throw new InvalidParameterValueException("Business Service with ID "+ businessServiceId +" does not exist");
+            }
+        }
+
+        if(clientId != null){
+            if(_globoDictionaryManager.getClient(clientId) == null){
+                throw new InvalidParameterValueException("Client with ID "+ clientId +" does not exist");
+            }
         }
 
         //don't allow 2 projects with the same name inside the same domain
@@ -473,10 +488,16 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
                 }
 
                 if(businessServiceId != null){
+                    if(_globoDictionaryManager.getBusinessService(businessServiceId) == null){
+                        throw new InvalidParameterValueException("Business Service with ID "+ businessServiceId +" does not exist");
+                    }
                     project.setBusinessServiceId(businessServiceId);
                 }
 
                 if(clientId != null) {
+                    if(_globoDictionaryManager.getClient(clientId) == null){
+                        throw new InvalidParameterValueException("Client with ID "+ clientId +" does not exist");
+                    }
                     project.setClientId(clientId);
                 }
 

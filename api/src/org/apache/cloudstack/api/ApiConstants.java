@@ -639,8 +639,8 @@ public class ApiConstants {
     public static final String L4_PROTOCOL = "l4protocol";
     public static final String L7_PROTOCOL = "l7protocol";
 
-    public static final String BUSINESS_SERVICE_ID = "business_service_id";
-    public static final String CLIENT_ID = "client_id";
+    public static final String BUSINESS_SERVICE_ID = "businessserviceid";
+    public static final String CLIENT_ID = "clientid";
 
     public enum HostDetails {
         all, capacity, events, stats, min;

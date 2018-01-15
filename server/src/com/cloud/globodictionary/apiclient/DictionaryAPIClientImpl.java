@@ -2,6 +2,7 @@ package com.cloud.globodictionary.apiclient;
 
 import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.cloud.globodictionary.apiclient.model.GloboDictionaryEntityVO;
+import com.cloud.globodictionary.exception.InvalidDictionaryAPIResponse;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.apache.cloudstack.framework.config.ConfigKey;
@@ -28,60 +29,62 @@ public class DictionaryAPIClientImpl implements DictionaryAPIClient, Configurabl
             "Globo Dictionary API Endpoint", true, ConfigKey.Scope.Global);
 
     @Override
-    public List<GloboDictionaryEntity> listBusinessServices() {
+    public List<GloboDictionaryEntity> listBusinessServices() throws InvalidDictionaryAPIResponse {
         return this.listDictionaryEntity(GloboDictionaryEntityType.BUSINESS_SERVICE);
     }
 
     @Override
-    public GloboDictionaryEntity getBusinessService(String id) {
+    public GloboDictionaryEntity getBusinessService(String id) throws InvalidDictionaryAPIResponse {
         return this.getDictionaryEntity(GloboDictionaryEntityType.BUSINESS_SERVICE, id);
     }
 
     @Override
-    public List<GloboDictionaryEntity> listClients() {
+    public List<GloboDictionaryEntity> listClients() throws InvalidDictionaryAPIResponse {
         return this.listDictionaryEntity(GloboDictionaryEntityType.CLIENT);
     }
 
     @Override
-    public GloboDictionaryEntity getClient(String id) {
+    public GloboDictionaryEntity getClient(String id) throws InvalidDictionaryAPIResponse {
         return this.getDictionaryEntity(GloboDictionaryEntityType.CLIENT, id);
     }
 
-    private List<GloboDictionaryEntity> listDictionaryEntity(GloboDictionaryEntityType entityType){
+    private List<GloboDictionaryEntity> listDictionaryEntity(GloboDictionaryEntityType entityType) throws InvalidDictionaryAPIResponse {
         String response = this.makeHttpRequest(entityType.getUri());
         return new Gson().fromJson(response, new TypeToken<ArrayList<GloboDictionaryEntityVO>>() { }.getType());
     }
 
-    private GloboDictionaryEntity getDictionaryEntity(GloboDictionaryEntityType entityType, String id) {
-        List<GloboDictionaryEntity> entities = this.listDictionaryEntity(entityType);
-        for(GloboDictionaryEntity entity : entities){
-            if(entity.getId().equals(id) && entity.isActive()){
-                return entity;
-            }
+    private GloboDictionaryEntity getDictionaryEntity(GloboDictionaryEntityType entityType, String id) throws InvalidDictionaryAPIResponse {
+        String response = this.makeHttpRequest(entityType.getUri(), "id_service_now=" + id);
+        List<GloboDictionaryEntity> entities = new Gson().fromJson(response, new TypeToken<ArrayList<GloboDictionaryEntityVO>>() { }.getType());
+        if(entities != null && entities.size() > 0){
+            return entities.get(0);
         }
         return null;
     }
 
-    //TODO: logs
-    private String makeHttpRequest(String uri){
+    private String makeHttpRequest(String uri) throws InvalidDictionaryAPIResponse {
+        return this.makeHttpRequest(uri, "");
+    }
+
+    private String makeHttpRequest(String uri, String queryString) throws InvalidDictionaryAPIResponse {
         HttpClient httpclient = new HttpClient();
-        GetMethod getMethod = new GetMethod(GloboDictionaryEndpoint.value() + uri);
+        GetMethod getMethod = new GetMethod(GloboDictionaryEndpoint.value() + uri + "?" + queryString);
         try {
             httpclient.executeMethod(getMethod);
             int status = httpclient.executeMethod(getMethod);
             if(status == HttpStatus.SC_OK) {
                 return getMethod.getResponseBodyAsString();
             }else{
-                //TODO: especificar exception
-                throw new RuntimeException();
+                s_logger.error("[DictionaryAPI] Invalid API status code " + status);
+                s_logger.error("[DictionaryAPI] Invalid API response body " + getMethod.getResponseBodyAsString());
+                throw new InvalidDictionaryAPIResponse();
             }
-            //TODO: melhorar tratamento
         } catch (IOException e) {
-            e.printStackTrace();
+            s_logger.error("[DictionaryAPI] Communication failure", e);
+            throw new InvalidDictionaryAPIResponse(e);
         } finally {
             getMethod.releaseConnection();
         }
-        return null;
     }
 
     @Override
