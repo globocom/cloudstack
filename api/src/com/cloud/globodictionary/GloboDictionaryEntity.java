@@ -1,6 +1,6 @@
 package com.cloud.globodictionary;
 
-public interface GloboDictionaryEntity {
+public interface GloboDictionaryEntity extends Comparable<GloboDictionaryEntity> {
 
     String getId();
 

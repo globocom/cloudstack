@@ -17,6 +17,7 @@ import javax.ejb.Local;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 
 
 @Component
@@ -50,7 +51,9 @@ public class DictionaryAPIClientImpl implements DictionaryAPIClient, Configurabl
 
     private List<GloboDictionaryEntity> listDictionaryEntity(GloboDictionaryEntityType entityType) throws InvalidDictionaryAPIResponse {
         String response = this.makeHttpRequest(entityType.getUri());
-        return new Gson().fromJson(response, new TypeToken<ArrayList<GloboDictionaryEntityVO>>() { }.getType());
+        List<GloboDictionaryEntity> globoDictionaryEntities = new Gson().fromJson(response, new TypeToken<ArrayList<GloboDictionaryEntityVO>>() {}.getType());
+        Collections.sort(globoDictionaryEntities);
+        return globoDictionaryEntities;
     }
 
     private GloboDictionaryEntity getDictionaryEntity(GloboDictionaryEntityType entityType, String id) throws InvalidDictionaryAPIResponse {

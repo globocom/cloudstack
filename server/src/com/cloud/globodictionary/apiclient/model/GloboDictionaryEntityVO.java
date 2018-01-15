@@ -1,6 +1,5 @@
 package com.cloud.globodictionary.apiclient.model;
 
-
 import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.google.gson.annotations.SerializedName;
 
@@ -44,5 +43,9 @@ public class GloboDictionaryEntityVO implements GloboDictionaryEntity {
 
     public boolean isActive() {
         return this.getStatus().equals("Ativo");
+    }
+
+    public int compareTo(GloboDictionaryEntity entity) {
+        return this.name.compareTo(entity.getName());
     }
 }

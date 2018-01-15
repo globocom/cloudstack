@@ -93,10 +93,16 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
     }
 
     public String getBusinessServiceId() {
+        if(businessServiceId.trim().equals("")){
+            return null;
+        }
         return businessServiceId;
     }
 
     public String getClientId() {
+        if(clientId.trim().equals("")){
+            return null;
+        }
         return clientId;
     }
 

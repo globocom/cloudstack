@@ -305,7 +305,9 @@
                         account: args.context.users[0].account,
                         domainId: args.context.users[0].domainid,
                         name: args.data['project-name'],
-                        displayText: args.data['project-display-text']
+                        displayText: args.data['project-display-text'],
+                        businessserviceid: args.data['project-businessservice'],
+                        clientid: args.data['project-client']
                     },
                     dataType: 'json',
                     async: true,
@@ -1020,6 +1022,12 @@
                                     },
                                     state: {
                                         label: 'label.state'
+                                    },
+                                    businessservice: {
+                                        label: 'label.project.businessservice'
+                                    },
+                                    client: {
+                                        label: 'label.project.client'
                                     }
                                 }],
 
@@ -1044,8 +1052,37 @@
                                             id: projectID
                                         },
                                         success: function(json) {
+                                            var project = json.listprojectsresponse.project ? json.listprojectsresponse.project[0] : {};
+                                            var businessService = {};
+                                            var client = {};
+
+                                            if(project.businessserviceid){
+                                                $.ajax({
+                                                    url: createURL('listBusinessServices'),
+                                                    data: { id: project.businessserviceid },
+                                                    async: false,
+                                                    success: function(json) {
+                                                        businessService = json.listbusinessservicesresponse.businessservice[0];
+                                                    }
+                                                });
+                                            }
+
+                                            if(project.clientid){
+                                                $.ajax({
+                                                    url: createURL('listClients'),
+                                                    data: { id: project.clientid },
+                                                    async: false,
+                                                    success: function(json) {
+                                                        client = json.listclientsresponse.client[0];
+                                                    }
+                                                });
+                                            }
+
+                                            project.businessservice = businessService.name
+                                            project.client = client.name
+
                                             args.response.success({
-                                                data: json.listprojectsresponse.project ? json.listprojectsresponse.project[0] : {},
+                                                data: project,
                                                 actionFilter: projectsActionFilter
                                             });
                                         }

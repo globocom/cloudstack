@@ -324,6 +324,47 @@
                     name: 'project-display-text',
                     id: 'project-desc'
                 }));
+
+            var $projectBusinessService = $('<div>').addClass('field businessservice')
+                .append($('<label>').attr('for', 'project-businessservice').html(_l('label.project.businessservice')))
+                .append($('<select>').attr({
+                  name: 'project-businessservice',
+                  id: 'project-businessservice'
+                }));
+
+            var $projectClient = $('<div>').addClass('field client')
+                .append($('<label>').attr('for', 'project-client').html(_l('label.project.client')))
+                .append($('<select>').attr({
+                  name: 'project-client',
+                  id: 'project-client'
+                }));
+
+            listBusinessServices(function(businessservices){
+                $('#project-businessservice').append($('<option>', {
+                    value: "",
+                    text : ""
+                }));
+                $.each(businessservices, function (i, businessservice) {
+                    $('#project-businessservice').append($('<option>', {
+                        value: businessservice.id,
+                        text : businessservice.name
+                    }));
+                });
+            })
+
+            listClients(function(clients){
+                $('#project-client').append($('<option>', {
+                    value: "",
+                    text : ""
+                }));
+                $.each(clients, function (i, client) {
+                    $('#project-client').append($('<option>', {
+                        value: client.id,
+                        text : client.name
+                    }));
+                });
+            })
+
             var $submit = $('<input>').attr({
                 type: 'submit'
             }).val(_l('label.create.project'));
@@ -546,6 +587,8 @@
                     .append($formDesc)
                     .append($projectName)
                     .append($projectDesc)
+                    .append($projectBusinessService)
+                    .append($projectClient)
                     .append($cancel)
                     .append($submit)
             );
@@ -745,6 +788,32 @@
             }
         });
     };
+
+    var listBusinessServices = function(callback){
+        $.ajax({
+            url: createURL('listBusinessServices'),
+            success: function(json) {
+                var businessservices =
+                    json.listbusinessservicesresponse.businessservice ?
+                    json.listbusinessservicesresponse.businessservice : [];
+
+                callback(businessservices)
+            }
+        });
+    }
+
+    var listClients = function(callback){
+        $.ajax({
+            url: createURL('listClients'),
+            success: function(json) {
+                var clients =
+                    json.listclientsresponse.client ?
+                    json.listclientsresponse.client : [];
+
+                callback(clients)
+            }
+        });
+    }
 
     /**
      * Projects entry point
