@@ -29,7 +29,7 @@ db.cloud.port=3306
 db.cloud.name=cloud
 
 # CloudStack database tuning parameters
-db.cloud.maxActive=250
+db.cloud.maxActive=120
 db.cloud.maxIdle=30
 db.cloud.maxWait=10000
 db.cloud.validationQuery=SELECT 1

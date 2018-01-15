@@ -1785,16 +1785,9 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
     }
 
     private String getLbIpDescription(Long projectId, Account owner) {
-        SimpleDateFormat format = new SimpleDateFormat("dd-MM-YYYY-HH:mm:ss");
-        String projectName = "";
-        if (projectId != null) {
-            Project pj = _projectMgr.getProject(projectId);
-            if (pj != null) {
-                projectName = pj.getName();
-            }
-        }
-
-        return "ACS_LB_IP_" + GloboNetworkRegion.value()+ "_"+ format.format(new Date()) + "_" + owner.getAccountName() + "_" + projectName;
+        SimpleDateFormat format = new SimpleDateFormat("dd-MM-YYYY");
+        String id = projectId != null ? projectId.toString() : "";
+        return "ACS_LB_IP_" + GloboNetworkRegion.value()+ "_"+  owner.getAccountName() + "_P" + id + "_" + format.format(new Date());
     }
 
     private String getNetworkGateway(String network, String mask, boolean isv6) {
