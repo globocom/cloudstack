@@ -1,8 +1,9 @@
 package com.cloud.globodictionary.apiclient;
 
 import com.cloud.globodictionary.GloboDictionaryEntity;
+import com.cloud.globodictionary.GloboDictionaryService;
 import com.cloud.globodictionary.apiclient.model.GloboDictionaryEntityVO;
-import com.cloud.globodictionary.exception.InvalidDictionaryAPIResponse;
+import com.cloud.utils.exception.CloudRuntimeException;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.apache.cloudstack.framework.config.ConfigKey;
@@ -21,43 +22,35 @@ import java.util.Collections;
 
 
 @Component
-@Local(value = DictionaryAPIClient.class)
-public class DictionaryAPIClientImpl implements DictionaryAPIClient, Configurable {
+@Local(value = GloboDictionaryAPIClient.class)
+public class GloboDictionaryAPIClientImpl implements GloboDictionaryAPIClient, Configurable {
 
-    public static final Logger s_logger = Logger.getLogger(DictionaryAPIClientImpl.class);
+    public static final Logger s_logger = Logger.getLogger(GloboDictionaryAPIClientImpl.class);
 
     private static final ConfigKey<String> GloboDictionaryEndpoint = new ConfigKey<>("Globo Dictionary", String.class, "globodictionary.api.endpoint", "",
             "Globo Dictionary API Endpoint", true, ConfigKey.Scope.Global);
 
+    private static final String API_ID_QUERY_PARAMETER = "id_service_now";
+
     @Override
-    public List<GloboDictionaryEntity> listBusinessServices() throws InvalidDictionaryAPIResponse {
-        return this.listDictionaryEntity(GloboDictionaryEntityType.BUSINESS_SERVICE);
+    public GloboDictionaryEntity get(GloboDictionaryService.GloboDictionaryEntityType type, String id) {
+        return this.getDictionaryEntity(type, id);
     }
 
     @Override
-    public GloboDictionaryEntity getBusinessService(String id) throws InvalidDictionaryAPIResponse {
-        return this.getDictionaryEntity(GloboDictionaryEntityType.BUSINESS_SERVICE, id);
+    public List<GloboDictionaryEntity> list(GloboDictionaryService.GloboDictionaryEntityType type) {
+        return this.listDictionaryEntity(type);
     }
 
-    @Override
-    public List<GloboDictionaryEntity> listClients() throws InvalidDictionaryAPIResponse {
-        return this.listDictionaryEntity(GloboDictionaryEntityType.CLIENT);
-    }
-
-    @Override
-    public GloboDictionaryEntity getClient(String id) throws InvalidDictionaryAPIResponse {
-        return this.getDictionaryEntity(GloboDictionaryEntityType.CLIENT, id);
-    }
-
-    private List<GloboDictionaryEntity> listDictionaryEntity(GloboDictionaryEntityType entityType) throws InvalidDictionaryAPIResponse {
-        String response = this.makeHttpRequest(entityType.getUri());
+    private List<GloboDictionaryEntity> listDictionaryEntity(GloboDictionaryService.GloboDictionaryEntityType entityType) {
+        String response = this.makeHttpRequest(entityType);
         List<GloboDictionaryEntity> globoDictionaryEntities = new Gson().fromJson(response, new TypeToken<ArrayList<GloboDictionaryEntityVO>>() {}.getType());
         Collections.sort(globoDictionaryEntities);
         return globoDictionaryEntities;
     }
 
-    private GloboDictionaryEntity getDictionaryEntity(GloboDictionaryEntityType entityType, String id) throws InvalidDictionaryAPIResponse {
-        String response = this.makeHttpRequest(entityType.getUri(), "id_service_now=" + id);
+    private GloboDictionaryEntity getDictionaryEntity(GloboDictionaryService.GloboDictionaryEntityType entityType, String id) {
+        String response = this.makeHttpRequest(entityType, API_ID_QUERY_PARAMETER + "=" + id);
         List<GloboDictionaryEntity> entities = new Gson().fromJson(response, new TypeToken<ArrayList<GloboDictionaryEntityVO>>() { }.getType());
         if(entities != null && entities.size() > 0){
             return entities.get(0);
@@ -65,13 +58,13 @@ public class DictionaryAPIClientImpl implements DictionaryAPIClient, Configurabl
         return null;
     }
 
-    private String makeHttpRequest(String uri) throws InvalidDictionaryAPIResponse {
-        return this.makeHttpRequest(uri, "");
+    private String makeHttpRequest(GloboDictionaryService.GloboDictionaryEntityType entityType) {
+        return this.makeHttpRequest(entityType, "");
     }
 
-    private String makeHttpRequest(String uri, String queryString) throws InvalidDictionaryAPIResponse {
+    private String makeHttpRequest(GloboDictionaryService.GloboDictionaryEntityType entityType, String queryString) {
         HttpClient httpclient = new HttpClient();
-        GetMethod getMethod = new GetMethod(GloboDictionaryEndpoint.value() + uri + "?" + queryString);
+        GetMethod getMethod = new GetMethod(GloboDictionaryEndpoint.value() + entityType.getUri() + "?" + queryString);
         try {
             httpclient.executeMethod(getMethod);
             int status = httpclient.executeMethod(getMethod);
@@ -80,11 +73,11 @@ public class DictionaryAPIClientImpl implements DictionaryAPIClient, Configurabl
             }else{
                 s_logger.error("[DictionaryAPI] Invalid API status code " + status);
                 s_logger.error("[DictionaryAPI] Invalid API response body " + getMethod.getResponseBodyAsString());
-                throw new InvalidDictionaryAPIResponse();
+                throw new CloudRuntimeException("Error listing " + entityType.getFriendlyName());
             }
         } catch (IOException e) {
             s_logger.error("[DictionaryAPI] Communication failure", e);
-            throw new InvalidDictionaryAPIResponse(e);
+            throw new CloudRuntimeException("Error listing " + entityType.getFriendlyName(), e);
         } finally {
             getMethod.releaseConnection();
         }

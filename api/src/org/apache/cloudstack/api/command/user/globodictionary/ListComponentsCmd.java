@@ -2,18 +2,18 @@ package org.apache.cloudstack.api.command.user.globodictionary;
 
 import com.cloud.globodictionary.GloboDictionaryService;
 import org.apache.cloudstack.api.APICommand;
-import org.apache.cloudstack.api.response.BusinessServiceResponse;
+import org.apache.cloudstack.api.response.ComponentResponse;
 
-@APICommand(name = "listBusinessServices", description = "Lists business services", responseObject = BusinessServiceResponse.class,
+@APICommand(name = "listComponents", description = "Lists components", responseObject = ComponentResponse.class,
         requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
-public class ListBusinessServicesCmd extends BaseDictionaryCmd {
+public class ListComponentsCmd extends BaseDictionaryCmd {
 
-    private static final String s_name = "listbusinessservicesresponse";
-    private static final String response_name = "businessservice";
+    private static final String s_name = "listcomponentsresponse";
+    private static final String response_name = "component";
 
     @Override
     GloboDictionaryService.GloboDictionaryEntityType getEntity() {
-        return GloboDictionaryService.GloboDictionaryEntityType.BUSINESS_SERVICE;
+        return GloboDictionaryService.GloboDictionaryEntityType.COMPONENT;
     }
 
     @Override

@@ -76,6 +76,9 @@ public class ProjectJoinDaoImpl extends GenericDaoBase<ProjectJoinVO, Long> impl
         response.setDisplaytext(proj.getDisplayText());
         response.setBusinessServiceId(proj.getBusinessServiceId());
         response.setClientId(proj.getClientId());
+        response.setComponentId(proj.getComponentId());
+        response.setSubComponentId(proj.getSubComponentId());
+        response.setProductId(proj.getProductId());
         if (proj.getState() != null) {
             response.setState(proj.getState().toString());
         }

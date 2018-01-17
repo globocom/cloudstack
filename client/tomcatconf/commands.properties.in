@@ -807,3 +807,6 @@ listGloboVirtualMachines=15
 ### GloboDictionary commands
 listBusinessServices=15
 listClients=15
+listComponents=15
+listSubComponents=15
+listProducts=15

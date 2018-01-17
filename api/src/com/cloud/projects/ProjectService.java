@@ -36,10 +36,13 @@ public interface ProjectService {
      *            - domainid of the project owner
      * @param businessServiceId
      * @param clientId
+     * @param componentId
+     * @param subComponentId
+     * @param productId
      * @return the project if created successfully, null otherwise
      * @throws ResourceAllocationException
      */
-    Project createProject(String name, String displayText, String accountName, Long domainId, String businessServiceId, String clientId) throws ResourceAllocationException;
+    Project createProject(String name, String displayText, String accountName, Long domainId, String businessServiceId, String clientId, String componentId, String subComponentId, String productId) throws ResourceAllocationException;
 
     /**
      * Deletes a project
@@ -69,7 +72,7 @@ public interface ProjectService {
 
     Project findByNameAndDomainId(String name, long domainId);
 
-    Project updateProject(long id, String displayText, String newOwnerName, String businessServiceId, String clientId) throws ResourceAllocationException;
+    Project updateProject(long id, String displayText, String newOwnerName, String businessServiceId, String clientId, String componentId, String subComponentId, String productId) throws ResourceAllocationException;
 
     boolean addAccountToProject(long projectId, String accountName, String email);
 

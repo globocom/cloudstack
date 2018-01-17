@@ -339,31 +339,32 @@
                   id: 'project-client'
                 }));
 
-            listBusinessServices(function(businessservices){
-                $('#project-businessservice').append($('<option>', {
-                    value: "",
-                    text : ""
+            var $projectComponent = $('<div>').addClass('field component')
+                .append($('<label>').attr('for', 'project-component').html(_l('label.project.component')))
+                .append($('<select>').attr({
+                  name: 'project-component',
+                  id: 'project-component'
                 }));
-                $.each(businessservices, function (i, businessservice) {
-                    $('#project-businessservice').append($('<option>', {
-                        value: businessservice.id,
-                        text : businessservice.name
-                    }));
-                });
-            })
 
-            listClients(function(clients){
-                $('#project-client').append($('<option>', {
-                    value: "",
-                    text : ""
+            var $projectSubComponent = $('<div>').addClass('field subcomponent')
+                .append($('<label>').attr('for', 'project-subcomponent').html(_l('label.project.subcomponent')))
+                .append($('<select>').attr({
+                  name: 'project-subcomponent',
+                  id: 'project-subcomponent'
                 }));
-                $.each(clients, function (i, client) {
-                    $('#project-client').append($('<option>', {
-                        value: client.id,
-                        text : client.name
-                    }));
-                });
-            })
+
+            var $projectProduct = $('<div>').addClass('field product')
+                .append($('<label>').attr('for', 'project-product').html(_l('label.project.product')))
+                .append($('<select>').attr({
+                  name: 'project-product',
+                  id: 'project-product'
+                }));
+
+            createDictionaryOption('businessservice', listBusinessServices)
+            createDictionaryOption('client', listClients)
+            createDictionaryOption('component', listComponents)
+            createDictionaryOption('subcomponent', listSubComponents)
+            createDictionaryOption('product', listProducts)
 
             var $submit = $('<input>').attr({
                 type: 'submit'
@@ -589,6 +590,9 @@
                     .append($projectDesc)
                     .append($projectBusinessService)
                     .append($projectClient)
+                    .append($projectComponent)
+                    .append($projectSubComponent)
+                    .append($projectProduct)
                     .append($cancel)
                     .append($submit)
             );
@@ -735,6 +739,49 @@
         }
     };
 
+    var createDictionaryOption = function(name, listFunction){
+        listFunction(function(objects){
+            $('#project-' + name).append($('<option>', {
+                value: "",
+                text : ""
+            }));
+            $.each(objects, function (i, object) {
+                $('#project-' + name).append($('<option>', {
+                    value: object.id,
+                    text : object.name
+                }));
+            });
+        })
+    }
+
+    var listBusinessServices = function(callback){
+        listDictionaryEntity('listBusinessServices', 'listbusinessservicesresponse', 'businessservice', callback)
+    }
+
+    var listClients = function(callback){
+        listDictionaryEntity('listClients', 'listclientsresponse', 'client', callback)
+    }
+
+    var listComponents = function(callback){
+        listDictionaryEntity('listComponents', 'listcomponentsresponse', 'component', callback)
+    }
+
+    var listSubComponents = function(callback){
+        listDictionaryEntity('listSubComponents', 'listsubcomponentsresponse', 'subcomponent', callback)
+    }
+    var listProducts = function(callback){
+        listDictionaryEntity('listProducts', 'listproductsresponse', 'product', callback)
+    }
+
+    var listDictionaryEntity = function(uri, responseRoot, object, callback){
+         $.ajax({
+            url: createURL(uri),
+            success: function(json) {
+                callback(json[responseRoot][object] ? json[responseRoot][object] : []);
+            }
+        });
+    }
+
     /**
      * Show project-mode appearance on CloudStack UI
      */
@@ -788,32 +835,6 @@
             }
         });
     };
-
-    var listBusinessServices = function(callback){
-        $.ajax({
-            url: createURL('listBusinessServices'),
-            success: function(json) {
-                var businessservices =
-                    json.listbusinessservicesresponse.businessservice ?
-                    json.listbusinessservicesresponse.businessservice : [];
-
-                callback(businessservices)
-            }
-        });
-    }
-
-    var listClients = function(callback){
-        $.ajax({
-            url: createURL('listClients'),
-            success: function(json) {
-                var clients =
-                    json.listclientsresponse.client ?
-                    json.listclientsresponse.client : [];
-
-                callback(clients)
-            }
-        });
-    }
 
     /**
      * Projects entry point

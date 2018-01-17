@@ -60,6 +60,14 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
     @Column(name = "client_id")
     private String clientId;
 
+    @Column(name = "component_id")
+    private String componentId;
+
+    @Column(name = "sub_component_id")
+    private String subComponentId;
+
+    @Column(name = "product_id")
+    private String productId;
 
     @Column(name = "state")
     @Enumerated(value = EnumType.STRING)
@@ -87,10 +95,13 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
         this.uuid = UUID.randomUUID().toString();
     }
 
-    public ProjectVO(String name, String displayText, long domainId, long projectAccountId, String businessServiceId, String clientId) {
+    public ProjectVO(String name, String displayText, long domainId, long projectAccountId, String businessServiceId, String clientId, String componentId, String subComponentId, String productId) {
         this(name, displayText, domainId, projectAccountId);
         this.businessServiceId = businessServiceId;
         this.clientId = clientId;
+        this.componentId = componentId;
+        this.subComponentId = subComponentId;
+        this.productId = productId;
     }
 
     @Override
@@ -166,6 +177,30 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
 
     public void setBusinessServiceId(String businessServiceId) {
         this.businessServiceId = businessServiceId;
+    }
+
+    public String getComponentId() {
+        return componentId;
+    }
+
+    public void setComponentId(String componentId) {
+        this.componentId = componentId;
+    }
+
+    public String getSubComponentId() {
+        return subComponentId;
+    }
+
+    public void setSubComponentId(String subComponentId) {
+        this.subComponentId = subComponentId;
+    }
+
+    public String getProductId() {
+        return productId;
+    }
+
+    public void setProductId(String productId) {
+        this.productId = productId;
     }
 
     public void setName(String name) {

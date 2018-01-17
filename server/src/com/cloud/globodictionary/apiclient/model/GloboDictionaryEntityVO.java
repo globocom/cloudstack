@@ -42,7 +42,7 @@ public class GloboDictionaryEntityVO implements GloboDictionaryEntity {
     }
 
     public boolean isActive() {
-        return this.getStatus().equals("Ativo");
+        return this.getStatus().equals("Ativo") || this.getStatus().equals("Em uso");
     }
 
     public int compareTo(GloboDictionaryEntity entity) {

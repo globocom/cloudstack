@@ -181,7 +181,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     @Override
     @ActionEvent(eventType = EventTypes.EVENT_PROJECT_CREATE, eventDescription = "creating project", create = true)
     @DB
-    public Project createProject(final String name, final String displayText, String accountName, final Long domainId, final String businessServiceId, final String clientId) throws ResourceAllocationException {
+    public Project createProject(final String name, final String displayText, String accountName, final Long domainId, final String businessServiceId, final String clientId, final String componentId, final String subComponentId, final String productId) throws ResourceAllocationException {
         Account caller = CallContext.current().getCallingAccount();
         Account owner = caller;
 
@@ -200,14 +200,32 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
         }
 
         if(businessServiceId != null){
-            if(_globoDictionaryManager.getBusinessService(businessServiceId) == null){
+            if(!businessServiceId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.BUSINESS_SERVICE, businessServiceId) == null){
                 throw new InvalidParameterValueException("Business Service with ID "+ businessServiceId +" does not exist");
             }
         }
 
         if(clientId != null){
-            if(_globoDictionaryManager.getClient(clientId) == null){
+            if(!clientId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.CLIENT, clientId) == null){
                 throw new InvalidParameterValueException("Client with ID "+ clientId +" does not exist");
+            }
+        }
+
+        if(componentId != null){
+            if(!componentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.COMPONENT, componentId) == null){
+                throw new InvalidParameterValueException("Component with ID "+ componentId +" does not exist");
+            }
+        }
+
+        if(subComponentId != null){
+            if(!subComponentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.SUB_COMPONENT, subComponentId) == null){
+                throw new InvalidParameterValueException("Sub-component with ID "+ subComponentId +" does not exist");
+            }
+        }
+
+        if(productId != null){
+            if(!productId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.PRODUCT, productId) == null){
+                throw new InvalidParameterValueException("Product with ID "+ productId +" does not exist");
             }
         }
 
@@ -230,7 +248,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
 
         Account projectAccount = _accountMgr.createAccount(acctNm.toString(), Account.ACCOUNT_TYPE_PROJECT, domainId, null, null, UUID.randomUUID().toString());
 
-        Project project = _projectDao.persist(new ProjectVO(name, displayText, ownerFinal.getDomainId(), projectAccount.getId(), businessServiceId, clientId));
+        Project project = _projectDao.persist(new ProjectVO(name, displayText, ownerFinal.getDomainId(), projectAccount.getId(), businessServiceId, clientId, componentId, subComponentId, productId));
 
         //assign owner to the project
                 assignAccountToProject(project, ownerFinal.getId(), ProjectAccount.Role.Admin);
@@ -467,7 +485,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     @Override
     @DB
     @ActionEvent(eventType = EventTypes.EVENT_PROJECT_UPDATE, eventDescription = "updating project", async = true)
-    public Project updateProject(final long projectId, final String displayText, final String newOwnerName, final String businessServiceId, final String clientId) throws ResourceAllocationException {
+    public Project updateProject(final long projectId, final String displayText, final String newOwnerName, final String businessServiceId, final String clientId, final String componentId, final String subComponentId, final String productId) throws ResourceAllocationException {
         Account caller = CallContext.current().getCallingAccount();
 
         //check that the project exists
@@ -488,17 +506,38 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
                 }
 
                 if(businessServiceId != null){
-                    if(_globoDictionaryManager.getBusinessService(businessServiceId) == null){
+                    if(!businessServiceId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.BUSINESS_SERVICE, businessServiceId) == null){
                         throw new InvalidParameterValueException("Business Service with ID "+ businessServiceId +" does not exist");
                     }
                     project.setBusinessServiceId(businessServiceId);
                 }
 
                 if(clientId != null) {
-                    if(_globoDictionaryManager.getClient(clientId) == null){
+                    if(!clientId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.CLIENT, clientId) == null){
                         throw new InvalidParameterValueException("Client with ID "+ clientId +" does not exist");
                     }
                     project.setClientId(clientId);
+                }
+
+                if(componentId != null) {
+                    if(!componentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.COMPONENT, componentId) == null){
+                        throw new InvalidParameterValueException("Component with ID "+ componentId +" does not exist");
+                    }
+                    project.setComponentId(componentId);
+                }
+
+                if(subComponentId != null) {
+                    if(!subComponentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.SUB_COMPONENT, subComponentId) == null){
+                        throw new InvalidParameterValueException("Sub-component with ID "+ subComponentId +" does not exist");
+                    }
+                    project.setSubComponentId(subComponentId);
+                }
+
+                if(productId != null) {
+                    if(!productId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.PRODUCT, productId) == null){
+                        throw new InvalidParameterValueException("Product with ID "+ productId +" does not exist");
+                    }
+                    project.setProductId(productId);
                 }
 
                 _projectDao.update(projectId, project);

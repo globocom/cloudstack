@@ -63,6 +63,15 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
     @Parameter(name = ApiConstants.CLIENT_ID, type = CommandType.STRING, required = false, description = "client id")
     private String clientId;
 
+    @Parameter(name = ApiConstants.COMPONENT_ID, type = CommandType.STRING, required = false, description = "component id")
+    private String componentId;
+
+    @Parameter(name = ApiConstants.SUB_COMPONENT_ID, type = CommandType.STRING, required = false, description = "sub-component id")
+    private String subComponentId;
+
+    @Parameter(name = ApiConstants.PRODUCT_ID, type = CommandType.STRING, required = false, description = "product id")
+    private String productId;
+
     // ///////////////////////////////////////////////////
     // ///////////////// Accessors ///////////////////////
     // ///////////////////////////////////////////////////
@@ -93,17 +102,23 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
     }
 
     public String getBusinessServiceId() {
-        if(businessServiceId.trim().equals("")){
-            return null;
-        }
         return businessServiceId;
     }
 
     public String getClientId() {
-        if(clientId.trim().equals("")){
-            return null;
-        }
         return clientId;
+    }
+
+    public String getComponentId() {
+        return componentId;
+    }
+
+    public String getSubComponentId() {
+        return subComponentId;
+    }
+
+    public String getProductId() {
+        return productId;
     }
 
     @Override
@@ -145,7 +160,8 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
     @Override
     public void create() throws ResourceAllocationException {
         CallContext.current().setEventDetails("Project Name: " + getName());
-        Project project = _projectService.createProject(getName(), getDisplayText(), getAccountName(), getDomainId(), getBusinessServiceId(), getClientId());
+        Project project = _projectService.createProject(getName(), getDisplayText(), getAccountName(), getDomainId(),
+                getBusinessServiceId(), getClientId(), getComponentId(), getSubComponentId(), getProductId());
         if (project != null) {
             this.setEntityId(project.getId());
             this.setEntityUuid(project.getUuid());

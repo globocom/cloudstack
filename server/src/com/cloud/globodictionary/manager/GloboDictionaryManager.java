@@ -2,14 +2,15 @@ package com.cloud.globodictionary.manager;
 
 import com.cloud.globodictionary.GloboDictionaryService;
 import com.cloud.globodictionary.GloboDictionaryEntity;
-import com.cloud.globodictionary.exception.InvalidDictionaryAPIResponse;
 import com.cloud.utils.component.PluggableService;
-import com.cloud.utils.exception.CloudRuntimeException;
+import com.cloud.globodictionary.apiclient.GloboDictionaryAPIClient;
 import org.apache.cloudstack.api.command.user.globodictionary.ListBusinessServicesCmd;
 import org.apache.cloudstack.api.command.user.globodictionary.ListClientsCmd;
-import com.cloud.globodictionary.apiclient.DictionaryAPIClient;
-import org.springframework.stereotype.Component;
+import org.apache.cloudstack.api.command.user.globodictionary.ListComponentsCmd;
+import org.apache.cloudstack.api.command.user.globodictionary.ListSubComponentsCmd;
+import org.apache.cloudstack.api.command.user.globodictionary.ListProductsCmd;
 
+import org.springframework.stereotype.Component;
 import javax.ejb.Local;
 import javax.inject.Inject;
 import java.util.ArrayList;
@@ -20,45 +21,18 @@ import java.util.List;
 public class GloboDictionaryManager implements GloboDictionaryService, PluggableService {
 
     @Inject
-    private DictionaryAPIClient dictionaryAPIClient;
+    private GloboDictionaryAPIClient dictionaryAPIClient;
 
-    public List<GloboDictionaryEntity> listBusinessServices() {
-        List<GloboDictionaryEntity> businessServices = null;
-        try {
-            return filterActives(dictionaryAPIClient.listBusinessServices());
-        } catch (InvalidDictionaryAPIResponse e) {
-            throw new CloudRuntimeException("Error listing business services", e);
-        }
+    @Override
+    public List<GloboDictionaryEntity> list(GloboDictionaryEntityType type) {
+        return this.filterActives(dictionaryAPIClient.list(type));
     }
 
-    public GloboDictionaryEntity getBusinessService(String id) {
-        try {
-            GloboDictionaryEntity businessService = dictionaryAPIClient.getBusinessService(id);
-            if (businessService != null && businessService.isActive()) {
-                return businessService;
-            }
-        } catch (InvalidDictionaryAPIResponse e) {
-            throw new CloudRuntimeException("Error listing business services", e);
-        }
-        return null;
-    }
-
-    public List<GloboDictionaryEntity> listClients() {
-        try {
-            return filterActives(dictionaryAPIClient.listClients());
-        } catch (InvalidDictionaryAPIResponse e) {
-            throw new CloudRuntimeException("Error listing clients", e);
-        }
-    }
-
-    public GloboDictionaryEntity getClient(String id) {
-        try {
-            GloboDictionaryEntity client = dictionaryAPIClient.getClient(id);
-            if(client != null && client.isActive()){
-                return client;
-            }
-        } catch (InvalidDictionaryAPIResponse e) {
-            throw new CloudRuntimeException("Error listing clients", e);
+    @Override
+    public GloboDictionaryEntity get(GloboDictionaryEntityType type, String id) {
+        GloboDictionaryEntity businessService = dictionaryAPIClient.get(type, id);
+        if (businessService != null && businessService.isActive()) {
+            return businessService;
         }
         return null;
     }
@@ -77,6 +51,9 @@ public class GloboDictionaryManager implements GloboDictionaryService, Pluggable
         List<Class<?>> cmdList = new ArrayList<>();
         cmdList.add(ListBusinessServicesCmd.class);
         cmdList.add(ListClientsCmd.class);
+        cmdList.add(ListComponentsCmd.class);
+        cmdList.add(ListSubComponentsCmd.class);
+        cmdList.add(ListProductsCmd.class);
         return cmdList;
     }
 }

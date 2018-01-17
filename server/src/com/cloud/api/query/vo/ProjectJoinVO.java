@@ -71,6 +71,15 @@ public class ProjectJoinVO extends BaseViewVO implements InternalIdentity, Ident
     @Column(name = "client_id")
     private String clientId;
 
+    @Column(name = "component_id")
+    private String componentId;
+
+    @Column(name = "sub_component_id")
+    private String subComponentId;
+
+    @Column(name = "product_id")
+    private String productId;
+
     @Column(name = "domain_id")
     private long domainId;
 
@@ -140,6 +149,18 @@ public class ProjectJoinVO extends BaseViewVO implements InternalIdentity, Ident
 
     public String getBusinessServiceId() {
         return businessServiceId;
+    }
+
+    public String getComponentId() {
+        return componentId;
+    }
+
+    public String getSubComponentId() {
+        return subComponentId;
+    }
+
+    public String getProductId() {
+        return productId;
     }
 
     public String getClientId() {

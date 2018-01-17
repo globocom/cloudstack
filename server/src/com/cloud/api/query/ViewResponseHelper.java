@@ -211,6 +211,9 @@ public class ViewResponseHelper {
             projectResponse.setDisplaytext(project.getDisplayText());
             projectResponse.setBusinessServiceId(project.getBusinessServiceId());
             projectResponse.setClientId(project.getClientId());
+            projectResponse.setComponentId(project.getComponentId());
+            projectResponse.setSubComponentId(project.getSubComponentId());
+            projectResponse.setProductId(project.getProductId());
             projectResponse.setId(project.getUuid());
             if (project.getState() != null) {
                 projectResponse.setState(project.getState().toString());

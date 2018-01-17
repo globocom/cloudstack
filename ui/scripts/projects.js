@@ -307,7 +307,10 @@
                         name: args.data['project-name'],
                         displayText: args.data['project-display-text'],
                         businessserviceid: args.data['project-businessservice'],
-                        clientid: args.data['project-client']
+                        clientid: args.data['project-client'],
+                        componentid: args.data['project-component'],
+                        subcomponentid: args.data['project-subcomponent'],
+                        productid: args.data['project-product']
                     },
                     dataType: 'json',
                     async: true,
@@ -1028,6 +1031,15 @@
                                     },
                                     client: {
                                         label: 'label.project.client'
+                                    },
+                                    component: {
+                                        label: 'label.project.component'
+                                    },
+                                    subcomponent: {
+                                        label: 'label.project.subcomponent'
+                                    },
+                                    product: {
+                                        label: 'label.project.product'
                                     }
                                 }],
 
@@ -1053,8 +1065,6 @@
                                         },
                                         success: function(json) {
                                             var project = json.listprojectsresponse.project ? json.listprojectsresponse.project[0] : {};
-                                            var businessService = {};
-                                            var client = {};
 
                                             if(project.businessserviceid){
                                                 $.ajax({
@@ -1062,7 +1072,7 @@
                                                     data: { id: project.businessserviceid },
                                                     async: false,
                                                     success: function(json) {
-                                                        businessService = json.listbusinessservicesresponse.businessservice[0];
+                                                        project.businessservice = json.listbusinessservicesresponse.businessservice[0].name;
                                                     }
                                                 });
                                             }
@@ -1073,13 +1083,43 @@
                                                     data: { id: project.clientid },
                                                     async: false,
                                                     success: function(json) {
-                                                        client = json.listclientsresponse.client[0];
+                                                        project.client = json.listclientsresponse.client[0].name;
                                                     }
                                                 });
                                             }
 
-                                            project.businessservice = businessService.name
-                                            project.client = client.name
+                                            if(project.componentid){
+                                                $.ajax({
+                                                    url: createURL('listComponents'),
+                                                    data: { id: project.componentid },
+                                                    async: false,
+                                                    success: function(json) {
+                                                        project.component = json.listcomponentsresponse.component[0].name;
+                                                    }
+                                                });
+                                            }
+
+                                            if(project.subcomponentid){
+                                                $.ajax({
+                                                    url: createURL('listSubComponents'),
+                                                    data: { id: project.subcomponentid },
+                                                    async: false,
+                                                    success: function(json) {
+                                                        project.subcomponent = json.listsubcomponentsresponse.subcomponent[0].name;
+                                                    }
+                                                });
+                                            }
+
+                                            if(project.productid){
+                                                $.ajax({
+                                                    url: createURL('listProducts'),
+                                                    data: { id: project.productid },
+                                                    async: false,
+                                                    success: function(json) {
+                                                        project.product = json.listproductsresponse.product[0].name;
+                                                    }
+                                                });
+                                            }
 
                                             args.response.success({
                                                 data: project,
