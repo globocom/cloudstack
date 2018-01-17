@@ -69,6 +69,9 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
     @Column(name = "product_id")
     private String productId;
 
+    @Column(name = "detailed_usage")
+    private boolean detailedUsage;
+
     @Column(name = "state")
     @Enumerated(value = EnumType.STRING)
     private State state;
@@ -95,13 +98,14 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
         this.uuid = UUID.randomUUID().toString();
     }
 
-    public ProjectVO(String name, String displayText, long domainId, long projectAccountId, String businessServiceId, String clientId, String componentId, String subComponentId, String productId) {
+    public ProjectVO(String name, String displayText, long domainId, long projectAccountId, String businessServiceId, String clientId, String componentId, String subComponentId, String productId, Boolean detailedUsage) {
         this(name, displayText, domainId, projectAccountId);
         this.businessServiceId = businessServiceId;
         this.clientId = clientId;
         this.componentId = componentId;
         this.subComponentId = subComponentId;
         this.productId = productId;
+        this.detailedUsage = detailedUsage;
     }
 
     @Override
@@ -193,6 +197,14 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
 
     public void setSubComponentId(String subComponentId) {
         this.subComponentId = subComponentId;
+    }
+
+    public Boolean isDetailedUsage() {
+        return detailedUsage;
+    }
+
+    public void setDetailedUsage(Boolean detailedUsage) {
+        this.detailedUsage = detailedUsage;
     }
 
     public String getProductId() {

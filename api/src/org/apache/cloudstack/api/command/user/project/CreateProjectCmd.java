@@ -72,6 +72,9 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
     @Parameter(name = ApiConstants.PRODUCT_ID, type = CommandType.STRING, required = false, description = "product id")
     private String productId;
 
+    @Parameter(name = ApiConstants.DETAILED_USAGE, type = CommandType.BOOLEAN, required = false, description = "true if project has detailed usage by third party app")
+    private Boolean detailedUsage;
+
     // ///////////////////////////////////////////////////
     // ///////////////// Accessors ///////////////////////
     // ///////////////////////////////////////////////////
@@ -121,6 +124,10 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
         return productId;
     }
 
+    public Boolean isDetailedUsage() {
+        return detailedUsage;
+    }
+
     @Override
     public String getCommandName() {
         return s_name;
@@ -161,7 +168,7 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
     public void create() throws ResourceAllocationException {
         CallContext.current().setEventDetails("Project Name: " + getName());
         Project project = _projectService.createProject(getName(), getDisplayText(), getAccountName(), getDomainId(),
-                getBusinessServiceId(), getClientId(), getComponentId(), getSubComponentId(), getProductId());
+                getBusinessServiceId(), getClientId(), getComponentId(), getSubComponentId(), getProductId(), isDetailedUsage());
         if (project != null) {
             this.setEntityId(project.getId());
             this.setEntityUuid(project.getUuid());

@@ -72,6 +72,10 @@ public class ProjectResponse extends BaseResponse implements ResourceLimitAndCou
     @Param(description = "the product id")
     private String productId;
 
+    @SerializedName(ApiConstants.DETAILED_USAGE)
+    @Param(description = "true if project has detailed usage by third party app")
+    private Boolean detailedUsage;
+
     @SerializedName(ApiConstants.ACCOUNT)
     @Param(description = "the account name of the project's owner")
     private String ownerName;
@@ -453,5 +457,9 @@ public class ProjectResponse extends BaseResponse implements ResourceLimitAndCou
 
     public void setProductId(String productId) {
         this.productId = productId;
+    }
+
+    public void setDetailedUsage(Boolean detailedUsage) {
+        this.detailedUsage = detailedUsage;
     }
 }

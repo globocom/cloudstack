@@ -10479,6 +10479,15 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
   border: 1px solid #C7C7C7;
 }
 
+.new-project .field input[type=checkbox] {
+  background: #FFFFFF 0px 7px;
+  font-size: 14px;
+  width: 506px;
+  height: 20px;
+  margin: 17px 25px 0 0;
+  float: right;
+}
+
 .new-project .field select {
   background: #FFFFFF 0px 7px;
   /*+border-radius:5px;*/

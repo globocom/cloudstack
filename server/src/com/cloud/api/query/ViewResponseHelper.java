@@ -214,6 +214,7 @@ public class ViewResponseHelper {
             projectResponse.setComponentId(project.getComponentId());
             projectResponse.setSubComponentId(project.getSubComponentId());
             projectResponse.setProductId(project.getProductId());
+            projectResponse.setDetailedUsage(project.isDetailedUsage());
             projectResponse.setId(project.getUuid());
             if (project.getState() != null) {
                 projectResponse.setState(project.getState().toString());

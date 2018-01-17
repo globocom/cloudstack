@@ -67,6 +67,9 @@ public class UpdateProjectCmd extends BaseAsyncCmd {
     @Parameter(name = ApiConstants.PRODUCT_ID, type = CommandType.STRING, required = false, description = "product id")
     private String productId;
 
+    @Parameter(name = ApiConstants.DETAILED_USAGE, type = CommandType.BOOLEAN, required = false, description = "true if project has detailed usage by third party app")
+    private Boolean detailedUsage;
+
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
     /////////////////////////////////////////////////////
@@ -103,6 +106,10 @@ public class UpdateProjectCmd extends BaseAsyncCmd {
         return productId;
     }
 
+    public Boolean isDetailedUsage() {
+        return detailedUsage;
+    }
+
     @Override
     public String getCommandName() {
         return s_name;
@@ -127,7 +134,7 @@ public class UpdateProjectCmd extends BaseAsyncCmd {
     public void execute() throws ResourceAllocationException {
         CallContext.current().setEventDetails("Project id: " + getId());
         Project project = _projectService.updateProject(getId(), getDisplayText(), getAccountName(), getBusinessServiceId(),
-                getClientId(), getComponentId(), getSubComponentId(), getProductId());
+                getClientId(), getComponentId(), getSubComponentId(), getProductId(), isDetailedUsage());
         if (project != null) {
             ProjectResponse response = _responseGenerator.createProjectResponse(project);
             response.setResponseName(getCommandName());

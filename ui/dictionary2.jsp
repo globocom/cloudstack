@@ -1035,6 +1035,7 @@ $.extend(dictionary, {
 'label.project.client': '<fmt:message key="label.project.client" />',
 'label.project.component': '<fmt:message key="label.project.component" />',
 'label.project.subcomponent': '<fmt:message key="label.project.subcomponent" />',
-'label.project.product': '<fmt:message key="label.project.product" />'
+'label.project.product': '<fmt:message key="label.project.product" />',
+'label.project.detailedusage': '<fmt:message key="label.project.detailedusage" />'
 });
 </script>

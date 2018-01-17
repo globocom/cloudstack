@@ -317,12 +317,21 @@
                     name: 'project-name',
                     id: 'project-name'
                 }));
+
             var $projectDesc = $('<div>').addClass('field desc')
                 .append($('<label>').attr('for', 'project-desc').html(_l('label.display.text')))
                 .append($('<input>').addClass('disallowSpecialCharacters').attr({
                     type: 'text',
                     name: 'project-display-text',
                     id: 'project-desc'
+                }));
+
+            var $projectDetailedUsage = $('<div>').addClass('field detailedusage')
+                .append($('<label>').attr('for', 'project-detailedusage').html(_l('label.project.detailedusage')))
+                .append($('<input>').attr({
+                    type: 'checkbox',
+                    name: 'project-detailedusage',
+                    id: 'project-detailedusage'
                 }));
 
             var $projectBusinessService = $('<div>').addClass('field businessservice')
@@ -588,6 +597,7 @@
                     .append($formDesc)
                     .append($projectName)
                     .append($projectDesc)
+                    .append($projectDetailedUsage)
                     .append($projectBusinessService)
                     .append($projectClient)
                     .append($projectComponent)

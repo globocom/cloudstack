@@ -181,7 +181,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     @Override
     @ActionEvent(eventType = EventTypes.EVENT_PROJECT_CREATE, eventDescription = "creating project", create = true)
     @DB
-    public Project createProject(final String name, final String displayText, String accountName, final Long domainId, final String businessServiceId, final String clientId, final String componentId, final String subComponentId, final String productId) throws ResourceAllocationException {
+    public Project createProject(final String name, final String displayText, String accountName, final Long domainId, final String businessServiceId, final String clientId, final String componentId, final String subComponentId, final String productId, final Boolean detailedUsage) throws ResourceAllocationException {
         Account caller = CallContext.current().getCallingAccount();
         Account owner = caller;
 
@@ -248,7 +248,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
 
         Account projectAccount = _accountMgr.createAccount(acctNm.toString(), Account.ACCOUNT_TYPE_PROJECT, domainId, null, null, UUID.randomUUID().toString());
 
-        Project project = _projectDao.persist(new ProjectVO(name, displayText, ownerFinal.getDomainId(), projectAccount.getId(), businessServiceId, clientId, componentId, subComponentId, productId));
+        Project project = _projectDao.persist(new ProjectVO(name, displayText, ownerFinal.getDomainId(), projectAccount.getId(), businessServiceId, clientId, componentId, subComponentId, productId, detailedUsage));
 
         //assign owner to the project
                 assignAccountToProject(project, ownerFinal.getId(), ProjectAccount.Role.Admin);
@@ -485,7 +485,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     @Override
     @DB
     @ActionEvent(eventType = EventTypes.EVENT_PROJECT_UPDATE, eventDescription = "updating project", async = true)
-    public Project updateProject(final long projectId, final String displayText, final String newOwnerName, final String businessServiceId, final String clientId, final String componentId, final String subComponentId, final String productId) throws ResourceAllocationException {
+    public Project updateProject(final long projectId, final String displayText, final String newOwnerName, final String businessServiceId, final String clientId, final String componentId, final String subComponentId, final String productId, final Boolean detailedUsage) throws ResourceAllocationException {
         Account caller = CallContext.current().getCallingAccount();
 
         //check that the project exists
@@ -503,6 +503,10 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
             public void doInTransactionWithoutResult(TransactionStatus status) throws ResourceAllocationException {
                 if (displayText != null) {
                     project.setDisplayText(displayText);
+                }
+
+                if (detailedUsage != null) {
+                    project.setDetailedUsage(detailedUsage);
                 }
 
                 if(businessServiceId != null){

@@ -644,6 +644,7 @@ public class ApiConstants {
     public static final String COMPONENT_ID = "componentid";
     public static final String SUB_COMPONENT_ID = "subcomponentid";
     public static final String PRODUCT_ID = "productid";
+    public static final String DETAILED_USAGE = "detailedusage";
 
     public enum HostDetails {
         all, capacity, events, stats, min;

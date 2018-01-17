@@ -310,7 +310,8 @@
                         clientid: args.data['project-client'],
                         componentid: args.data['project-component'],
                         subcomponentid: args.data['project-subcomponent'],
-                        productid: args.data['project-product']
+                        productid: args.data['project-product'],
+                        detailedusage: (args.data['project-detailedusage'] == "on")
                     },
                     dataType: 'json',
                     async: true,
@@ -1025,6 +1026,11 @@
                                     },
                                     state: {
                                         label: 'label.state'
+                                    },
+                                    detailedusage: {
+                                        label: 'label.project.detailedusage',
+                                        isBoolean: true,
+                                        converter: cloudStack.converters.toBooleanText
                                     },
                                     businessservice: {
                                         label: 'label.project.businessservice'
