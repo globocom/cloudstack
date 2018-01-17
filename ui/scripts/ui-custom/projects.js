@@ -317,6 +317,7 @@
                     name: 'project-name',
                     id: 'project-name'
                 }));
+
             var $projectDesc = $('<div>').addClass('field desc')
                 .append($('<label>').attr('for', 'project-desc').html(_l('label.display.text')))
                 .append($('<input>').addClass('disallowSpecialCharacters').attr({
@@ -324,6 +325,56 @@
                     name: 'project-display-text',
                     id: 'project-desc'
                 }));
+
+            var $projectDetailedUsage = $('<div>').addClass('field detailedusage')
+                .append($('<label>').attr('for', 'project-detailedusage').html(_l('label.project.detailedusage')))
+                .append($('<input>').attr({
+                    type: 'checkbox',
+                    name: 'project-detailedusage',
+                    id: 'project-detailedusage'
+                }));
+
+            var $projectBusinessService = $('<div>').addClass('field businessservice')
+                .append($('<label>').attr('for', 'project-businessservice').html(_l('label.project.businessservice')))
+                .append($('<select>').attr({
+                  name: 'project-businessservice',
+                  id: 'project-businessservice'
+                }));
+
+            var $projectClient = $('<div>').addClass('field client')
+                .append($('<label>').attr('for', 'project-client').html(_l('label.project.client')))
+                .append($('<select>').attr({
+                  name: 'project-client',
+                  id: 'project-client'
+                }));
+
+            var $projectComponent = $('<div>').addClass('field component')
+                .append($('<label>').attr('for', 'project-component').html(_l('label.project.component')))
+                .append($('<select>').attr({
+                  name: 'project-component',
+                  id: 'project-component'
+                }));
+
+            var $projectSubComponent = $('<div>').addClass('field subcomponent')
+                .append($('<label>').attr('for', 'project-subcomponent').html(_l('label.project.subcomponent')))
+                .append($('<select>').attr({
+                  name: 'project-subcomponent',
+                  id: 'project-subcomponent'
+                }));
+
+            var $projectProduct = $('<div>').addClass('field product')
+                .append($('<label>').attr('for', 'project-product').html(_l('label.project.product')))
+                .append($('<select>').attr({
+                  name: 'project-product',
+                  id: 'project-product'
+                }));
+
+            createDictionaryOption('businessservice', listBusinessServices)
+            createDictionaryOption('client', listClients)
+            createDictionaryOption('component', listComponents)
+            createDictionaryOption('subcomponent', listSubComponents)
+            createDictionaryOption('product', listProducts)
+
             var $submit = $('<input>').attr({
                 type: 'submit'
             }).val(_l('label.create.project'));
@@ -546,6 +597,12 @@
                     .append($formDesc)
                     .append($projectName)
                     .append($projectDesc)
+                    .append($projectDetailedUsage)
+                    .append($projectBusinessService)
+                    .append($projectClient)
+                    .append($projectComponent)
+                    .append($projectSubComponent)
+                    .append($projectProduct)
                     .append($cancel)
                     .append($submit)
             );
@@ -691,6 +748,49 @@
                 .append($cancel);
         }
     };
+
+    var createDictionaryOption = function(name, listFunction){
+        listFunction(function(objects){
+            $('#project-' + name).append($('<option>', {
+                value: "",
+                text : ""
+            }));
+            $.each(objects, function (i, object) {
+                $('#project-' + name).append($('<option>', {
+                    value: object.id,
+                    text : object.name
+                }));
+            });
+        })
+    }
+
+    var listBusinessServices = function(callback){
+        listDictionaryEntity('listBusinessServices', 'listbusinessservicesresponse', 'businessservice', callback)
+    }
+
+    var listClients = function(callback){
+        listDictionaryEntity('listClients', 'listclientsresponse', 'client', callback)
+    }
+
+    var listComponents = function(callback){
+        listDictionaryEntity('listComponents', 'listcomponentsresponse', 'component', callback)
+    }
+
+    var listSubComponents = function(callback){
+        listDictionaryEntity('listSubComponents', 'listsubcomponentsresponse', 'subcomponent', callback)
+    }
+    var listProducts = function(callback){
+        listDictionaryEntity('listProducts', 'listproductsresponse', 'product', callback)
+    }
+
+    var listDictionaryEntity = function(uri, responseRoot, object, callback){
+         $.ajax({
+            url: createURL(uri),
+            success: function(json) {
+                callback(json[responseRoot][object] ? json[responseRoot][object] : []);
+            }
+        });
+    }
 
     /**
      * Show project-mode appearance on CloudStack UI

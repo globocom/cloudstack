@@ -803,3 +803,10 @@ updateGloboNetworkPool=15
 createGloboNetworkPool=15
 deleteGloboNetworkPool=15
 listGloboVirtualMachines=15
+
+### GloboDictionary commands
+listBusinessServices=15
+listClients=15
+listComponents=15
+listSubComponents=15
+listProducts=15

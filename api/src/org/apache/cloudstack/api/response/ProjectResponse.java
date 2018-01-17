@@ -52,6 +52,30 @@ public class ProjectResponse extends BaseResponse implements ResourceLimitAndCou
     @Param(description = "the domain name where the project belongs to")
     private String domain;
 
+    @SerializedName(ApiConstants.BUSINESS_SERVICE_ID)
+    @Param(description = "the business service id")
+    private String businessServiceId;
+
+    @SerializedName(ApiConstants.CLIENT_ID)
+    @Param(description = "the client id")
+    private String clientId;
+
+    @SerializedName(ApiConstants.COMPONENT_ID)
+    @Param(description = "the component id")
+    private String componentId;
+
+    @SerializedName(ApiConstants.SUB_COMPONENT_ID)
+    @Param(description = "the sub-component id")
+    private String subComponentId;
+
+    @SerializedName(ApiConstants.PRODUCT_ID)
+    @Param(description = "the product id")
+    private String productId;
+
+    @SerializedName(ApiConstants.DETAILED_USAGE)
+    @Param(description = "true if project has detailed usage by third party app")
+    private Boolean detailedUsage;
+
     @SerializedName(ApiConstants.ACCOUNT)
     @Param(description = "the account name of the project's owner")
     private String ownerName;
@@ -415,4 +439,27 @@ public class ProjectResponse extends BaseResponse implements ResourceLimitAndCou
         this.secondaryStorageAvailable = secondaryStorageAvailable;
     }
 
+    public void setBusinessServiceId(String businessServiceId) {
+        this.businessServiceId = businessServiceId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
+
+    public void setComponentId(String componentId) {
+        this.componentId = componentId;
+    }
+
+    public void setSubComponentId(String subComponentId) {
+        this.subComponentId = subComponentId;
+    }
+
+    public void setProductId(String productId) {
+        this.productId = productId;
+    }
+
+    public void setDetailedUsage(Boolean detailedUsage) {
+        this.detailedUsage = detailedUsage;
+    }
 }

@@ -26,7 +26,7 @@
                       http://www.springframework.org/schema/context
                       http://www.springframework.org/schema/context/spring-context-3.0.xsd"
                       >
-
+    <context:component-scan base-package="com.cloud.globodictionary" />
 
     <bean id="basicAgentAuthManager"
         class="com.cloud.agent.manager.authn.impl.BasicAgentAuthManager">
@@ -78,5 +78,4 @@
     <bean id="ExternalIpAddressAllocator" class="com.cloud.network.ExternalIpAddressAllocator">
         <property name="name" value="Basic" />
     </bean>
-    
 </beans>

@@ -209,6 +209,12 @@ public class ViewResponseHelper {
             ProjectResponse projectResponse = new ProjectResponse();
             projectResponse.setName(project.getName());
             projectResponse.setDisplaytext(project.getDisplayText());
+            projectResponse.setBusinessServiceId(project.getBusinessServiceId());
+            projectResponse.setClientId(project.getClientId());
+            projectResponse.setComponentId(project.getComponentId());
+            projectResponse.setSubComponentId(project.getSubComponentId());
+            projectResponse.setProductId(project.getProductId());
+            projectResponse.setDetailedUsage(project.isDetailedUsage());
             projectResponse.setId(project.getUuid());
             if (project.getState() != null) {
                 projectResponse.setState(project.getState().toString());

@@ -54,6 +54,24 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
     @Column(name = "project_account_id")
     long projectAccountId;
 
+    @Column(name = "business_service_id")
+    private String businessServiceId;
+
+    @Column(name = "client_id")
+    private String clientId;
+
+    @Column(name = "component_id")
+    private String componentId;
+
+    @Column(name = "sub_component_id")
+    private String subComponentId;
+
+    @Column(name = "product_id")
+    private String productId;
+
+    @Column(name = "detailed_usage")
+    private boolean detailedUsage;
+
     @Column(name = "state")
     @Enumerated(value = EnumType.STRING)
     private State state;
@@ -78,6 +96,16 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
         this.domainId = domainId;
         this.state = State.Disabled;
         this.uuid = UUID.randomUUID().toString();
+    }
+
+    public ProjectVO(String name, String displayText, long domainId, long projectAccountId, String businessServiceId, String clientId, String componentId, String subComponentId, String productId, Boolean detailedUsage) {
+        this(name, displayText, domainId, projectAccountId);
+        this.businessServiceId = businessServiceId;
+        this.clientId = clientId;
+        this.componentId = componentId;
+        this.subComponentId = subComponentId;
+        this.productId = productId;
+        this.detailedUsage = detailedUsage;
     }
 
     @Override
@@ -137,6 +165,54 @@ public class ProjectVO implements Project, Identity, InternalIdentity {
     @Override
     public long getProjectAccountId() {
         return projectAccountId;
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
+
+    public String getBusinessServiceId() {
+        return businessServiceId;
+    }
+
+    public void setBusinessServiceId(String businessServiceId) {
+        this.businessServiceId = businessServiceId;
+    }
+
+    public String getComponentId() {
+        return componentId;
+    }
+
+    public void setComponentId(String componentId) {
+        this.componentId = componentId;
+    }
+
+    public String getSubComponentId() {
+        return subComponentId;
+    }
+
+    public void setSubComponentId(String subComponentId) {
+        this.subComponentId = subComponentId;
+    }
+
+    public Boolean isDetailedUsage() {
+        return detailedUsage;
+    }
+
+    public void setDetailedUsage(Boolean detailedUsage) {
+        this.detailedUsage = detailedUsage;
+    }
+
+    public String getProductId() {
+        return productId;
+    }
+
+    public void setProductId(String productId) {
+        this.productId = productId;
     }
 
     public void setName(String name) {

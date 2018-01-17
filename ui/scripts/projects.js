@@ -305,7 +305,13 @@
                         account: args.context.users[0].account,
                         domainId: args.context.users[0].domainid,
                         name: args.data['project-name'],
-                        displayText: args.data['project-display-text']
+                        displayText: args.data['project-display-text'],
+                        businessserviceid: args.data['project-businessservice'],
+                        clientid: args.data['project-client'],
+                        componentid: args.data['project-component'],
+                        subcomponentid: args.data['project-subcomponent'],
+                        productid: args.data['project-product'],
+                        detailedusage: (args.data['project-detailedusage'] == "on")
                     },
                     dataType: 'json',
                     async: true,
@@ -1020,6 +1026,26 @@
                                     },
                                     state: {
                                         label: 'label.state'
+                                    },
+                                    detailedusage: {
+                                        label: 'label.project.detailedusage',
+                                        isBoolean: true,
+                                        converter: cloudStack.converters.toBooleanText
+                                    },
+                                    businessservice: {
+                                        label: 'label.project.businessservice'
+                                    },
+                                    client: {
+                                        label: 'label.project.client'
+                                    },
+                                    component: {
+                                        label: 'label.project.component'
+                                    },
+                                    subcomponent: {
+                                        label: 'label.project.subcomponent'
+                                    },
+                                    product: {
+                                        label: 'label.project.product'
                                     }
                                 }],
 
@@ -1044,8 +1070,65 @@
                                             id: projectID
                                         },
                                         success: function(json) {
+                                            var project = json.listprojectsresponse.project ? json.listprojectsresponse.project[0] : {};
+
+                                            if(project.businessserviceid){
+                                                $.ajax({
+                                                    url: createURL('listBusinessServices'),
+                                                    data: { id: project.businessserviceid },
+                                                    async: false,
+                                                    success: function(json) {
+                                                        project.businessservice = json.listbusinessservicesresponse.businessservice[0].name;
+                                                    }
+                                                });
+                                            }
+
+                                            if(project.clientid){
+                                                $.ajax({
+                                                    url: createURL('listClients'),
+                                                    data: { id: project.clientid },
+                                                    async: false,
+                                                    success: function(json) {
+                                                        project.client = json.listclientsresponse.client[0].name;
+                                                    }
+                                                });
+                                            }
+
+                                            if(project.componentid){
+                                                $.ajax({
+                                                    url: createURL('listComponents'),
+                                                    data: { id: project.componentid },
+                                                    async: false,
+                                                    success: function(json) {
+                                                        project.component = json.listcomponentsresponse.component[0].name;
+                                                    }
+                                                });
+                                            }
+
+                                            if(project.subcomponentid){
+                                                $.ajax({
+                                                    url: createURL('listSubComponents'),
+                                                    data: { id: project.subcomponentid },
+                                                    async: false,
+                                                    success: function(json) {
+                                                        project.subcomponent = json.listsubcomponentsresponse.subcomponent[0].name;
+                                                    }
+                                                });
+                                            }
+
+                                            if(project.productid){
+                                                $.ajax({
+                                                    url: createURL('listProducts'),
+                                                    data: { id: project.productid },
+                                                    async: false,
+                                                    success: function(json) {
+                                                        project.product = json.listproductsresponse.product[0].name;
+                                                    }
+                                                });
+                                            }
+
                                             args.response.success({
-                                                data: json.listprojectsresponse.project ? json.listprojectsresponse.project[0] : {},
+                                                data: project,
                                                 actionFilter: projectsActionFilter
                                             });
                                         }

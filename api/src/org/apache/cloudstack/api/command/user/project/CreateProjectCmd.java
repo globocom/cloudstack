@@ -57,6 +57,24 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
     @Parameter(name = ApiConstants.DISPLAY_TEXT, type = CommandType.STRING, required = true, description = "display text of the project")
     private String displayText;
 
+    @Parameter(name = ApiConstants.BUSINESS_SERVICE_ID, type = CommandType.STRING, required = false, description = "business service id")
+    private String businessServiceId;
+
+    @Parameter(name = ApiConstants.CLIENT_ID, type = CommandType.STRING, required = false, description = "client id")
+    private String clientId;
+
+    @Parameter(name = ApiConstants.COMPONENT_ID, type = CommandType.STRING, required = false, description = "component id")
+    private String componentId;
+
+    @Parameter(name = ApiConstants.SUB_COMPONENT_ID, type = CommandType.STRING, required = false, description = "sub-component id")
+    private String subComponentId;
+
+    @Parameter(name = ApiConstants.PRODUCT_ID, type = CommandType.STRING, required = false, description = "product id")
+    private String productId;
+
+    @Parameter(name = ApiConstants.DETAILED_USAGE, type = CommandType.BOOLEAN, required = false, description = "true if project has detailed usage by third party app")
+    private Boolean detailedUsage;
+
     // ///////////////////////////////////////////////////
     // ///////////////// Accessors ///////////////////////
     // ///////////////////////////////////////////////////
@@ -84,6 +102,30 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
 
     public String getDisplayText() {
         return displayText;
+    }
+
+    public String getBusinessServiceId() {
+        return businessServiceId;
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public String getComponentId() {
+        return componentId;
+    }
+
+    public String getSubComponentId() {
+        return subComponentId;
+    }
+
+    public String getProductId() {
+        return productId;
+    }
+
+    public Boolean isDetailedUsage() {
+        return detailedUsage;
     }
 
     @Override
@@ -125,7 +167,8 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
     @Override
     public void create() throws ResourceAllocationException {
         CallContext.current().setEventDetails("Project Name: " + getName());
-        Project project = _projectService.createProject(getName(), getDisplayText(), getAccountName(), getDomainId());
+        Project project = _projectService.createProject(getName(), getDisplayText(), getAccountName(), getDomainId(),
+                getBusinessServiceId(), getClientId(), getComponentId(), getSubComponentId(), getProductId(), isDetailedUsage());
         if (project != null) {
             this.setEntityId(project.getId());
             this.setEntityUuid(project.getUuid());

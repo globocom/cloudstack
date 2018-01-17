@@ -1030,6 +1030,12 @@ $.extend(dictionary, {
 'label.action.unlink.loadbalancer': '<fmt:message key="label.action.unlink.loadbalancer" />',
 'label.action.link.loadbalancer': '<fmt:message key="label.action.link.loadbalancer" />',
 'label.action.unlink.loadbalancer.processing': '<fmt:message key="label.action.unlink.loadbalancer.processing" />',
-'label.action.link.loadbalancer.processing': '<fmt:message key="label.action.link.loadbalancer.processing" />'
+'label.action.link.loadbalancer.processing': '<fmt:message key="label.action.link.loadbalancer.processing" />',
+'label.project.businessservice': '<fmt:message key="label.project.businessservice" />',
+'label.project.client': '<fmt:message key="label.project.client" />',
+'label.project.component': '<fmt:message key="label.project.component" />',
+'label.project.subcomponent': '<fmt:message key="label.project.subcomponent" />',
+'label.project.product': '<fmt:message key="label.project.product" />',
+'label.project.detailedusage': '<fmt:message key="label.project.detailedusage" />'
 });
 </script>

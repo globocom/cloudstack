@@ -39,6 +39,7 @@ import javax.mail.URLName;
 import javax.mail.internet.InternetAddress;
 import javax.naming.ConfigurationException;
 
+import com.cloud.globodictionary.GloboDictionaryService;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
@@ -126,6 +127,8 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     private ProjectInvitationJoinDao _projectInvitationJoinDao;
     @Inject
     protected ResourceTagDao _resourceTagDao;
+    @Inject
+    protected GloboDictionaryService _globoDictionaryManager;
 
     protected boolean _invitationRequired = false;
     protected long _invitationTimeOut = 86400000;
@@ -178,7 +181,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     @Override
     @ActionEvent(eventType = EventTypes.EVENT_PROJECT_CREATE, eventDescription = "creating project", create = true)
     @DB
-    public Project createProject(final String name, final String displayText, String accountName, final Long domainId) throws ResourceAllocationException {
+    public Project createProject(final String name, final String displayText, String accountName, final Long domainId, final String businessServiceId, final String clientId, final String componentId, final String subComponentId, final String productId, final Boolean detailedUsage) throws ResourceAllocationException {
         Account caller = CallContext.current().getCallingAccount();
         Account owner = caller;
 
@@ -194,6 +197,36 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
 
         if (accountName != null) {
             owner = _accountMgr.finalizeOwner(caller, accountName, domainId, null);
+        }
+
+        if(businessServiceId != null){
+            if(!businessServiceId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.BUSINESS_SERVICE, businessServiceId) == null){
+                throw new InvalidParameterValueException("Business Service with ID "+ businessServiceId +" does not exist");
+            }
+        }
+
+        if(clientId != null){
+            if(!clientId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.CLIENT, clientId) == null){
+                throw new InvalidParameterValueException("Client with ID "+ clientId +" does not exist");
+            }
+        }
+
+        if(componentId != null){
+            if(!componentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.COMPONENT, componentId) == null){
+                throw new InvalidParameterValueException("Component with ID "+ componentId +" does not exist");
+            }
+        }
+
+        if(subComponentId != null){
+            if(!subComponentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.SUB_COMPONENT, subComponentId) == null){
+                throw new InvalidParameterValueException("Sub-component with ID "+ subComponentId +" does not exist");
+            }
+        }
+
+        if(productId != null){
+            if(!productId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.PRODUCT, productId) == null){
+                throw new InvalidParameterValueException("Product with ID "+ productId +" does not exist");
+            }
         }
 
         //don't allow 2 projects with the same name inside the same domain
@@ -215,7 +248,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
 
         Account projectAccount = _accountMgr.createAccount(acctNm.toString(), Account.ACCOUNT_TYPE_PROJECT, domainId, null, null, UUID.randomUUID().toString());
 
-                Project project = _projectDao.persist(new ProjectVO(name, displayText, ownerFinal.getDomainId(), projectAccount.getId()));
+        Project project = _projectDao.persist(new ProjectVO(name, displayText, ownerFinal.getDomainId(), projectAccount.getId(), businessServiceId, clientId, componentId, subComponentId, productId, detailedUsage));
 
         //assign owner to the project
                 assignAccountToProject(project, ownerFinal.getId(), ProjectAccount.Role.Admin);
@@ -452,7 +485,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     @Override
     @DB
     @ActionEvent(eventType = EventTypes.EVENT_PROJECT_UPDATE, eventDescription = "updating project", async = true)
-    public Project updateProject(final long projectId, final String displayText, final String newOwnerName) throws ResourceAllocationException {
+    public Project updateProject(final long projectId, final String displayText, final String newOwnerName, final String businessServiceId, final String clientId, final String componentId, final String subComponentId, final String productId, final Boolean detailedUsage) throws ResourceAllocationException {
         Account caller = CallContext.current().getCallingAccount();
 
         //check that the project exists
@@ -468,43 +501,83 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
         Transaction.execute(new TransactionCallbackWithExceptionNoReturn<ResourceAllocationException>() {
             @Override
             public void doInTransactionWithoutResult(TransactionStatus status) throws ResourceAllocationException {
-        if (displayText != null) {
-            project.setDisplayText(displayText);
-            _projectDao.update(projectId, project);
-        }
-
-        if (newOwnerName != null) {
-            //check that the new owner exists
-            Account futureOwnerAccount = _accountMgr.getActiveAccountByName(newOwnerName, project.getDomainId());
-            if (futureOwnerAccount == null) {
-                throw new InvalidParameterValueException("Unable to find account name=" + newOwnerName + " in domain id=" + project.getDomainId());
-            }
-            Account currentOwnerAccount = getProjectOwner(projectId);
-            if (currentOwnerAccount.getId() != futureOwnerAccount.getId()) {
-                ProjectAccountVO futureOwner = _projectAccountDao.findByProjectIdAccountId(projectId, futureOwnerAccount.getAccountId());
-                if (futureOwner == null) {
-                            throw new InvalidParameterValueException("Account " + newOwnerName +
-                                " doesn't belong to the project. Add it to the project first and then change the project's ownership");
+                if (displayText != null) {
+                    project.setDisplayText(displayText);
                 }
 
-                //do resource limit check
-                _resourceLimitMgr.checkResourceLimit(_accountMgr.getAccount(futureOwnerAccount.getId()), ResourceType.project);
+                if (detailedUsage != null) {
+                    project.setDetailedUsage(detailedUsage);
+                }
 
-                //unset the role for the old owner
-                ProjectAccountVO currentOwner = _projectAccountDao.findByProjectIdAccountId(projectId, currentOwnerAccount.getId());
-                currentOwner.setAccountRole(Role.Regular);
-                _projectAccountDao.update(currentOwner.getId(), currentOwner);
-                _resourceLimitMgr.decrementResourceCount(currentOwnerAccount.getId(), ResourceType.project);
+                if(businessServiceId != null){
+                    if(!businessServiceId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.BUSINESS_SERVICE, businessServiceId) == null){
+                        throw new InvalidParameterValueException("Business Service with ID "+ businessServiceId +" does not exist");
+                    }
+                    project.setBusinessServiceId(businessServiceId);
+                }
 
-                //set new owner
-                futureOwner.setAccountRole(Role.Admin);
-                _projectAccountDao.update(futureOwner.getId(), futureOwner);
-                _resourceLimitMgr.incrementResourceCount(futureOwnerAccount.getId(), ResourceType.project);
+                if(clientId != null) {
+                    if(!clientId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.CLIENT, clientId) == null){
+                        throw new InvalidParameterValueException("Client with ID "+ clientId +" does not exist");
+                    }
+                    project.setClientId(clientId);
+                }
 
-            } else {
-                s_logger.trace("Future owner " + newOwnerName + "is already the owner of the project id=" + projectId);
-            }
-        }
+                if(componentId != null) {
+                    if(!componentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.COMPONENT, componentId) == null){
+                        throw new InvalidParameterValueException("Component with ID "+ componentId +" does not exist");
+                    }
+                    project.setComponentId(componentId);
+                }
+
+                if(subComponentId != null) {
+                    if(!subComponentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.SUB_COMPONENT, subComponentId) == null){
+                        throw new InvalidParameterValueException("Sub-component with ID "+ subComponentId +" does not exist");
+                    }
+                    project.setSubComponentId(subComponentId);
+                }
+
+                if(productId != null) {
+                    if(!productId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.PRODUCT, productId) == null){
+                        throw new InvalidParameterValueException("Product with ID "+ productId +" does not exist");
+                    }
+                    project.setProductId(productId);
+                }
+
+                _projectDao.update(projectId, project);
+
+                if (newOwnerName != null) {
+                    //check that the new owner exists
+                    Account futureOwnerAccount = _accountMgr.getActiveAccountByName(newOwnerName, project.getDomainId());
+                    if (futureOwnerAccount == null) {
+                        throw new InvalidParameterValueException("Unable to find account name=" + newOwnerName + " in domain id=" + project.getDomainId());
+                    }
+                    Account currentOwnerAccount = getProjectOwner(projectId);
+                    if (currentOwnerAccount.getId() != futureOwnerAccount.getId()) {
+                        ProjectAccountVO futureOwner = _projectAccountDao.findByProjectIdAccountId(projectId, futureOwnerAccount.getAccountId());
+                        if (futureOwner == null) {
+                                    throw new InvalidParameterValueException("Account " + newOwnerName +
+                                        " doesn't belong to the project. Add it to the project first and then change the project's ownership");
+                        }
+
+                        //do resource limit check
+                        _resourceLimitMgr.checkResourceLimit(_accountMgr.getAccount(futureOwnerAccount.getId()), ResourceType.project);
+
+                        //unset the role for the old owner
+                        ProjectAccountVO currentOwner = _projectAccountDao.findByProjectIdAccountId(projectId, currentOwnerAccount.getId());
+                        currentOwner.setAccountRole(Role.Regular);
+                        _projectAccountDao.update(currentOwner.getId(), currentOwner);
+                        _resourceLimitMgr.decrementResourceCount(currentOwnerAccount.getId(), ResourceType.project);
+
+                        //set new owner
+                        futureOwner.setAccountRole(Role.Admin);
+                        _projectAccountDao.update(futureOwner.getId(), futureOwner);
+                        _resourceLimitMgr.incrementResourceCount(futureOwnerAccount.getId(), ResourceType.project);
+
+                    } else {
+                        s_logger.trace("Future owner " + newOwnerName + "is already the owner of the project id=" + projectId);
+                    }
+                }
             }
         });
 
