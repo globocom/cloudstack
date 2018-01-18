@@ -46,7 +46,16 @@ public class GloboDictionaryAPIClientImpl implements GloboDictionaryAPIClient, C
     private static final ConfigKey<String> GloboDictionaryEndpoint = new ConfigKey<>("Globo Dictionary", String.class, "globodictionary.api.endpoint", "",
             "Globo Dictionary API Endpoint", true, ConfigKey.Scope.Global);
 
+    private final HttpClient httpClient;
     private static final String API_ID_QUERY_PARAMETER = "id_service_now";
+
+    public GloboDictionaryAPIClientImpl() {
+        this.httpClient = new HttpClient();
+    }
+
+    public GloboDictionaryAPIClientImpl(HttpClient httpClient){
+        this.httpClient = httpClient;
+    }
 
     @Override
     public GloboDictionaryEntity get(GloboDictionaryService.GloboDictionaryEntityType type, String id) {
@@ -79,11 +88,9 @@ public class GloboDictionaryAPIClientImpl implements GloboDictionaryAPIClient, C
     }
 
     private String makeHttpRequest(GloboDictionaryService.GloboDictionaryEntityType entityType, String queryString) {
-        HttpClient httpclient = new HttpClient();
-        GetMethod getMethod = new GetMethod(GloboDictionaryEndpoint.value() + entityType.getUri() + "?" + queryString);
+        GetMethod getMethod = this.createRequest(entityType, queryString);
         try {
-            httpclient.executeMethod(getMethod);
-            int status = httpclient.executeMethod(getMethod);
+            int status = this.httpClient.executeMethod(getMethod);
             if(status == HttpStatus.SC_OK) {
                 return getMethod.getResponseBodyAsString();
             }else{
@@ -97,6 +104,10 @@ public class GloboDictionaryAPIClientImpl implements GloboDictionaryAPIClient, C
         } finally {
             getMethod.releaseConnection();
         }
+    }
+
+    protected GetMethod createRequest(GloboDictionaryService.GloboDictionaryEntityType entityType, String queryString) {
+        return new GetMethod(GloboDictionaryEndpoint.value() + entityType.getUri() + "?" + queryString);
     }
 
     @Override

@@ -33,6 +33,12 @@ public class GloboDictionaryEntityVO implements GloboDictionaryEntity {
     public GloboDictionaryEntityVO() {
     }
 
+    public GloboDictionaryEntityVO(String id, String name, String status) {
+        this.id = id;
+        this.name = name;
+        this.status = status;
+    }
+
     public String getId() {
         return id;
     }
@@ -63,5 +69,25 @@ public class GloboDictionaryEntityVO implements GloboDictionaryEntity {
 
     public int compareTo(GloboDictionaryEntity entity) {
         return this.name.compareTo(entity.getName());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        GloboDictionaryEntityVO that = (GloboDictionaryEntityVO) o;
+
+        if (!id.equals(that.id)) return false;
+        if (!name.equals(that.name)) return false;
+        return status.equals(that.status);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = id.hashCode();
+        result = 31 * result + name.hashCode();
+        result = 31 * result + status.hashCode();
+        return result;
     }
 }

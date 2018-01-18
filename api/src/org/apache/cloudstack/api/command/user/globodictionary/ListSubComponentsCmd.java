@@ -18,9 +18,9 @@ package org.apache.cloudstack.api.command.user.globodictionary;
 
 import com.cloud.globodictionary.GloboDictionaryService;
 import org.apache.cloudstack.api.APICommand;
-import org.apache.cloudstack.api.response.SubComponentResponse;
+import org.apache.cloudstack.api.response.GloboDictionaryResponse;
 
-@APICommand(name = "listSubComponents", description = "Lists sub-components", responseObject = SubComponentResponse.class,
+@APICommand(name = "listSubComponents", description = "Lists sub-components", responseObject = GloboDictionaryResponse.class,
         requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
 public class ListSubComponentsCmd extends BaseDictionaryCmd {
 

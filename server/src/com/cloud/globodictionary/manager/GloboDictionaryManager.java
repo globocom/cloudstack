@@ -39,6 +39,14 @@ public class GloboDictionaryManager implements GloboDictionaryService, Pluggable
     @Inject
     private GloboDictionaryAPIClient dictionaryAPIClient;
 
+
+    public GloboDictionaryManager() {
+    }
+
+    public GloboDictionaryManager(GloboDictionaryAPIClient dictionaryAPIClient) {
+        this.dictionaryAPIClient = dictionaryAPIClient;
+    }
+
     @Override
     public List<GloboDictionaryEntity> list(GloboDictionaryEntityType type) {
         return this.filterActives(dictionaryAPIClient.list(type));

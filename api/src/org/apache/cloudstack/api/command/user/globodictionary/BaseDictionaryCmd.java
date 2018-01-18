@@ -27,7 +27,7 @@ import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseCmd;
 import org.apache.cloudstack.api.Parameter;
 import org.apache.cloudstack.api.ServerApiException;
-import org.apache.cloudstack.api.response.ComponentResponse;
+import org.apache.cloudstack.api.response.GloboDictionaryResponse;
 import org.apache.cloudstack.api.response.ListResponse;
 import org.apache.cloudstack.context.CallContext;
 
@@ -38,7 +38,7 @@ import java.util.List;
 public abstract class BaseDictionaryCmd extends BaseCmd {
 
     @Inject
-    private GloboDictionaryService globoDictionaryService;
+    protected GloboDictionaryService globoDictionaryService;
 
     /////////////////////////////////////////////////////
     //////////////// API parameters /////////////////////
@@ -53,24 +53,28 @@ public abstract class BaseDictionaryCmd extends BaseCmd {
 
     @Override
     public void execute() throws ResourceUnavailableException, InsufficientCapacityException, ServerApiException, ConcurrentOperationException, ResourceAllocationException, NetworkRuleConflictException {
-        ListResponse<ComponentResponse> response = new ListResponse<>();
-        List<ComponentResponse> componentResponses = new ArrayList<>();
+        ListResponse<GloboDictionaryResponse> response = new ListResponse<>();
+        List<GloboDictionaryResponse> globoDictionaryResponses = new ArrayList<>();
 
         if(id != null){
             GloboDictionaryEntity component = globoDictionaryService.get(this.getEntity(), id);
             if(component != null){
-                componentResponses.add(createResponse(component));
+                globoDictionaryResponses.add(createResponse(component));
             }
         }else {
             List<GloboDictionaryEntity> components = globoDictionaryService.list(this.getEntity());
             for (GloboDictionaryEntity component : components) {
-                componentResponses.add(createResponse(component));
+                globoDictionaryResponses.add(createResponse(component));
             }
         }
 
-        response.setResponses(componentResponses);
+        response.setResponses(globoDictionaryResponses);
         response.setResponseName(getCommandName());
         this.setResponseObject(response);
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     @Override
@@ -83,10 +87,10 @@ public abstract class BaseDictionaryCmd extends BaseCmd {
         return CallContext.current().getCallingAccountId();
     }
 
-    private ComponentResponse createResponse(GloboDictionaryEntity component) {
-        ComponentResponse componentResponse = new ComponentResponse(component.getId(), component.getName());
-        componentResponse.setObjectName(this.getResponseName());
-        return componentResponse;
+    private GloboDictionaryResponse createResponse(GloboDictionaryEntity component) {
+        GloboDictionaryResponse globoDictionaryResponse = new GloboDictionaryResponse(component.getId(), component.getName());
+        globoDictionaryResponse.setObjectName(this.getResponseName());
+        return globoDictionaryResponse;
     }
 
     abstract GloboDictionaryService.GloboDictionaryEntityType getEntity();

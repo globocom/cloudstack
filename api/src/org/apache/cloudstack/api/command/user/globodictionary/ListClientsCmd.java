@@ -16,11 +16,11 @@
 */
 package org.apache.cloudstack.api.command.user.globodictionary;
 
-import org.apache.cloudstack.api.response.ClientResponse;
 import com.cloud.globodictionary.GloboDictionaryService;
 import org.apache.cloudstack.api.APICommand;
+import org.apache.cloudstack.api.response.GloboDictionaryResponse;
 
-@APICommand(name = "listClients", description = "Lists clients", responseObject = ClientResponse.class,
+@APICommand(name = "listClients", description = "Lists clients", responseObject = GloboDictionaryResponse.class,
         requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
 public class ListClientsCmd extends BaseDictionaryCmd {
 

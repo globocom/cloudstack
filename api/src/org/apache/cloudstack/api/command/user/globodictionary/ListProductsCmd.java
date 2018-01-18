@@ -18,9 +18,9 @@ package org.apache.cloudstack.api.command.user.globodictionary;
 
 import com.cloud.globodictionary.GloboDictionaryService;
 import org.apache.cloudstack.api.APICommand;
-import org.apache.cloudstack.api.response.ProductResponse;
+import org.apache.cloudstack.api.response.GloboDictionaryResponse;
 
-@APICommand(name = "listProducts", description = "Lists products", responseObject = ProductResponse.class,
+@APICommand(name = "listProducts", description = "Lists products", responseObject = GloboDictionaryResponse.class,
         requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
 public class ListProductsCmd extends BaseDictionaryCmd {
 

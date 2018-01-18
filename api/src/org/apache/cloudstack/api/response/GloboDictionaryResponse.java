@@ -16,23 +16,22 @@
 */
 package org.apache.cloudstack.api.response;
 
-
 import com.cloud.serializer.Param;
 import com.google.gson.annotations.SerializedName;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseResponse;
 
-public class ClientResponse extends BaseResponse {
+public class GloboDictionaryResponse extends BaseResponse {
 
     @SerializedName(ApiConstants.ID)
-    @Param(description = "the client id")
+    @Param(description = "the globo dictionary object id")
     private String id;
 
     @SerializedName(ApiConstants.NAME)
-    @Param(description = "the client name")
+    @Param(description = "the globo dictionary object name")
     private String name;
 
-    public ClientResponse(String id, String name) {
+    public GloboDictionaryResponse(String id, String name) {
         this.id = id;
         this.name = name;
     }
