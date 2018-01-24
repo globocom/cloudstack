@@ -73,7 +73,7 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
     private String productId;
 
     @Parameter(name = ApiConstants.DETAILED_USAGE, type = CommandType.BOOLEAN, required = false, description = "true if project has detailed usage by third party app")
-    private Boolean detailedUsage;
+    private Boolean detailedUsage = false;
 
     // ///////////////////////////////////////////////////
     // ///////////////// Accessors ///////////////////////
