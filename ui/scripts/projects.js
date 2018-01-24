@@ -839,26 +839,115 @@
                             };
                         },
                         actions: {
-                            edit: {
-                                label: 'label.edit',
+                            update: {
+                                label: 'label.update',
                                 action: function(args) {
-                                    $.ajax({
-                                        url: createURL('updateProject'),
-                                        data: $.extend(true, {}, args.context.projects[0], args.data),
-                                        success: function(json) {
-                                            args.response.success();
+                                    var project = args.context.projects[0];
+                                    cloudStack.dialog.createForm({
+                                        form: {
+                                            title: 'Update Project',
+                                            fields: {
+                                               displaytext: {
+                                                   label: 'label.display.name',
+                                                   defaultValue: project.displaytext,
+                                                   required: true
+                                               },
+                                               detailedusage: {
+                                                  label: 'label.project.detailedusage',
+                                                  isBoolean: true,
+                                                  defaultValue: false,
+                                                  isChecked: (project.detailedusage)
+                                               },
+                                               businessserviceid: {
+                                                   label: 'label.project.businessservice',
+                                                   defaultValue: project.businessserviceid,
+                                                   select: function(args) {
+                                                       createDictionaryEntityOption('listBusinessServices', 'listbusinessservicesresponse', 'businessservice', args)
+                                                   }
+                                               },
+                                               clientid: {
+                                                   label: 'label.project.client',
+                                                   defaultValue: project.clientid,
+                                                   select: function(args) {
+                                                       createDictionaryEntityOption('listClients', 'listclientsresponse', 'client', args)
+                                                   }
+                                               },
+                                               componentid: {
+                                                   label: 'label.project.component',
+                                                   defaultValue: project.componentid,
+                                                   select: function(args) {
+                                                       createDictionaryEntityOption('listComponents', 'listcomponentsresponse', 'component', args)
+                                                   }
+                                               },
+                                               subcomponentid: {
+                                                   label: 'label.project.subcomponent',
+                                                   defaultValue: project.subcomponentid,
+                                                   select: function(args) {
+                                                       createDictionaryEntityOption('listSubComponents', 'listsubcomponentsresponse', 'subcomponent', args)
+                                                   }
+                                               },
+                                               productid: {
+                                                   label: 'label.project.product',
+                                                   defaultValue: project.productid,
+                                                   select: function(args) {
+                                                       createDictionaryEntityOption('listProducts', 'listproductsresponse', 'product', args)
+                                                   }
+                                               }
+                                            }
                                         },
-                                        error: function(json) {
-                                            args.response.error(parseXMLHttpResponse(json));
-                                        }
+                                        after: function(args2) {
+                                            cloudStack.dialog.confirm({
+                                                message: "Confirm to update project",
+                                                action: function() { // "Yes"
+                                                    args2.data.id = project.id;
+                                                    args2.data.detailedusage = args2.data.detailedusage == "on"
+
+                                                    $.ajax({
+                                                        url: createURL('updateProject'),
+                                                        dataType: 'json',
+                                                        async: true,
+                                                        data: args2.data,
+                                                        success: function(json) {
+                                                            var jid = json.updateprojectresponse.jobid;
+                                                            args.response.success({
+                                                                _custom: {
+                                                                    jobId: jid,
+                                                                    getUpdatedItem: function(json) {
+                                                                        $(window).trigger('cloudStack.fullRefresh');
+                                                                    }
+                                                                }
+                                                            });
+                                                        },
+                                                        error: function(errorMessage) {
+                                                            args.response.error(errorMessage);
+                                                        }
+                                                    });
+                                                },
+                                                cancelAction: function() { // "Cancel"
+                                                    $(window).trigger('cloudStack.fullRefresh');
+                                                }
+                                            });
+                                        },
+                                    });
+
+                                    $('.create-form').find('.cancel').bind("click", function( event, ui ) {
+                                        $('.loading-overlay').remove();
+                                        return true;
                                     });
                                 },
                                 messages: {
                                     notification: function(args) {
                                         return 'label.edit.project.details';
                                     }
+                                },
+                                notification: {
+                                    poll: pollAsyncJobResult
+                                },
+                                cancelAction: function() { // "Cancel"
+                                    $(window).trigger('cloudStack.fullRefresh');
                                 }
                             },
+
                             disable: {
                                 label: 'label.suspend.project',
                                 action: function(args) {
@@ -1079,6 +1168,9 @@
                                                     async: false,
                                                     success: function(json) {
                                                         project.businessservice = json.listbusinessservicesresponse.businessservice[0].name;
+                                                    },
+                                                    error: function(jqXHR, text, error){
+                                                        project.businessservice = {}
                                                     }
                                                 });
                                             }
@@ -1090,6 +1182,9 @@
                                                     async: false,
                                                     success: function(json) {
                                                         project.client = json.listclientsresponse.client[0].name;
+                                                    },
+                                                    error: function(jqXHR, text, error){
+                                                        project.client = {}
                                                     }
                                                 });
                                             }
@@ -1101,6 +1196,9 @@
                                                     async: false,
                                                     success: function(json) {
                                                         project.component = json.listcomponentsresponse.component[0].name;
+                                                    },
+                                                    error: function(jqXHR, text, error){
+                                                        project.component = {}
                                                     }
                                                 });
                                             }
@@ -1112,6 +1210,9 @@
                                                     async: false,
                                                     success: function(json) {
                                                         project.subcomponent = json.listsubcomponentsresponse.subcomponent[0].name;
+                                                    },
+                                                    error: function(jqXHR, text, error){
+                                                        project.subcomponent = {}
                                                     }
                                                 });
                                             }
@@ -1123,6 +1224,9 @@
                                                     async: false,
                                                     success: function(json) {
                                                         project.product = json.listproductsresponse.product[0].name;
+                                                    },
+                                                    error: function(jqXHR, text, error){
+                                                        project.product = {}
                                                     }
                                                 });
                                             }
@@ -1375,8 +1479,26 @@
         }
     };
 
+    function createDictionaryEntityOption(uri, collectionName, objectName, args){
+        $.ajax({
+            url: createURL(uri),
+            async: false,
+            success: function(json) {
+                options = Array()
+                options.push({id: "", description: ""})
+                $.each(json[collectionName][objectName], function( index, value ) {
+                    options.push({id: value.id, description: value.name})
+                });
+                args.response.success({ data: options });
+            },
+            error: function(jqXHR, text, error){
+                args.response.success({ data: [{id: "", description: ""}] });
+            }
+        });
+    }
+
     var projectsActionFilter = function(args) {
-        var allowedActions = ['remove', 'edit'];
+        var allowedActions = ['remove', 'edit', 'update'];
 
         if (args.context.item.account == cloudStack.context.users[0].account ||
             isAdmin() || isDomainAdmin()) {

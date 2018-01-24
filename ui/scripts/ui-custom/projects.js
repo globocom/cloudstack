@@ -788,6 +788,9 @@
             url: createURL(uri),
             success: function(json) {
                 callback(json[responseRoot][object] ? json[responseRoot][object] : []);
+            },
+            error: function() {
+                callback([])
             }
         });
     }
