@@ -25,6 +25,7 @@ import com.google.gson.reflect.TypeToken;
 import org.apache.cloudstack.framework.config.ConfigKey;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.log4j.Logger;
@@ -50,7 +51,7 @@ public class GloboDictionaryAPIClientImpl implements GloboDictionaryAPIClient, C
     private static final String API_ID_QUERY_PARAMETER = "id_service_now";
 
     public GloboDictionaryAPIClientImpl() {
-        this.httpClient = new HttpClient();
+        this.httpClient = new HttpClient(new MultiThreadedHttpConnectionManager());
     }
 
     public GloboDictionaryAPIClientImpl(HttpClient httpClient){
