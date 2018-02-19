@@ -41,7 +41,7 @@ public class AutoScaleCounterProcessorImpl implements AutoScaleCounterProcessor,
     SNMPClient snmpClient;
     ExecutorService threadExecutorPool;
 
-    private static final ConfigKey<Integer> ThreadPoolSize = new ConfigKey<>("Advanced", Integer.class, "autoscale.counter.threadpoolsize", "10", "Auto scale counter reader thread pool size", true, ConfigKey.Scope.Global);
+    private static final ConfigKey<Integer> ThreadPoolSize = new ConfigKey<>("Advanced", Integer.class, "autoscale.counter.threadpoolsize", "10", "Auto scale counter reader thread pool size", false, ConfigKey.Scope.Global);
 
     public static Logger s_logger = Logger.getLogger(AutoScaleCounterProcessorImpl.class.getName());
 

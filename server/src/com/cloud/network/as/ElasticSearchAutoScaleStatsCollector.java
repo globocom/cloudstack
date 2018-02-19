@@ -41,16 +41,16 @@ public class ElasticSearchAutoScaleStatsCollector extends AutoScaleStatsCollecto
     protected TransportClient elasticSearchClient;
 
     private static final ConfigKey<String> ElasticSearchHost = new ConfigKey<>("Advanced", String.class, "autoscale.elasticsearch.host", null,
-            "Elastic search server host name", true, ConfigKey.Scope.Global);
+            "Elastic search server host name", false, ConfigKey.Scope.Global);
 
     private static final ConfigKey<Integer> ElasticSearchPort = new ConfigKey<>("Advanced", Integer.class, "autoscale.elasticsearch.port", null,
-            "Elastic search server transport module port", true, ConfigKey.Scope.Global);
+            "Elastic search server transport module port", false, ConfigKey.Scope.Global);
 
     private static final ConfigKey<String> ElasticSearchClusterName = new ConfigKey<>("Advanced", String.class, "autoscale.elasticsearch.cluster", null,
-            "Elastic search server cluster name", true, ConfigKey.Scope.Global);
+            "Elastic search server cluster name", false, ConfigKey.Scope.Global);
 
     private static final ConfigKey<String> ElasticSearchIndexName = new ConfigKey<>("Advanced", String.class, "autoscale.elasticsearch.index", null,
-            "Elastic search index name", true, ConfigKey.Scope.Global);
+            "Elastic search index name", false, ConfigKey.Scope.Global);
 
     private static final Logger s_logger = Logger.getLogger(ElasticSearchAutoScaleStatsCollector.class.getName());
 

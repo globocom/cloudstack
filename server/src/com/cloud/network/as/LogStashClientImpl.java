@@ -10,8 +10,8 @@ import java.net.InetAddress;
 
 public class LogStashClientImpl implements LogStashClient, Configurable {
 
-    private static final ConfigKey<String> LogStashServer = new ConfigKey<>("Advanced", String.class, "autoscale.logstash.host", "", "Auto scale metrics target logstash host", true, ConfigKey.Scope.Global);
-    private static final ConfigKey<Integer> LogStashPort = new ConfigKey<>("Advanced", Integer.class, "autoscale.logstash.port", null, "Auto scale metrics target logstash port", true, ConfigKey.Scope.Global);
+    private static final ConfigKey<String> LogStashServer = new ConfigKey<>("Advanced", String.class, "autoscale.logstash.host", "", "Auto scale metrics target logstash host", false, ConfigKey.Scope.Global);
+    private static final ConfigKey<Integer> LogStashPort = new ConfigKey<>("Advanced", Integer.class, "autoscale.logstash.port", null, "Auto scale metrics target logstash port", false, ConfigKey.Scope.Global);
 
     public static Logger s_logger = Logger.getLogger(LogStashClientImpl.class.getName());
 

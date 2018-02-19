@@ -44,10 +44,10 @@ public class SNMPClientImpl implements SNMPClient, Configurable{
     protected static final String MEMORY_FREE_OID = "1.3.6.1.4.1.2021.4.6.0";
     protected static final String MEMORY_TOTAL_OID = "1.3.6.1.4.1.2021.4.5.0";
 
-    private static final ConfigKey<Integer> SnmpTimeout = new ConfigKey<>("Advanced", Integer.class, "autoscale.snmp.timeout", "500", "Auto scale snmp client max timeout", true, ConfigKey.Scope.Global);
-    private static final ConfigKey<String> SnmpCommunity = new ConfigKey<>("Advanced", String.class, "autoscale.snmp.community", "DataCenter", "SNMP community", true, ConfigKey.Scope.Global);
-    private static final ConfigKey<String> SnmpPort = new ConfigKey<>("Advanced", String.class, "autoscale.snmp.port", "161", "SNMP port", true, ConfigKey.Scope.Global);
-    private static final ConfigKey<String> SnmpVersion = new ConfigKey<>("Advanced", String.class, "autoscale.snmp.version", "2c", "SNMP version (1, 2c or 3)", true, ConfigKey.Scope.Global);
+    private static final ConfigKey<Integer> SnmpTimeout = new ConfigKey<>("Advanced", Integer.class, "autoscale.snmp.timeout", "500", "Auto scale snmp client max timeout", false, ConfigKey.Scope.Global);
+    private static final ConfigKey<String> SnmpCommunity = new ConfigKey<>("Advanced", String.class, "autoscale.snmp.community", "DataCenter", "SNMP community", false, ConfigKey.Scope.Global);
+    private static final ConfigKey<String> SnmpPort = new ConfigKey<>("Advanced", String.class, "autoscale.snmp.port", "161", "SNMP port", false, ConfigKey.Scope.Global);
+    private static final ConfigKey<String> SnmpVersion = new ConfigKey<>("Advanced", String.class, "autoscale.snmp.version", "2c", "SNMP version (1, 2c or 3)", false, ConfigKey.Scope.Global);
 
     public static Logger s_logger = Logger.getLogger(SNMPClientImpl.class.getName());
 
