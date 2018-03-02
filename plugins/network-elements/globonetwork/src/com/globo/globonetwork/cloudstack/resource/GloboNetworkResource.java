@@ -36,7 +36,6 @@ import com.globo.globonetwork.cloudstack.commands.CheckDSREnabled;
 import com.globo.globonetwork.cloudstack.commands.GetPoolLBByIdCommand;
 import com.globo.globonetwork.cloudstack.commands.ListExpectedHealthchecksCommand;
 import com.globo.globonetwork.cloudstack.commands.ListPoolLBCommand;
-import com.globo.globonetwork.cloudstack.commands.UpdatePoolCommand;
 import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkExpectHealthcheckResponse;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkPoolResponse;
@@ -300,8 +299,6 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             return execute((GetPoolLBByIdCommand) cmd);
         }else if (cmd instanceof ListExpectedHealthchecksCommand) {
             return execute((ListExpectedHealthchecksCommand) cmd);
-        }else if (cmd instanceof UpdatePoolCommand) {
-            return execute((UpdatePoolCommand) cmd);
         }else if (cmd instanceof CreatePoolCommand) {
             return execute((CreatePoolCommand) cmd);
         }else if (cmd instanceof DeletePoolCommand) {
@@ -415,43 +412,6 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             }
         } catch (GloboNetworkException e) {
             s_logger.error("Error rollbacking pool removal", e);
-        }
-    }
-
-    private Answer execute(UpdatePoolCommand cmd) {
-        try {
-            PoolAPI poolAPI = getNewGloboNetworkAPI().getPoolAPI();
-
-            List<GloboNetworkPoolResponse.Pool> pools = new ArrayList<GloboNetworkPoolResponse.Pool>();
-            List<PoolV3> poolsV3 = poolAPI.getByIdsV3(cmd.getPoolIds());
-            for (PoolV3 poolv3 : poolsV3) {
-
-                PoolV3.Healthcheck healthCheck = poolv3.getHealthcheck();
-                healthCheck.setHealthcheck(cmd.getHealthcheckType(), cmd.getHealthcheck(), cmd.getExpectedHealthcheck() );
-
-                poolv3.setMaxconn(cmd.getMaxConn());
-            }
-
-            if ( poolsV3.size() > 0 ) {
-                if (poolsV3.get(0).isPoolCreated()) {
-                    poolAPI.updateDeployAll(poolsV3);
-                } else {
-                    poolAPI.updateAll(poolsV3);
-                }
-            }
-
-            for (PoolV3 poolv3 : poolsV3) {
-                pools.add(poolV3FromNetworkApi(poolv3));
-            }
-
-            GloboNetworkPoolResponse answer = new GloboNetworkPoolResponse(cmd, pools, true, "");
-
-            return answer;
-        } catch (GloboNetworkException e) {
-            return handleGloboNetworkException(cmd, e);
-        } catch (Exception e) {
-            s_logger.error("Generic error accessing GloboNetwork while update pool", e);
-            return new Answer(cmd, false, e.getMessage());
         }
     }
 

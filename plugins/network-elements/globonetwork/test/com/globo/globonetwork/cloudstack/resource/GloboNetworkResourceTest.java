@@ -57,7 +57,6 @@ import com.globo.globonetwork.cloudstack.commands.GetVipInfoFromGloboNetworkComm
 import com.globo.globonetwork.cloudstack.commands.ListExpectedHealthchecksCommand;
 import com.globo.globonetwork.cloudstack.commands.ListPoolLBCommand;
 import com.globo.globonetwork.cloudstack.commands.RemoveVipFromGloboNetworkCommand;
-import com.globo.globonetwork.cloudstack.commands.UpdatePoolCommand;
 import com.globo.globonetwork.cloudstack.manager.HealthCheckHelper;
 import com.globo.globonetwork.cloudstack.manager.Protocol;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkExpectHealthcheckResponse;
@@ -211,10 +210,10 @@ public class GloboNetworkResourceTest {
         assertTrue(_resource.findPoolsByPort(80, null).isEmpty());
     }
 
-    private PoolV3 mockPoolSave(Long poolId, Long idReturned, Boolean hasPoolMember, Integer vipPort, Integer port, String ip, String healthCheckType, String healthCheck, String expectedHealthCheck, int maxConn,  String serviceDAction) throws GloboNetworkException {
+    public static PoolV3 mockPoolSave(Long poolId, Long idReturned, Boolean hasPoolMember, Integer vipPort, Integer port, String ip, String healthCheckType, String healthCheck, String expectedHealthCheck, int maxConn,  String serviceDAction, GloboNetworkAPI gnAPI) throws GloboNetworkException {
         PoolV3 expectedPool = new PoolV3();
         expectedPool.setId(poolId);
-        expectedPool.setIdentifier(_resource.buildPoolName("region", "vip.domain.com",vipPort,  port));
+        expectedPool.setIdentifier(GloboNetworkResource.buildPoolName("region", "vip.domain.com",vipPort,  port));
         expectedPool.setLbMethod("round-robin");
         expectedPool.setMaxconn(maxConn);
         expectedPool.setDefaultPort(port);
@@ -801,43 +800,7 @@ public class GloboNetworkResourceTest {
         return command;
     }
 
-    @Test
-    public void testExecuteUpdatePool() throws GloboNetworkException {
-        UpdatePoolCommand cmd = new UpdatePoolCommand(Arrays.asList(12L, 13L), "HTTP", "GET /heal HTTP/1.0\\r\\nHost: vip.domain.com\\r\\n\\r\\n", "OK", 5, "vip.domain.com");
-
-        PoolV3 pool1 = mockPool(12L, "ACS_POOL_vip.domain.com_8080", 8080, "least", "http", "/heal.html", "OK", "*:*", 10);
-        PoolV3 pool2 = mockPool(13L, "ACS_POOL_vip.domain.com_8443", 8443, "least", "http", "/heal.html", "OK", "*:*", 10);
-        List<PoolV3> poolsResponse = new ArrayList<>();
-        poolsResponse.add(pool1);
-        poolsResponse.add(pool2);
-
-        when(gnAPI.getPoolAPI().getByIdsV3(Arrays.asList(12L, 13L))).thenReturn(poolsResponse);
-
-        mockPoolSave(12L, 12L, true, 80, 8080, "10.0.0.1", "HTTP", "GET /heal HTTP/1.0\\r\\nHost: vip.domain.com\\r\\n\\r\\n", "OK", 5, "none" );
-        mockPoolSave(13L, 13L, true, 443, 8443, "10.0.0.1", "HTTP", "GET /heal HTTP/1.0\\r\\nHost: vip.domain.com\\r\\n\\r\\n", "OK", 5, "none" );
-
-        Answer answer = _resource.executeRequest(cmd);
-
-        List<GloboNetworkPoolResponse.Pool> pools = ((GloboNetworkPoolResponse)answer).getPools();
-
-        assertEquals(2, pools.size());
-
-        GloboNetworkPoolResponse.Pool pool = pools.get(0);
-        assertEquals((Long) 12L, pool.getId());
-        assertEquals((Integer)5, pool.getMaxconn());
-        assertEquals("HTTP", pool.getHealthcheckType());
-        assertEquals("GET /heal HTTP/1.0\\r\\nHost: vip.domain.com\\r\\n\\r\\n", pool.getHealthcheck());
-        assertEquals("OK", pool.getExpectedHealthcheck());
-
-        pool = pools.get(1);
-        assertEquals((Long) 13L, pool.getId());
-        assertEquals((Integer)5, pool.getMaxconn());
-        assertEquals("HTTP", pool.getHealthcheckType());
-        assertEquals("GET /heal HTTP/1.0\\r\\nHost: vip.domain.com\\r\\n\\r\\n", pool.getHealthcheck());
-        assertEquals("OK", pool.getExpectedHealthcheck());
-    }
-
-    private PoolV3 mockPool(Long poolId, String identifier, int port, String lbmethod, String healthheckType, String healthcheck, String expectedHealthcheck, String destination, Integer maxconn) {
+    public static PoolV3 mockPool(Long poolId, String identifier, int port, String lbmethod, String healthheckType, String healthcheck, String expectedHealthcheck, String destination, Integer maxconn) {
         PoolV3.ServiceDownAction action = new PoolV3.ServiceDownAction();
         action.setId(3L);
         action.setName("none");
@@ -1013,7 +976,7 @@ public class GloboNetworkResourceTest {
 
         PoolV3 expectedPool = mockPoolSave(null, 123L, true, 80, 8080, "10.0.0.1",
                 build.getHealthCheckType(), build.getExpectedHealthCheck(), build.getHealthCheck(), 0,
-                cmd.getServiceDownAction());
+                cmd.getServiceDownAction(), gnAPI);
 
 
         List<VipPoolMap> vipPoolMaps = _resource.createPools(gnAPI, poolMembers, vipInfo.getEnvironment(), cmd);

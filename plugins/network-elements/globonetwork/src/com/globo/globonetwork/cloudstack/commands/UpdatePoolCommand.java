@@ -87,6 +87,10 @@ public class UpdatePoolCommand extends GloboNetworkResourceCommand {
                 healthCheck.setHealthcheck(this.getHealthcheckType(), this.getHealthcheck(), this.getExpectedHealthcheck() );
 
                 poolv3.setMaxconn(this.getMaxConn());
+
+                for (PoolV3.PoolMember poolMember : poolv3.getPoolMembers()) {
+                    poolMember.setLimit(this.getMaxConn());
+                }
             }
 
             if ( poolsV3.size() > 0 ) {
