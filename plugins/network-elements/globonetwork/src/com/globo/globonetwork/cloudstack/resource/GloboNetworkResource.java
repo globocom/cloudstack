@@ -1133,6 +1133,7 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
 
                         if (poolMemberAlreadyExists == null) {
                             poolMember.setPortReal(realPort);
+                            poolMember.setLimit(poolV3.getMaxconn());
                             poolMembersFinal.add(poolMember);
                         } else {
                             poolMemberAlreadyExists.setEquipment(poolMember.getEquipment());
