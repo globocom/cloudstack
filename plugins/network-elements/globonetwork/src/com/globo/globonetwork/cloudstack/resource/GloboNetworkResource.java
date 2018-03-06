@@ -20,6 +20,7 @@ import com.cloud.exception.InvalidParameterValueException;
 import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.utils.Pair;
 import com.cloud.utils.StringUtils;
+import com.globo.globonetwork.client.exception.GloboNetworkErrorCodeException;
 import com.globo.globonetwork.client.model.OptionVipV3;
 import com.globo.globonetwork.client.model.VipV3;
 import com.globo.globonetwork.cloudstack.commands.CreatePoolCommand;
@@ -678,6 +679,12 @@ public class GloboNetworkResource extends ManagerBase implements ServerResource 
             getNewGloboNetworkAPI().getVlanAPI().deallocate(cmd.getVlanId());
             return new Answer(cmd, true, "Vlan deallocated");
         } catch (GloboNetworkException e) {
+            if (e instanceof GloboNetworkErrorCodeException) {
+                GloboNetworkErrorCodeException ex = (GloboNetworkErrorCodeException)e;
+                if (ex.getCode() == GloboNetworkErrorCodeException.VLAN_NOT_REGISTERED) {
+                    return new Answer(cmd, true, "Vlan already has been deallocated");
+                }
+            }
             return handleGloboNetworkException(cmd, e);
         }
     }

@@ -31,7 +31,7 @@
     <dependency>
       <groupId>com.globo.globonetwork</groupId>
       <artifactId>globonetwork-client</artifactId>
-      <version>0.0.55</version>
+      <version>0.0.56</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
