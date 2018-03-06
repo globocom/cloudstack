@@ -1005,9 +1005,11 @@ public class GloboNetworkResourceTest {
         //input 3 - poolMembers
         List<PoolV3.PoolMember> poolMembers = new ArrayList<>();
         PoolV3.PoolMember real1 = mockPoolMember(null, 8080, 1L, "10.0.0.1", 1L, "vm-01");
+        real1.setLimit(10);
         poolMembers.add(real1);
         PoolV3.PoolMember real2 = mockPoolMember(null, 8080, 2L, "10.0.0.2", 2L, "vm-02");
         poolMembers.add(real2);
+        real1.setLimit(10);
 
         //input 4 - cmd
         ApplyVipInGloboNetworkCommand cmd = new ApplyVipInGloboNetworkCommand();
@@ -1021,7 +1023,9 @@ public class GloboNetworkResourceTest {
 
         //mock 1 - Pool find by id - v3
         PoolV3 poolv3GetById = mockPool(12L, "ACS_POOL_", 8080, "round-robin", build.getHealthCheckType(), build.getHealthCheck(), build.getExpectedHealthCheck(), "*", 5);
+        poolv3GetById.setMaxconn(10);
         PoolV3.PoolMember poolM = mockPoolMember(200L, 8080, 1L, "10.0.0.1", 1L, "vm-01");
+        poolM.setLimit(10);
         poolv3GetById.getPoolMembers().add(poolM);
 
         when(gnAPI.getPoolAPI().getById(12L)).thenReturn(poolv3GetById);
@@ -1029,9 +1033,13 @@ public class GloboNetworkResourceTest {
 
         //mock 2 - Pool save pool
         PoolV3 poolToSave = mockPool(12L, "ACS_POOL_", 8080, "round-robin", build.getHealthCheckType(), build.getHealthCheck(), build.getExpectedHealthCheck(), "*", 5);
+        poolToSave.setMaxconn(10);
+
         PoolV3.PoolMember poolMSaved = mockPoolMember(200L, 8080, 1L, "10.0.0.1", 1L, "vm-01");
+        poolMSaved.setLimit(10);
         poolToSave.getPoolMembers().add(poolMSaved);
         PoolV3.PoolMember poolM2Saved = mockPoolMember(null, 8080, 2L, "10.0.0.2", 2L, "vm-02");
+        poolM2Saved.setLimit(10);
         poolToSave.getPoolMembers().add(poolM2Saved);
 
         when(gnAPI.getPoolAPI().save(poolToSave)).thenReturn(new PoolV3(12L));
