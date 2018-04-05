@@ -300,6 +300,16 @@ cloudStack.docs = {
     helpComputeOfferingDomain: {
         desc: 'The domain to associate this compute offering with'
     },
+    // Create Instance Snapshot
+    helpCreateInstanceSnapshotName: {
+        desc: 'Give the snapshot a name. A unique name will be automatically generated if you leave this blank'
+    },
+    helpCreateInstanceSnapshotDescription: {
+        desc: 'A short description of for the snapshot'
+    },
+    helpCreateInstanceSnapshotMemory: {
+        desc: 'Check this to include CPU/memory state. Does not quiesce the VM. If not checked, the snapshot contain only volumes.'
+    },
     // Add disk offering
     helpDiskOfferingName: {
         desc: 'Any desired name for the offering',
@@ -326,7 +336,7 @@ cloudStack.docs = {
         externalLink: ''
     },
     helpDiskOfferingDiskSize: {
-        desc: 'Appears only if Custom Disk Size is not selected. Define the volume size in GB.',
+        desc: 'Appears only if Custom Disk Size is not selected. Define the volume size in GB. (1GB = 1,073,741,824 bytes)',
         externalLink: ''
     },
     helpDiskOfferingDiskBytesReadRate: {
@@ -358,7 +368,7 @@ cloudStack.docs = {
         externalLink: ''
     },
     helpDiskOfferingHypervisorSnapshotReserve: {
-        desc: 'Hypervisor snapshot reserve space as a percent of a volume (for managed storage using XenServer or VMware) (Ex. The value 25 means 25%.)).',
+        desc: 'Hypervisor snapshot reserve space as a percent of a volume (for managed storage using XenServer or VMware) (Ex. The value 25 means 25%.)).'
     },
     helpDiskOfferingCacheMode: {
         desc: 'The write caching mode to use for disks created with this disk offering. This can improve write performance.',
@@ -383,6 +393,10 @@ cloudStack.docs = {
     },
     helpDomainNetworkDomain: {
         desc: 'If you want to assign a special domain name to this domain\'s guest VM network, specify the DNS suffix',
+        externalLink: ''
+    },
+    helpDomainId: {
+        desc: 'A valid domain id. CloudStack will generate one for you if empty.',
         externalLink: ''
     },
     // Add F5
@@ -558,6 +572,10 @@ cloudStack.docs = {
         desc: 'Number of guest networks/accounts that will share this device',
         externalLink: ''
     },
+    helpNetscalerServicePackages: {
+        desc: 'Choose the Netscaler Service Package you want to use.',
+        externalLink: ''
+    },
     // Add network offering
     helpNetworkOfferingName: {
         desc: 'Any desired name for the network offering',
@@ -658,7 +676,7 @@ cloudStack.docs = {
         externalLink: ''
     },
     helpPrimaryStorageProtocol: {
-        desc: 'For XenServer, choose NFS, iSCSI, or PreSetup. For KVM, choose NFS or SharedMountPoint. For vSphere, choose VMFS (iSCSI or FiberChannel) or NFS. For Hyper-V, choose SMB/CIFS',
+        desc: 'For XenServer, choose NFS, iSCSI, or PreSetup. For KVM, choose NFS, SharedMountPoint, RDB, CLVM or Gluster. For vSphere, choose VMFS (iSCSI or FiberChannel) or NFS. For Hyper-V, choose SMB/CIFS. For LXC, choose NFS or SharedMountPoint. For OVM, choose NFS or ocfs2.',
         externalLink: ''
     },
     helpPrimaryStorageServer: {
@@ -998,7 +1016,7 @@ cloudStack.docs = {
     },
     // Add volume
     helpVolumeName: {
-        desc: 'Give the volume a unique name so you can find it later.',
+        desc: 'Give a unique volume name. If it is not provided, a name will be generated randomly.',
         externalLink: ''
     },
     helpVolumeAvailabilityZone: {
@@ -1007,6 +1025,10 @@ cloudStack.docs = {
     },
     helpVolumeDiskOffering: {
         desc: 'Choose the characteristics of the storage.',
+        externalLink: ''
+    },
+    helpVolumeSizeGb: {
+        desc: 'Volume size in GB (1GB = 1,073,741,824 bytes)',
         externalLink: ''
     },
     // Add VPC
@@ -1104,6 +1126,10 @@ cloudStack.docs = {
         desc: 'Check this to make the virtual router query its IKE peer at regular intervals to ensure continued availability. It is recommended to have the same DPD setting on both sides of the VPN connection.',
         externalLink: ''
     },
+    helpVPNGatewayForceEncapsulation: {
+        desc: 'Force UDP encapsulation for ESP packets even if no NAT situation is detected. This may help to surmount restrictive firewalls. In order to force the peer to encapsulate packets, NAT detection payloads are faked',
+        externalLink: ''
+    },
     // Copy template
     helpCopyTemplateDestination: {
         desc: 'The zone to which you want to copy the template',
@@ -1139,6 +1165,10 @@ cloudStack.docs = {
     },
     helpRegisterISOURL: {
         desc: 'The Management Server will download the file from the specified URL, such as http://my.web.server/filename.iso',
+        externalLink: ''
+    },
+    helpRegisterISODirectDownload: {
+        desc: 'KVM Only: Secondary Storage is bypassed and ISO is downloaded to Primary Storage on deployment',
         externalLink: ''
     },
     helpRegisterISOZone: {
@@ -1178,8 +1208,12 @@ cloudStack.docs = {
         desc: 'The Management Server will download the file from the specified URL, such as http://my.web.server/filename.vhd.gz',
         externalLink: ''
     },
+    helpRegisterTemplateDirectDownload: {
+        desc: 'KVM Only: Secondary Storage is bypassed and template/ISO is downloaded to Primary Storage on deployment',
+        externalLink: ''
+    },
     helpRegisterTemplateZone: {
-        desc: 'Choose the zone where you want the template to be available, or All Zones to make it available throughout the cloud',
+        desc: 'Choose one or more zones where you want the template to be available, or All Zones to make it available throughout the cloud. (Tip: Use Ctrl to choose multiple zones)',
         externalLink: ''
     },
     helpRegisterTemplateHypervisor: {
@@ -1232,7 +1266,7 @@ cloudStack.docs = {
         externalLink: ''
     },
     helpUploadVolumeFormat: {
-        desc: 'The disk image format of the volume. XenServer is VHD, VMware is OVA, and KVM is QCOW2. Hyper-V is VHD.',
+        desc: 'The disk image format of the volume. XenServer is VHD, VMware is OVA, and KVM is QCOW2. Hyper-V is VHD or VHDX. OVM is RAW.',
         externalLink: ''
     },
     helpUploadVolumeURL: {
@@ -1356,6 +1390,31 @@ cloudStack.docs = {
     helpAutoscaleVmGroupName: {
         desc: 'The name of the AutoScale group. This name will be prefix of any VM of this group.',
         externalLink: ''
+	},
+    helpOvm3pool: {
+        desc: 'Pool the Ovm3 nodes in this cluster, required for vm node migrations',
+        externalLink: ''
+    },
+    helpOvm3cluster: {
+        desc: 'Use the native Ovm3 OCFS2 clustering, required for native HA and requires pooling',
+        externalLink: ''
+    },
+    helpOvm3Vip: {
+        desc: 'The VIP used by the pool and cluster',
+        externalLink: ''
+    },
+    helpLdapGroupName: {
+        desc: 'Fully qualified name of OU/GROUP in LDAP',
+        externalLink: ''
+    },
+    helpLdapGroupType: {
+        desc: 'Type of LDAP name provided. Can be either GROUP/OU',
+        externalLink: ''
+    },
+    helpLdapLinkDomainAdmin: {
+        desc: 'domain admin of the linked domain. Specify a username in GROUP/OU of LDAP'
+    },
+    helpSetReservationSystemVms: {
+        desc: 'If enabled, IP range reservation is set for SSVM & CPVM. Global setting "system.vm.public.ip.reservation.mode.strictness" is used to control whether reservation is strict or not (preferred)'
     }
-
 };

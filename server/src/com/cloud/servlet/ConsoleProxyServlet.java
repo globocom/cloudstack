@@ -47,6 +47,7 @@ import org.apache.cloudstack.framework.security.keys.KeysManager;
 
 import com.cloud.exception.PermissionDeniedException;
 import com.cloud.host.HostVO;
+import com.cloud.hypervisor.Hypervisor;
 import com.cloud.server.ManagementServer;
 import com.cloud.storage.GuestOSVO;
 import com.cloud.user.Account;
@@ -227,12 +228,14 @@ public class ConsoleProxyServlet extends HttpServlet {
         try {
             w = Integer.parseInt(value);
         } catch (NumberFormatException e) {
+            s_logger.info("[ignored] not a number: " + value);
         }
 
         value = req.getParameter("h");
         try {
             h = Integer.parseInt(value);
         } catch (NumberFormatException e) {
+            s_logger.info("[ignored] not a number: " + value);
         }
 
         try {
@@ -260,6 +263,11 @@ public class ConsoleProxyServlet extends HttpServlet {
         if (host == null) {
             s_logger.warn("VM " + vmId + "'s host does not exist, sending blank response for console access request");
             sendResponse(resp, "");
+            return;
+        }
+
+        if (Hypervisor.HypervisorType.LXC.equals(vm.getHypervisorType())){
+            sendResponse(resp, "<html><body><p>Console access is not supported for LXC</p></body></html>");
             return;
         }
 

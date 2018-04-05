@@ -21,10 +21,14 @@ import java.util.Map;
 import org.apache.cloudstack.acl.ControlledEntity;
 import org.apache.cloudstack.acl.RoleType;
 import org.apache.cloudstack.acl.SecurityChecker.AccessType;
+import org.apache.cloudstack.api.command.admin.user.GetUserKeysCmd;
 import org.apache.cloudstack.api.command.admin.user.RegisterCmd;
 
 import com.cloud.domain.Domain;
 import com.cloud.exception.PermissionDeniedException;
+import com.cloud.offering.DiskOffering;
+import com.cloud.offering.ServiceOffering;
+
 
 public interface AccountService {
 
@@ -55,9 +59,9 @@ public interface AccountService {
      * @return the user if created successfully, null otherwise
      */
     UserAccount createUserAccount(String userName, String password, String firstName, String lastName, String email, String timezone, String accountName,
-        short accountType, Long domainId, String networkDomain, Map<String, String> details, String accountUUID, String userUUID);
+        short accountType, Long roleId, Long domainId, String networkDomain, Map<String, String> details, String accountUUID, String userUUID);
 
-    UserAccount createUserAccount(String userName, String password, String firstName, String lastName, String email, String timezone, String accountName, short accountType, Long domainId, String networkDomain,
+    UserAccount createUserAccount(String userName, String password, String firstName, String lastName, String email, String timezone, String accountName, short accountType, Long roleId, Long domainId, String networkDomain,
                                   Map<String, String> details, String accountUUID, String userUUID, User.Source source);
 
     /**
@@ -118,6 +122,12 @@ public interface AccountService {
 
     void checkAccess(Account account, AccessType accessType, boolean sameOwner, ControlledEntity... entities) throws PermissionDeniedException;
 
+    void checkAccess(Account account, ServiceOffering so) throws PermissionDeniedException;
+
+    void checkAccess(Account account, DiskOffering dof) throws PermissionDeniedException;
+
+    void checkAccess(User user, ControlledEntity entity);
+
     void checkAccess(Account account, AccessType accessType, boolean sameOwner, String apiName,
             ControlledEntity... entities) throws PermissionDeniedException;
 
@@ -130,4 +140,5 @@ public interface AccountService {
      */
     UserAccount getUserAccountById(Long userId);
 
+    public Map<String, String> getKeys(GetUserKeysCmd cmd);
 }

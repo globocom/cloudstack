@@ -23,19 +23,21 @@
        xmlns:util="http://www.springframework.org/schema/util"
        
        xsi:schemaLocation="http://www.springframework.org/schema/beans
-                      http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+                      http://www.springframework.org/schema/beans/spring-beans.xsd
                       http://www.springframework.org/schema/aop 
-                      http://www.springframework.org/schema/aop/spring-aop-3.0.xsd
+                      http://www.springframework.org/schema/aop/spring-aop.xsd
                       http://www.springframework.org/schema/context
-                      http://www.springframework.org/schema/context/spring-context-3.0.xsd
+                      http://www.springframework.org/schema/context/spring-context.xsd
                       http://www.springframework.org/schema/util
-                      http://www.springframework.org/schema/util/spring-util-3.0.xsd"
+                      http://www.springframework.org/schema/util/spring-util.xsd"
                       >
 
     <bean id="authenticationManagerImpl" class="com.cloud.api.auth.APIAuthenticationManagerImpl">
         <property name="apiAuthenticators"
                   value="#{pluggableAPIAuthenticatorsRegistry.registered}" />
     </bean>
+
+    <bean id="roleManagerImpl" class="org.apache.cloudstack.acl.RoleManagerImpl" />
 
     <bean id="accountManagerImpl" class="com.cloud.user.AccountManagerImpl">
         <property name="userAuthenticators"
@@ -68,6 +70,15 @@
             value="#{resourceDiscoverersRegistry.registered}" />
     </bean>
 
+    <!-- the new background poll manager -->
+    <bean id="bgPollManager" class="org.apache.cloudstack.poll.BackgroundPollManagerImpl">
+    </bean>
+
+    <!-- the new HA manager -->
+    <bean id="haManagerImpl" class="org.apache.cloudstack.ha.HAManagerImpl">
+        <property name="haProviders" value="#{haProvidersRegistry.registered}" />
+    </bean>
+
     <bean id="highAvailabilityManagerExtImpl" class="com.cloud.ha.HighAvailabilityManagerExtImpl">
         <property name="investigators" value="#{haInvestigatorsRegistry.registered}" />
         <property name="fenceBuilders" value="#{haFenceBuildersRegistry.registered}" />
@@ -81,7 +92,9 @@
         <property name="networkElements" value="#{networkElementsRegistry.registered}" />
     </bean>
 
+
     <bean id="configurationServerImpl" class="com.cloud.server.ConfigurationServerImpl" />
+
 
     <bean id="userVmManagerImpl" class="com.cloud.vm.UserVmManagerImpl" />
 
@@ -93,6 +106,8 @@
     <bean id="securityGroupManagerImpl2" class="com.cloud.network.security.SecurityGroupManagerImpl2" />
 
     <bean id="ipv6AddressManagerImpl" class="com.cloud.network.Ipv6AddressManagerImpl" />
+
+    <bean id="NetworkMigrationManagerImpl" class="com.cloud.network.NetworkMigrationManagerImpl" />
 
 
     <bean id="alertManagerImpl" class="com.cloud.alert.AlertManagerImpl" />
@@ -140,6 +155,10 @@
 
     <bean id="oCFS2ManagerImpl" class="com.cloud.storage.OCFS2ManagerImpl" />
 
+    <bean id="outOfBandManagementServiceImpl" class="org.apache.cloudstack.outofbandmanagement.OutOfBandManagementServiceImpl">
+        <property name="outOfBandManagementDrivers" value="#{outOfBandManagementDriversRegistry.registered}" />
+    </bean>
+
     <bean id="projectManagerImpl" class="com.cloud.projects.ProjectManagerImpl" />
 
     <bean id="queryManagerImpl" class="com.cloud.api.query.QueryManagerImpl" />
@@ -175,14 +194,47 @@
 
     <bean id="uploadMonitorImpl" class="com.cloud.storage.upload.UploadMonitorImpl" />
     <bean id="usageServiceImpl" class="com.cloud.usage.UsageServiceImpl" />
+    
     <bean id="virtualNetworkApplianceManagerImpl"
         class="com.cloud.network.router.VirtualNetworkApplianceManagerImpl" />
+        
     <bean id="vpcManagerImpl" class="com.cloud.network.vpc.VpcManagerImpl" >
         <property name="vpcElements" value="#{vpcProvidersRegistry.registered}"></property>
     </bean>
+    
+    <bean id="vpcTxCallable" class="com.cloud.network.vpc.VpcPrivateGatewayTransactionCallable" />
+    
     <bean id="vpcVirtualNetworkApplianceManagerImpl"
         class="com.cloud.network.router.VpcVirtualNetworkApplianceManagerImpl" />
-
+    
+    <bean id="virtualNetworkApplianceFactory"
+        class="com.cloud.network.rules.VirtualNetworkApplianceFactory" />
+    
+    <bean id="topologyContext" class="org.apache.cloudstack.network.topology.NetworkTopologyContext" init-method="init" />
+    
+    <bean id="basicNetworkTopology" class="org.apache.cloudstack.network.topology.BasicNetworkTopology" />
+    <bean id="advancedNetworkTopology" class="org.apache.cloudstack.network.topology.AdvancedNetworkTopology" />
+    
+    <bean id="basicNetworkVisitor" class="org.apache.cloudstack.network.topology.BasicNetworkVisitor" />
+    <bean id="advancedNetworkVisitor" class="org.apache.cloudstack.network.topology.AdvancedNetworkVisitor" />
+    
+    <bean id="commandSetupHelper"
+        class="com.cloud.network.router.CommandSetupHelper" />
+    
+    <bean id="routerControlHelper"
+        class="com.cloud.network.router.RouterControlHelper" />
+        
+    <bean id="networkHelper"
+        class="com.cloud.network.router.NetworkHelperImpl" />
+        
+    <bean id="vpcNetworkHelper"
+        class="com.cloud.network.router.VpcNetworkHelperImpl" />
+        
+    <bean id="nicProfileHelper"
+        class="com.cloud.network.router.NicProfileHelperImpl" />
+        
+    <bean id="routerDeploymentDefinitionBuilder"
+        class="org.cloud.network.router.deployment.RouterDeploymentDefinitionBuilder" />
 
     <bean id="ApiAsyncJobDispatcher" class="com.cloud.api.ApiAsyncJobDispatcher">
         <property name="name" value="ApiAsyncJobDispatcher" />
@@ -255,5 +307,16 @@
         class="org.apache.cloudstack.region.gslb.GlobalLoadBalancingRulesServiceImpl" >
         <property name="gslbServiceProviders" value="#{gslbServiceProvidersRegistry.registered}" />
     </bean>
-    <bean id="certServiceImpl" class="org.apache.cloudstack.network.lb.CertServiceImpl" />
+    <bean id="certServiceImpl" class="org.apache.cloudstack.network.ssl.CertServiceImpl" />
+
+    <bean id="imageStoreUploadMonitorImpl" class="com.cloud.storage.ImageStoreUploadMonitorImpl" />
+
+    <!-- the new CA manager -->
+    <bean id="caManager" class="org.apache.cloudstack.ca.CAManagerImpl">
+        <property name="caProviders" value="#{caProvidersRegistry.registered}" />
+    </bean>
+
+    <bean id="annotationService" class="org.apache.cloudstack.annotation.AnnotationManagerImpl" />
+
+    <bean id="directDownloadManager" class="org.apache.cloudstack.direct.download.DirectDownloadManagerImpl" />
 </beans>

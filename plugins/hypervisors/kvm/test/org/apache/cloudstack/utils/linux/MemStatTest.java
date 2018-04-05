@@ -52,4 +52,3 @@ public class MemStatTest {
         Assert.assertEquals(memStat.getCache(), Double.valueOf(2606764));
     }
 }
-

@@ -22,6 +22,7 @@ package com.cloud.resource;
 import java.io.File;
 import java.util.UUID;
 
+import org.apache.cloudstack.agent.directdownload.DirectDownloadCommand;
 import org.apache.log4j.Logger;
 
 import org.apache.cloudstack.storage.command.AttachAnswer;
@@ -35,6 +36,10 @@ import org.apache.cloudstack.storage.command.DettachAnswer;
 import org.apache.cloudstack.storage.command.DettachCommand;
 import org.apache.cloudstack.storage.command.ForgetObjectCmd;
 import org.apache.cloudstack.storage.command.IntroduceObjectCmd;
+import org.apache.cloudstack.storage.command.ResignatureAnswer;
+import org.apache.cloudstack.storage.command.ResignatureCommand;
+import org.apache.cloudstack.storage.command.SnapshotAndCopyAnswer;
+import org.apache.cloudstack.storage.command.SnapshotAndCopyCommand;
 import org.apache.cloudstack.storage.to.SnapshotObjectTO;
 import org.apache.cloudstack.storage.to.TemplateObjectTO;
 import org.apache.cloudstack.storage.to.VolumeObjectTO;
@@ -58,18 +63,46 @@ public class SimulatorStorageProcessor implements StorageProcessor {
     }
 
     @Override
+    public SnapshotAndCopyAnswer snapshotAndCopy(SnapshotAndCopyCommand cmd) {
+        s_logger.info("'SnapshotAndCopyAnswer snapshotAndCopy(SnapshotAndCopyCommand)' not currently used for SimulatorStorageProcessor");
+
+        return new SnapshotAndCopyAnswer();
+    }
+
+    @Override
+    public ResignatureAnswer resignature(ResignatureCommand cmd) {
+        s_logger.info("'ResignatureAnswer resignature(ResignatureCommand)' not currently used for SimulatorStorageProcessor");
+
+        return new ResignatureAnswer();
+    }
+
+    @Override
+    public Answer handleDownloadTemplateToPrimaryStorage(DirectDownloadCommand cmd) {
+        return null;
+    }
+
+    @Override
     public Answer copyTemplateToPrimaryStorage(CopyCommand cmd) {
         TemplateObjectTO template = new TemplateObjectTO();
         template.setPath(UUID.randomUUID().toString());
+        template.setSize(new Long(100));
         template.setFormat(Storage.ImageFormat.RAW);
         return new CopyCmdAnswer(template);
     }
 
     @Override
     public Answer cloneVolumeFromBaseTemplate(CopyCommand cmd) {
+        long size = 100;
+        DataTO dataTO = cmd.getDestTO();
+        if (dataTO instanceof VolumeObjectTO) {
+            VolumeObjectTO destVolume = (VolumeObjectTO)dataTO;
+            if (destVolume.getSize() != null) {
+                size = destVolume.getSize();
+            }
+        }
         VolumeObjectTO volume = new VolumeObjectTO();
         volume.setPath(UUID.randomUUID().toString());
-        volume.setSize(100);
+        volume.setSize(size);
         volume.setFormat(Storage.ImageFormat.RAW);
         return new CopyCmdAnswer(volume);
     }

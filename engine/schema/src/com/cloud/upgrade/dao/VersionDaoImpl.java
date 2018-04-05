@@ -22,7 +22,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 
-import javax.ejb.Local;
 
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -39,7 +38,6 @@ import com.cloud.utils.db.TransactionLegacy;
 import com.cloud.utils.exception.CloudRuntimeException;
 
 @Component
-@Local(value = VersionDao.class)
 @DB()
 public class VersionDaoImpl extends GenericDaoBase<VersionVO, Long> implements VersionDao {
     private static final Logger s_logger = Logger.getLogger(VersionDaoImpl.class);
@@ -64,8 +62,8 @@ public class VersionDaoImpl extends GenericDaoBase<VersionVO, Long> implements V
     }
 
     @Override
-    public VersionVO findByVersion(String version, Step step) {
-        SearchCriteria<VersionVO> sc = AllFieldsSearch.create();
+    public VersionVO findByVersion(final String version, final Step step) {
+        final SearchCriteria<VersionVO> sc = AllFieldsSearch.create();
         sc.setParameters("version", version);
         sc.setParameters("step", step);
 
@@ -75,98 +73,82 @@ public class VersionDaoImpl extends GenericDaoBase<VersionVO, Long> implements V
     @Override
     @DB
     public String getCurrentVersion() {
-        Connection conn = null;
-        try {
+        try (Connection conn = TransactionLegacy.getStandaloneConnection();) {
             s_logger.debug("Checking to see if the database is at a version before it was the version table is created");
 
-            conn = TransactionLegacy.getStandaloneConnection();
-
-            PreparedStatement pstmt = conn.prepareStatement("SHOW TABLES LIKE 'version'");
-            ResultSet rs = pstmt.executeQuery();
-            if (!rs.next()) {
-                rs.close();
-                pstmt.close();
-                pstmt = conn.prepareStatement("SHOW TABLES LIKE 'nics'");
-                rs = pstmt.executeQuery();
+            try (
+                    PreparedStatement pstmt = conn.prepareStatement("SHOW TABLES LIKE 'version'");
+                    ResultSet rs = pstmt.executeQuery();
+                ) {
                 if (!rs.next()) {
-                    rs.close();
-                    pstmt.close();
-
-                    pstmt = conn.prepareStatement("SELECT domain_id FROM account_vlan_map LIMIT 1");
-                    try {
-                        pstmt.executeQuery();
-                        return "2.1.8";
-                    } catch (SQLException e) {
-                        s_logger.debug("Assuming the exception means domain_id is not there.");
-                        s_logger.debug("No version table and no nics table, returning 2.1.7");
-                        return "2.1.7";
-                    } finally {
-                        pstmt.close();
-                    }
-                } else {
-                    try {
-                        rs.close();
-                        pstmt.close();
-                        pstmt = conn.prepareStatement("SELECT is_static_nat from firewall_rules");
-                        pstmt.executeQuery();
-                        return "2.2.1";
-                    } catch (SQLException e) {
-                        s_logger.debug("Assuming the exception means static_nat field doesn't exist in firewall_rules table, returning version 2.2.2");
-                        return "2.2.2";
-                    } finally {
-                        rs.close();
-                        pstmt.close();
+                    try (PreparedStatement pstmt_nics = conn.prepareStatement("SHOW TABLES LIKE 'nics'");
+                         ResultSet rs_nics = pstmt_nics.executeQuery();
+                        ) {
+                        if (!rs_nics.next()) {
+                            try (PreparedStatement pstmt_domain = conn.prepareStatement("SELECT domain_id FROM account_vlan_map LIMIT 1"); ){
+                                pstmt_domain.executeQuery();
+                                return "2.1.8";
+                            } catch (final SQLException e) {
+                                s_logger.debug("Assuming the exception means domain_id is not there.");
+                                s_logger.debug("No version table and no nics table, returning 2.1.7");
+                                return "2.1.7";
+                            }
+                        } else {
+                            try (PreparedStatement pstmt_static_nat = conn.prepareStatement("SELECT is_static_nat from firewall_rules");
+                                 ResultSet rs_static_nat = pstmt_static_nat.executeQuery();){
+                                return "2.2.1";
+                            } catch (final SQLException e) {
+                                s_logger.debug("Assuming the exception means static_nat field doesn't exist in firewall_rules table, returning version 2.2.2");
+                                return "2.2.2";
+                            }
+                        }
                     }
                 }
+            } catch (final SQLException e) {
+                throw new CloudRuntimeException("Unable to get the current version", e);
             }
 
             SearchCriteria<String> sc = CurrentVersionSearch.create();
 
             sc.setParameters("step", Step.Complete);
             Filter filter = new Filter(VersionVO.class, "id", false, 0l, 1l);
-            List<String> upgradedVersions = customSearch(sc, filter);
+            final List<String> upgradedVersions = customSearch(sc, filter);
 
             if (upgradedVersions.isEmpty()) {
 
                 // Check if there are records in Version table
                 filter = new Filter(VersionVO.class, "id", false, 0l, 1l);
                 sc = CurrentVersionSearch.create();
-                List<String> vers = customSearch(sc, filter);
+                final List<String> vers = customSearch(sc, filter);
                 if (!vers.isEmpty()) {
                     throw new CloudRuntimeException("Version table contains records for which upgrade wasn't completed");
                 }
 
                 // Use nics table information and is_static_nat field from firewall_rules table to determine version information
-                try {
-                    s_logger.debug("Version table exists, but it's empty; have to confirm that version is 2.2.2");
-                    pstmt = conn.prepareStatement("SHOW TABLES LIKE 'nics'");
-                    rs = pstmt.executeQuery();
+                s_logger.debug("Version table exists, but it's empty; have to confirm that version is 2.2.2");
+                try (PreparedStatement pstmt = conn.prepareStatement("SHOW TABLES LIKE 'nics'");
+                     ResultSet rs = pstmt.executeQuery();){
                     if (!rs.next()) {
                         throw new CloudRuntimeException("Unable to determine the current version, version table exists and empty, nics table doesn't exist");
                     } else {
-                        pstmt = conn.prepareStatement("SELECT is_static_nat from firewall_rules");
-                        pstmt.executeQuery();
-                        throw new CloudRuntimeException("Unable to determine the current version, version table exists and empty, " +
-                            "nics table doesn't exist, is_static_nat field exists in firewall_rules table");
+                        try (PreparedStatement pstmt_static_nat = conn.prepareStatement("SELECT is_static_nat from firewall_rules"); ) {
+                            pstmt_static_nat.executeQuery();
+                            throw new CloudRuntimeException("Unable to determine the current version, version table exists and empty, " +
+                                    "nics table doesn't exist, is_static_nat field exists in firewall_rules table");
+                        } catch (final SQLException e) {
+                            s_logger.debug("Assuming the exception means static_nat field doesn't exist in firewall_rules table, returning version 2.2.2");
+                            return "2.2.2";
+                        }
                     }
-                } catch (SQLException e) {
-                    s_logger.debug("Assuming the exception means static_nat field doesn't exist in firewall_rules table, returning version 2.2.2");
-                    return "2.2.2";
-                } finally {
-                    rs.close();
-                    pstmt.close();
+                } catch (final SQLException e) {
+                    throw new CloudRuntimeException("Unable to determine the current version, version table exists and empty, query for nics table yields SQL exception", e);
                 }
             } else {
                 return upgradedVersions.get(0);
             }
 
-        } catch (SQLException e) {
+        } catch (final SQLException e) {
             throw new CloudRuntimeException("Unable to get the current version", e);
-        } finally {
-            try {
-                conn.close();
-            } catch (SQLException e) {
-            }
         }
 
     }

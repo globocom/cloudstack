@@ -18,7 +18,6 @@ package com.cloud.ha;
 
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
@@ -36,7 +35,6 @@ import com.cloud.resource.ResourceManager;
 import com.cloud.utils.component.AdapterBase;
 import com.cloud.vm.VirtualMachine;
 
-@Local(value = Investigator.class)
 public class XenServerInvestigator extends AdapterBase implements Investigator {
     private final static Logger s_logger = Logger.getLogger(XenServerInvestigator.class);
     @Inject
@@ -68,7 +66,8 @@ public class XenServerInvestigator extends AdapterBase implements Investigator {
                     s_logger.debug("Host " + neighbor + " couldn't determine the status of " + agent);
                     continue;
                 }
-                return ans.isAlive() ? Status.Up : Status.Down;
+                // even it returns true, that means host is up, but XAPI may not work
+                return ans.isAlive() ? null : Status.Down;
             }
         }
 
@@ -76,11 +75,15 @@ public class XenServerInvestigator extends AdapterBase implements Investigator {
     }
 
     @Override
-    public Boolean isVmAlive(VirtualMachine vm, Host host) {
+    public boolean isVmAlive(VirtualMachine vm, Host host) throws UnknownVM {
         Status status = isAgentAlive(host);
         if (status == null) {
-            return null;
+            throw new UnknownVM();
         }
-        return status == Status.Up ? true : null;
+        if (status == Status.Up) {
+            return true;
+        } else {
+            throw new UnknownVM();
+        }
     }
 }

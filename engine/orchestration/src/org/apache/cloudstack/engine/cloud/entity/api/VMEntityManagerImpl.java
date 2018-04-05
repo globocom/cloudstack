@@ -192,7 +192,7 @@ public class VMEntityManagerImpl implements VMEntityManager {
             try {
                 dest = _dpMgr.planDeployment(vmProfile, plan, exclude, plannerToUse);
             } catch (AffinityConflictException e) {
-                throw new CloudRuntimeException("Unable to create deployment, affinity rules associted to the VM conflict");
+                throw new CloudRuntimeException("Unable to create deployment, affinity rules associated to the VM conflict");
             }
 
             if (dest != null) {
@@ -218,7 +218,7 @@ public class VMEntityManagerImpl implements VMEntityManager {
     }
 
     @Override
-    public void deployVirtualMachine(String reservationId, VMEntityVO vmEntityVO, String caller, Map<VirtualMachineProfile.Param, Object> params)
+    public void deployVirtualMachine(String reservationId, VMEntityVO vmEntityVO, String caller, Map<VirtualMachineProfile.Param, Object> params, boolean deployOnGivenHost)
         throws InsufficientCapacityException, ResourceUnavailableException {
         //grab the VM Id and destination using the reservationId.
 
@@ -233,13 +233,17 @@ public class VMEntityManagerImpl implements VMEntityManager {
                 _itMgr.start(vm.getUuid(), params, reservedPlan, _planningMgr.getDeploymentPlannerByName(vmReservation.getDeploymentPlanner()));
             } catch (Exception ex) {
                 // Retry the deployment without using the reservation plan
-                DataCenterDeployment plan = new DataCenterDeployment(0, null, null, null, null, null);
+                // Retry is only done if host id is not passed in deploy virtual machine api. Otherwise
+                // the instance may be started on another host instead of the intended one.
+                if (!deployOnGivenHost) {
+                    DataCenterDeployment plan = new DataCenterDeployment(0, null, null, null, null, null);
 
-                if (reservedPlan.getAvoids() != null) {
-                    plan.setAvoids(reservedPlan.getAvoids());
+                    if (reservedPlan.getAvoids() != null) {
+                        plan.setAvoids(reservedPlan.getAvoids());
+                    }
+
+                    _itMgr.start(vm.getUuid(), params, plan, null);
                 }
-
-                _itMgr.start(vm.getUuid(), params, plan, null);
             }
         } else {
             // no reservation found. Let VirtualMachineManager retry
@@ -255,10 +259,16 @@ public class VMEntityManagerImpl implements VMEntityManager {
     }
 
     @Override
-    public boolean destroyVirtualMachine(VMEntityVO vmEntityVO, String caller) throws AgentUnavailableException, OperationTimedoutException, ConcurrentOperationException {
+    public boolean stopvirtualmachineforced(VMEntityVO vmEntityVO, String caller) throws ResourceUnavailableException {
+        _itMgr.stopForced(vmEntityVO.getUuid());
+        return true;
+    }
+
+    @Override
+    public boolean destroyVirtualMachine(VMEntityVO vmEntityVO, String caller, boolean expunge) throws AgentUnavailableException, OperationTimedoutException, ConcurrentOperationException {
 
         VMInstanceVO vm = _vmDao.findByUuid(vmEntityVO.getUuid());
-        _itMgr.destroy(vm.getUuid());
+        _itMgr.destroy(vm.getUuid(), expunge);
         return true;
     }
 

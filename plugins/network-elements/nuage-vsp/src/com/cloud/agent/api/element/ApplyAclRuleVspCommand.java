@@ -20,58 +20,44 @@
 package com.cloud.agent.api.element;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
+
+import net.nuage.vsp.acs.client.api.model.VspAclRule;
+import net.nuage.vsp.acs.client.api.model.VspNetwork;
+
+import org.apache.commons.lang.builder.HashCodeBuilder;
 
 import com.cloud.agent.api.Command;
 
 public class ApplyAclRuleVspCommand extends Command {
 
-    String _networkUuid;
-    String _networkDomainUuid;
-    String _vpcOrSubnetUuid;
-    boolean _isL3Network;
-    List<Map<String, Object>> _aclRules;
-    boolean _isVpc;
-    long _networkId;
+    private final VspAclRule.ACLType _aclType;
+    private final VspNetwork _network;
+    private final List<VspAclRule> _aclRules;
+    private final boolean _networkReset;
 
-    public ApplyAclRuleVspCommand(String networkUuid, String networkDomainUuid, String vpcOrSubnetUuid, boolean isL3Network, List<Map<String, Object>> aclRules, boolean isVpc,
-            long networkId) {
+    public ApplyAclRuleVspCommand(VspAclRule.ACLType aclType, VspNetwork network, List<VspAclRule> aclRules, boolean networkReset) {
         super();
-        this._networkUuid = networkUuid;
-        this._networkDomainUuid = networkDomainUuid;
-        this._vpcOrSubnetUuid = vpcOrSubnetUuid;
-        this._isL3Network = isL3Network;
+        this._aclType = aclType;
+        this._network = network;
         this._aclRules = aclRules;
-        this._isVpc = isVpc;
-        this._networkId = networkId;
+        this._networkReset = networkReset;
     }
 
-    public String getNetworkUuid() {
-        return _networkUuid;
+    public VspAclRule.ACLType getAclType() {
+        return _aclType;
     }
 
-    public String getNetworkDomainUuid() {
-        return _networkDomainUuid;
+    public VspNetwork getNetwork() {
+        return _network;
     }
 
-    public String getVpcOrSubnetUuid() {
-        return _vpcOrSubnetUuid;
-    }
-
-    public boolean isL3Network() {
-        return _isL3Network;
-    }
-
-    public List<Map<String, Object>> getAclRules() {
+    public List<VspAclRule> getAclRules() {
         return _aclRules;
     }
 
-    public boolean isVpc() {
-        return _isVpc;
-    }
-
-    public long getNetworkId() {
-        return this._networkId;
+    public boolean isNetworkReset() {
+        return _networkReset;
     }
 
     @Override
@@ -79,4 +65,32 @@ public class ApplyAclRuleVspCommand extends Command {
         return false;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+
+        if (!(o instanceof ApplyAclRuleVspCommand)) {
+            return false;
+        }
+
+        ApplyAclRuleVspCommand that = (ApplyAclRuleVspCommand) o;
+
+        return super.equals(that)
+                && _networkReset == that._networkReset
+                && Objects.equals(_aclType, that._aclType)
+                && Objects.equals(_network, that._network)
+                && Objects.equals(_aclRules, that._aclRules);
+    }
+
+    @Override
+    public int hashCode() {
+        return new HashCodeBuilder()
+                .appendSuper(super.hashCode())
+                .append(_aclType)
+                .append(_network)
+                .append(_networkReset)
+                .toHashCode();
+    }
 }

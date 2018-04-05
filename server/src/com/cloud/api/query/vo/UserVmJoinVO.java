@@ -20,6 +20,7 @@ import java.net.URI;
 import java.util.Date;
 import java.util.Map;
 
+import javax.persistence.AttributeOverride;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
@@ -31,7 +32,6 @@ import javax.persistence.Transient;
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
 import com.cloud.network.Network.GuestType;
 import com.cloud.network.Networks.TrafficType;
-import com.cloud.server.ResourceTag.ResourceObjectType;
 import com.cloud.storage.Storage.StoragePoolType;
 import com.cloud.storage.Volume;
 import com.cloud.utils.db.GenericDao;
@@ -40,7 +40,8 @@ import com.cloud.vm.VirtualMachine.State;
 
 @Entity
 @Table(name = "user_vm_view")
-public class UserVmJoinVO extends BaseViewVO implements ControlledViewEntity {
+@AttributeOverride( name="id", column = @Column(name = "id", updatable = false, nullable = false) )
+public class UserVmJoinVO extends BaseViewWithTagInformationVO implements ControlledViewEntity {
 
     @Id
     @Column(name = "id", updatable = false, nullable = false)
@@ -51,6 +52,9 @@ public class UserVmJoinVO extends BaseViewVO implements ControlledViewEntity {
 
     @Column(name = "display_name", updatable = false, nullable = false, length = 255)
     private String displayName = null;
+
+    @Column(name = "user_id")
+    private long userId;
 
     @Column(name = "account_id")
     private long accountId;
@@ -343,37 +347,6 @@ public class UserVmJoinVO extends BaseViewVO implements ControlledViewEntity {
     @Column(name = "job_status")
     private int jobStatus;
 
-    @Column(name = "tag_id")
-    private long tagId;
-
-    @Column(name = "tag_uuid")
-    private String tagUuid;
-
-    @Column(name = "tag_key")
-    private String tagKey;
-
-    @Column(name = "tag_value")
-    private String tagValue;
-
-    @Column(name = "tag_domain_id")
-    private long tagDomainId;
-
-    @Column(name = "tag_account_id")
-    private long tagAccountId;
-
-    @Column(name = "tag_resource_id")
-    private long tagResourceId;
-
-    @Column(name = "tag_resource_uuid")
-    private String tagResourceUuid;
-
-    @Column(name = "tag_resource_type")
-    @Enumerated(value = EnumType.STRING)
-    private ResourceObjectType tagResourceType;
-
-    @Column(name = "tag_customer")
-    private String tagCustomer;
-
     @Column(name = "affinity_group_id")
     private long affinityGroupId;
 
@@ -399,11 +372,6 @@ public class UserVmJoinVO extends BaseViewVO implements ControlledViewEntity {
 
 
     public UserVmJoinVO() {
-    }
-
-    @Override
-    public long getId() {
-        return id;
     }
 
     @Override
@@ -437,6 +405,10 @@ public class UserVmJoinVO extends BaseViewVO implements ControlledViewEntity {
 
     public String getDisplayName() {
         return displayName;
+    }
+
+    public long getUserId() {
+        return userId;
     }
 
     @Override
@@ -740,8 +712,6 @@ public class UserVmJoinVO extends BaseViewVO implements ControlledViewEntity {
     }
 
     public String getDetail(String name) {
-        assert (details != null) : "Did you forget to load the details?";
-
         return details != null ? details.get(name) : null;
     }
 
@@ -769,46 +739,6 @@ public class UserVmJoinVO extends BaseViewVO implements ControlledViewEntity {
 
     public String getKeypairName() {
         return keypairName;
-    }
-
-    public long getTagId() {
-        return tagId;
-    }
-
-    public String getTagUuid() {
-        return tagUuid;
-    }
-
-    public String getTagKey() {
-        return tagKey;
-    }
-
-    public String getTagValue() {
-        return tagValue;
-    }
-
-    public long getTagDomainId() {
-        return tagDomainId;
-    }
-
-    public long getTagAccountId() {
-        return tagAccountId;
-    }
-
-    public long getTagResourceId() {
-        return tagResourceId;
-    }
-
-    public String getTagResourceUuid() {
-        return tagResourceUuid;
-    }
-
-    public ResourceObjectType getTagResourceType() {
-        return tagResourceType;
-    }
-
-    public String getTagCustomer() {
-        return tagCustomer;
     }
 
     public boolean isLimitCpuUse() {
@@ -860,7 +790,7 @@ public class UserVmJoinVO extends BaseViewVO implements ControlledViewEntity {
     @Override
     public String toString() {
         if (toString == null) {
-            toString = new StringBuilder("VM[").append(id).append("|").append(name).append("]").toString();
+            toString = new StringBuilder("VM[").append(getId()).append("|").append(name).append("]").toString();
         }
         return toString;
     }
@@ -902,4 +832,5 @@ public class UserVmJoinVO extends BaseViewVO implements ControlledViewEntity {
     public Class<?> getEntityType() {
         return VirtualMachine.class;
     }
+
 }

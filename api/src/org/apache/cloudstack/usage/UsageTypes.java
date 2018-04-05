@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.cloudstack.api.response.UsageTypeResponse;
 
 public class UsageTypes {
+    /* Any changes here should also reflect in cloud_usage.quota_mapping table */
     public static final int RUNNING_VM = 1;
     public static final int ALLOCATED_VM = 2; // used for tracking how long storage has been allocated for a VM
     public static final int IP_ADDRESS = 3;
@@ -41,6 +42,8 @@ public class UsageTypes {
     public static final int VM_DISK_BYTES_READ = 23;
     public static final int VM_DISK_BYTES_WRITE = 24;
     public static final int VM_SNAPSHOT = 25;
+    public static final int VOLUME_SECONDARY = 26;
+    public static final int VM_SNAPSHOT_ON_PRIMARY = 27;
 
     public static List<UsageTypeResponse> listUsageTypes() {
         List<UsageTypeResponse> responseList = new ArrayList<UsageTypeResponse>();
@@ -63,6 +66,7 @@ public class UsageTypes {
         responseList.add(new UsageTypeResponse(VM_DISK_BYTES_READ, "VM Disk usage(Bytes Read)"));
         responseList.add(new UsageTypeResponse(VM_DISK_BYTES_WRITE, "VM Disk usage(Bytes Write)"));
         responseList.add(new UsageTypeResponse(VM_SNAPSHOT, "VM Snapshot storage usage"));
+        responseList.add(new UsageTypeResponse(VM_SNAPSHOT_ON_PRIMARY, "VM Snapshot on primary storage usage"));
         return responseList;
     }
 }

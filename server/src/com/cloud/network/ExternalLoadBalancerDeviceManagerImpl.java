@@ -54,6 +54,7 @@ import com.cloud.dc.DataCenterIpAddressVO;
 import com.cloud.dc.DataCenterVO;
 import com.cloud.dc.Pod;
 import com.cloud.dc.Vlan.VlanType;
+import com.cloud.dc.VlanVO;
 import com.cloud.dc.dao.DataCenterDao;
 import com.cloud.dc.dao.HostPodDao;
 import com.cloud.dc.dao.VlanDao;
@@ -63,6 +64,7 @@ import com.cloud.exception.InvalidParameterValueException;
 import com.cloud.exception.ResourceUnavailableException;
 import com.cloud.host.DetailVO;
 import com.cloud.host.Host;
+import com.cloud.host.Host.Type;
 import com.cloud.host.HostVO;
 import com.cloud.host.dao.HostDao;
 import com.cloud.host.dao.HostDetailsDao;
@@ -90,6 +92,7 @@ import com.cloud.network.dao.PhysicalNetworkDao;
 import com.cloud.network.dao.PhysicalNetworkServiceProviderDao;
 import com.cloud.network.dao.PhysicalNetworkServiceProviderVO;
 import com.cloud.network.dao.PhysicalNetworkVO;
+import com.cloud.network.dao.VirtualRouterProviderDao;
 import com.cloud.network.element.IpDeployer;
 import com.cloud.network.element.NetworkElement;
 import com.cloud.network.element.StaticNatServiceProvider;
@@ -102,6 +105,7 @@ import com.cloud.network.rules.FirewallRule.Purpose;
 import com.cloud.network.rules.StaticNat;
 import com.cloud.network.rules.StaticNatImpl;
 import com.cloud.network.rules.dao.PortForwardingRulesDao;
+import com.cloud.offering.NetworkOffering;
 import com.cloud.offerings.NetworkOfferingVO;
 import com.cloud.offerings.dao.NetworkOfferingDao;
 import com.cloud.resource.ResourceManager;
@@ -109,6 +113,8 @@ import com.cloud.resource.ResourceState;
 import com.cloud.resource.ResourceStateAdapter;
 import com.cloud.resource.ServerResource;
 import com.cloud.resource.UnableDeleteHostException;
+import com.cloud.service.dao.ServiceOfferingDao;
+import com.cloud.storage.dao.VMTemplateDao;
 import com.cloud.user.Account;
 import com.cloud.user.AccountManager;
 import com.cloud.user.dao.AccountDao;
@@ -127,8 +133,10 @@ import com.cloud.utils.net.UrlUtil;
 import com.cloud.vm.Nic;
 import com.cloud.vm.Nic.ReservationStrategy;
 import com.cloud.vm.NicVO;
+import com.cloud.vm.VirtualMachineManager;
 import com.cloud.vm.dao.DomainRouterDao;
 import com.cloud.vm.dao.NicDao;
+import com.cloud.vm.dao.VMInstanceDao;
 
 public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase implements ExternalLoadBalancerDeviceManager, ResourceStateAdapter {
 
@@ -192,6 +200,19 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
     protected HostPodDao _podDao = null;
     @Inject
     IpAddressManager _ipAddrMgr;
+    @Inject
+    protected
+    VirtualMachineManager _itMgr;
+    @Inject
+    VMInstanceDao _vmDao;
+    @Inject
+    VMTemplateDao _templateDao;
+    @Inject
+    ServiceOfferingDao _serviceOfferingDao;
+    @Inject
+    PhysicalNetworkServiceProviderDao _physicalProviderDao;
+    @Inject
+    VirtualRouterProviderDao _vrProviderDao;
 
     private long _defaultLbCapacity;
     private static final org.apache.log4j.Logger s_logger = Logger.getLogger(ExternalLoadBalancerDeviceManagerImpl.class);
@@ -517,7 +538,7 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
                             // acquire a public IP to associate with lb appliance (used as subnet IP to make the appliance part of private network)
                             PublicIp publicIp =
                                 _ipAddrMgr.assignPublicIpAddress(guestConfig.getDataCenterId(), null, _accountMgr.getSystemAccount(), VlanType.VirtualNetwork, null,
-                                    null, false);
+                                    null, false, false);
                             String publicIPNetmask = publicIp.getVlanNetmask();
                             String publicIPgateway = publicIp.getVlanGateway();
                             String publicIP = publicIp.getAddress().toString();
@@ -792,7 +813,7 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
                         try {
                             PublicIp directIp =
                                 _ipAddrMgr.assignPublicIpAddress(network.getDataCenterId(), null, _accountDao.findById(network.getAccountId()), VlanType.DirectAttached,
-                                    network.getId(), null, true);
+                                    network.getId(), null, true, false);
                             loadBalancingIpAddress = directIp.getAddress().addr();
                         } catch (InsufficientCapacityException capException) {
                             String msg = "Ran out of guest IP addresses from the shared network.";
@@ -821,7 +842,7 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
                 // On the firewall provider for the network, create a static NAT rule between the source IP
                 // address and the load balancing IP address
                 try {
-                    applyStaticNatRuleForInlineLBRule(zone, network, revoked, srcIp, loadBalancingIpNic.getIp4Address());
+                    applyStaticNatRuleForInlineLBRule(zone, network, revoked, srcIp, loadBalancingIpNic.getIPv4Address());
                 } catch (ResourceUnavailableException ex) {
                     // Rollback db operation
                     _inlineLoadBalancerNicMapDao.expunge(mapping.getId());
@@ -843,7 +864,7 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
                 if (count == 0) {
                     // On the firewall provider for the network, delete the static NAT rule between the source IP
                     // address and the load balancing IP address
-                    applyStaticNatRuleForInlineLBRule(zone, network, revoked, srcIp, loadBalancingIpNic.getIp4Address());
+                    applyStaticNatRuleForInlineLBRule(zone, network, revoked, srcIp, loadBalancingIpNic.getIPv4Address());
 
                     // Delete the mapping between the source IP address and the load balancing IP address
                     _inlineLoadBalancerNicMapDao.expunge(mapping.getId());
@@ -865,6 +886,21 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
         return nic;
     }
 
+    public boolean isNccServiceProvider(Network network) {
+        NetworkOffering networkOffering = _networkOfferingDao.findById(network.getNetworkOfferingId());
+        if(null!= networkOffering && networkOffering.getServicePackage() != null ) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    public HostVO getNetScalerControlCenterForNetwork(Network guestConfig) {
+        long zoneId = guestConfig.getDataCenterId();
+        return _hostDao.findByTypeNameAndZoneId(zoneId, "NetscalerControlCenter", Type.NetScalerControlCenter);
+    }
+
     @Override
     public boolean applyLoadBalancerRules(Network network, List<LoadBalancingRule> loadBalancingRules) throws ResourceUnavailableException {
         // Find the external load balancer in this zone
@@ -875,13 +911,21 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
             return true;
         }
 
-        ExternalLoadBalancerDeviceVO lbDeviceVO = getExternalLoadBalancerForNetwork(network);
-        if (lbDeviceVO == null) {
-            s_logger.warn("There is no external load balancer device assigned to this network either network is not implement are already shutdown so just returning");
-            return true;
+        HostVO externalLoadBalancer = null;
+
+        if(isNccServiceProvider(network)) {
+            externalLoadBalancer  = getNetScalerControlCenterForNetwork(network);
+        } else {
+            ExternalLoadBalancerDeviceVO lbDeviceVO = getExternalLoadBalancerForNetwork(network);
+            if (lbDeviceVO == null) {
+                s_logger.warn("There is no external load balancer device assigned to this network either network is not implement are already shutdown so just returning");
+                return true;
+            } else {
+                externalLoadBalancer = _hostDao.findById(lbDeviceVO.getHostId());
+            }
         }
 
-        HostVO externalLoadBalancer = _hostDao.findById(lbDeviceVO.getHostId());
+
 
         boolean externalLoadBalancerIsInline = _networkMgr.isNetworkInlineMode(network);
 
@@ -901,6 +945,16 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
             String algorithm = rule.getAlgorithm();
             String uuid = rule.getUuid();
             String srcIp = rule.getSourceIp().addr();
+            String srcIpVlan = null;
+            String srcIpGateway = null;
+            String srcIpNetmask = null;
+            Long vlanid =  _networkModel.getPublicIpAddress(rule.getSourceIp().addr(), network.getDataCenterId()).getVlanId();
+            if(vlanid != null ) {
+              VlanVO publicVlan =   _vlanDao.findById(vlanid);
+              srcIpVlan =  publicVlan.getVlanTag();
+              srcIpGateway = publicVlan.getVlanGateway();
+              srcIpNetmask = publicVlan.getVlanNetmask();
+            }
             int srcPort = rule.getSourcePortStart();
             List<LbDestination> destinations = rule.getDestinations();
 
@@ -914,7 +968,7 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
                 }
 
                 // Change the source IP address for the load balancing rule to be the load balancing IP address
-                srcIp = loadBalancingIpNic.getIp4Address();
+                srcIp = loadBalancingIpNic.getIPv4Address();
             }
 
             if ((destinations != null && !destinations.isEmpty()) || rule.isAutoScaleConfig()) {
@@ -922,6 +976,10 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
                 LoadBalancerTO loadBalancer =
                     new LoadBalancerTO(uuid, srcIp, srcPort, protocol, algorithm, revoked, false, inline, destinations, rule.getStickinessPolicies(),
                         rule.getHealthCheckPolicies(), rule.getLbSslCert(), rule.getLbProtocol());
+                loadBalancer.setNetworkId(network.getId());
+                loadBalancer.setSrcIpVlan(srcIpVlan);
+                loadBalancer.setSrcIpNetmask(srcIpNetmask);
+                loadBalancer.setSrcIpGateway(srcIpGateway);
                 if (rule.isAutoScaleConfig()) {
                     loadBalancer.setAutoScaleVmGroup(rule.getAutoScaleVmGroup());
                 }
@@ -1010,7 +1068,7 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
         }
 
         // Send a command to the external load balancer to implement or shutdown the guest network
-        long guestVlanTag = Long.parseLong(BroadcastDomainType.getValue(guestConfig.getBroadcastUri()));
+        String guestVlanTag = BroadcastDomainType.getValue(guestConfig.getBroadcastUri());
         String selfIp = null;
         String guestVlanNetmask = NetUtils.cidr2Netmask(guestConfig.getCidr());
         Integer networkRate = _networkModel.getNetworkRate(guestConfig.getId(), null);
@@ -1037,13 +1095,13 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
                     + " Either network implement failed half way through or already network shutdown is completed. So just returning.");
                 return true;
             }
-            selfIp = selfipNic.getIp4Address();
+            selfIp = selfipNic.getIPv4Address();
         }
 
         // It's a hack, using isOneToOneNat field for indicate if it's inline or not
         boolean inline = _networkMgr.isNetworkInlineMode(guestConfig);
         IpAddressTO ip =
-            new IpAddressTO(guestConfig.getAccountId(), null, add, false, true, String.valueOf(guestVlanTag), selfIp, guestVlanNetmask, null, networkRate, inline);
+            new IpAddressTO(guestConfig.getAccountId(), null, add, false, true, guestVlanTag, selfIp, guestVlanNetmask, null, networkRate, inline);
         IpAddressTO[] ips = new IpAddressTO[1];
         ips[0] = ip;
         IpAssocCommand cmd = new IpAssocCommand(ips);
@@ -1113,7 +1171,12 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
         if (!(startup[0] instanceof StartupExternalLoadBalancerCommand)) {
             return null;
         }
-        host.setType(Host.Type.ExternalLoadBalancer);
+        if(host.getName().equalsIgnoreCase("NetScalerControlCenter")) {
+            host.setType(Host.Type.NetScalerControlCenter);
+        }
+        else {
+            host.setType(Host.Type.ExternalLoadBalancer);
+        }
         return host;
     }
 
@@ -1158,13 +1221,19 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
             return null;
         }
 
-        ExternalLoadBalancerDeviceVO lbDeviceVO = getExternalLoadBalancerForNetwork(network);
-        if (lbDeviceVO == null) {
-            s_logger.warn("There is no external load balancer device assigned to this network either network is not implement are already shutdown so just returning");
-            return null;
-        }
+        HostVO externalLoadBalancer = null;
 
-        HostVO externalLoadBalancer = _hostDao.findById(lbDeviceVO.getHostId());
+        if(isNccServiceProvider(network)) {
+            externalLoadBalancer  = getNetScalerControlCenterForNetwork(network);
+        } else {
+            ExternalLoadBalancerDeviceVO lbDeviceVO = getExternalLoadBalancerForNetwork(network);
+            if (lbDeviceVO == null) {
+                s_logger.warn("There is no external load balancer device assigned to this network either network is not implement are already shutdown so just returning");
+                return null;
+            } else {
+                externalLoadBalancer = _hostDao.findById(lbDeviceVO.getHostId());
+            }
+        }
 
         boolean externalLoadBalancerIsInline = _networkMgr.isNetworkInlineMode(network);
 
@@ -1196,7 +1265,7 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
 
                 // Change the source IP address for the load balancing rule to
                 // be the load balancing IP address
-                srcIp = loadBalancingIpNic.getIp4Address();
+                srcIp = loadBalancingIpNic.getIPv4Address();
             }
 
             if ((destinations != null && !destinations.isEmpty()) || !rule.isAutoScaleConfig()) {
@@ -1212,14 +1281,11 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
             if (loadBalancersToApply.size() > 0) {
                 int numLoadBalancersForCommand = loadBalancersToApply.size();
                 LoadBalancerTO[] loadBalancersForCommand = loadBalancersToApply.toArray(new LoadBalancerTO[numLoadBalancersForCommand]);
-                // LoadBalancerConfigCommand cmd = new
-                // LoadBalancerConfigCommand(loadBalancersForCommand, null);
-                HealthCheckLBConfigCommand cmd = new HealthCheckLBConfigCommand(loadBalancersForCommand);
+                HealthCheckLBConfigCommand cmd = new HealthCheckLBConfigCommand(loadBalancersForCommand, network.getId());
                 long guestVlanTag = Integer.parseInt(BroadcastDomainType.getValue(network.getBroadcastUri()));
                 cmd.setAccessDetail(NetworkElementCommand.GUEST_VLAN_TAG, String.valueOf(guestVlanTag));
 
-                HealthCheckLBConfigAnswer answer = (HealthCheckLBConfigAnswer) _agentMgr
-                        .easySend(externalLoadBalancer.getId(), cmd);
+                HealthCheckLBConfigAnswer answer = (HealthCheckLBConfigAnswer) _agentMgr.easySend(externalLoadBalancer.getId(), cmd);
                 // easySend will return null on error
                 return answer == null ? null : answer.getLoadBalancers();
             }
@@ -1235,10 +1301,11 @@ public abstract class ExternalLoadBalancerDeviceManagerImpl extends AdapterBase 
         for (NicVO guestIp : guestIps) {
             // only external firewall and external load balancer will create NicVO with PlaceHolder reservation strategy
             if (guestIp.getReservationStrategy().equals(ReservationStrategy.PlaceHolder) && guestIp.getVmType() == null && guestIp.getReserver() == null &&
-                !guestIp.getIp4Address().equals(network.getGateway())) {
+                !guestIp.getIPv4Address().equals(network.getGateway())) {
                 return guestIp;
             }
         }
         return null;
     }
+
 }

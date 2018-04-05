@@ -21,7 +21,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
@@ -59,7 +58,6 @@ import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.dao.SecondaryStorageVmDao;
 
 @Component
-@Local(value = {StorageNetworkManager.class, StorageNetworkService.class})
 public class StorageNetworkManagerImpl extends ManagerBase implements StorageNetworkManager, StorageNetworkService {
     private static final Logger s_logger = Logger.getLogger(StorageNetworkManagerImpl.class);
 
@@ -79,12 +77,21 @@ public class StorageNetworkManagerImpl extends ManagerBase implements StorageNet
         if (pod == null) {
             throw new CloudRuntimeException("Cannot find pod " + podId);
         }
-        String[] IpRange = pod.getDescription().split("-");
-        if ((IpRange[0] == null || IpRange[1] == null) || (!NetUtils.isValidIp(IpRange[0]) || !NetUtils.isValidIp(IpRange[1]))) {
-            return;
-        }
-        if (NetUtils.ipRangesOverlap(startIp, endIp, IpRange[0], IpRange[1])) {
-            throw new InvalidParameterValueException("The Storage network Start IP and endIP address range overlap with private IP :" + IpRange[0] + ":" + IpRange[1]);
+
+        final String[] existingPodIpRanges = pod.getDescription().split(",");
+
+        for(String podIpRange: existingPodIpRanges) {
+            final String[] existingPodIpRange = podIpRange.split("-");
+
+            if (existingPodIpRange.length > 1) {
+                if (!NetUtils.isValidIp4(existingPodIpRange[0]) || !NetUtils.isValidIp4(existingPodIpRange[1])) {
+                    continue;
+                }
+
+                if (NetUtils.ipRangesOverlap(startIp, endIp, existingPodIpRange[0], existingPodIpRange[1])) {
+                    throw new InvalidParameterValueException("The Storage network Start IP and endIP address range overlap with private IP :" + existingPodIpRange[0] + ":" + existingPodIpRange[1]);
+                }
+            }
         }
     }
 
@@ -104,22 +111,20 @@ public class StorageNetworkManagerImpl extends ManagerBase implements StorageNet
         String insertSql =
             "INSERT INTO `cloud`.`op_dc_storage_network_ip_address` (range_id, ip_address, mac_address, taken) VALUES (?, ?, (select mac_address from `cloud`.`data_center` where id=?), ?)";
         String updateSql = "UPDATE `cloud`.`data_center` set mac_address = mac_address+1 where id=?";
-        PreparedStatement stmt = null;
         Connection conn = txn.getConnection();
-
         while (startIPLong <= endIPLong) {
-            stmt = conn.prepareStatement(insertSql);
-            stmt.setLong(1, rangeId);
-            stmt.setString(2, NetUtils.long2Ip(startIPLong++));
-            stmt.setLong(3, zoneId);
-            stmt.setNull(4, java.sql.Types.DATE);
-            stmt.executeUpdate();
-            stmt.close();
+            try (PreparedStatement stmt_insert = conn.prepareStatement(insertSql);) {
+                stmt_insert.setLong(1, rangeId);
+                stmt_insert.setString(2, NetUtils.long2Ip(startIPLong++));
+                stmt_insert.setLong(3, zoneId);
+                stmt_insert.setNull(4, java.sql.Types.DATE);
+                stmt_insert.executeUpdate();
+            }
 
-            stmt = txn.prepareStatement(updateSql);
-            stmt.setLong(1, zoneId);
-            stmt.executeUpdate();
-            stmt.close();
+            try (PreparedStatement stmt_update = txn.prepareStatement(updateSql);) {
+                stmt_update.setLong(1, zoneId);
+                stmt_update.executeUpdate();
+            }
         }
     }
 
@@ -132,7 +137,7 @@ public class StorageNetworkManagerImpl extends ManagerBase implements StorageNet
         String endIp = cmd.getEndIp();
         final String netmask = cmd.getNetmask();
 
-        if (netmask != null && !NetUtils.isValidNetmask(netmask)) {
+        if (netmask != null && !NetUtils.isValidIp4Netmask(netmask)) {
             throw new CloudRuntimeException("Invalid netmask:" + netmask);
         }
 
@@ -202,7 +207,7 @@ public class StorageNetworkManagerImpl extends ManagerBase implements StorageNet
             endIp = startIp;
         }
 
-        if (!NetUtils.isValidNetmask(netmask)) {
+        if (!NetUtils.isValidIp4Netmask(netmask)) {
             throw new CloudRuntimeException("Invalid netmask:" + netmask);
         }
 

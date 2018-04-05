@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -43,8 +42,8 @@ import com.cloud.agent.api.SetupAnswer;
 import com.cloud.agent.api.SetupCommand;
 import com.cloud.agent.api.StartupCommand;
 import com.cloud.agent.api.StartupRoutingCommand;
-import com.cloud.configuration.Config;
 import com.cloud.alert.AlertManager;
+import com.cloud.configuration.Config;
 import com.cloud.dc.ClusterVO;
 import com.cloud.dc.DataCenterVO;
 import com.cloud.dc.HostPodVO;
@@ -72,7 +71,6 @@ import com.cloud.storage.StorageLayer;
  * HypervDirectConnectResource corresponding to the agent on a Hyper-V
  * hypervisor and manages its lifecycle.
  */
-@Local(value = Discoverer.class)
 public class HypervServerDiscoverer extends DiscovererBase implements Discoverer, Listener, ResourceStateAdapter {
     private static final Logger s_logger = Logger.getLogger(HypervServerDiscoverer.class);
     Random _rand = new Random(System.currentTimeMillis());
@@ -106,6 +104,10 @@ public class HypervServerDiscoverer extends DiscovererBase implements Discoverer
     @Override
     public final AgentControlAnswer processControlCommand(final long agentId, final AgentControlCommand cmd) {
         return null;
+    }
+
+    @Override
+    public void processHostAdded(long hostId) {
     }
 
     @Override
@@ -179,6 +181,14 @@ public class HypervServerDiscoverer extends DiscovererBase implements Discoverer
     }
 
     @Override
+    public void processHostAboutToBeRemoved(long hostId) {
+    }
+
+    @Override
+    public void processHostRemoved(long hostId, long clusterId) {
+    }
+
+    @Override
     public final boolean isRecurring() {
         return false;
     }
@@ -247,7 +257,7 @@ public class HypervServerDiscoverer extends DiscovererBase implements Discoverer
                 return null;
             }
 
-            s_logger.info("Creating" + HypervDirectConnectResource.class.getName() + " HypervDummyResourceBase for zone/pod/cluster " + dcId + "/" + podId + "/" +
+            s_logger.info("Creating" + HypervDirectConnectResource.class.getName() + " HypervDirectConnectResource for zone/pod/cluster " + dcId + "/" + podId + "/" +
                 clusterId);
 
             // Some Hypervisors organise themselves in pools.

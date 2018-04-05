@@ -1,4 +1,5 @@
-#!/bin/sh -e
+#!/bin/sh
+
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -16,6 +17,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+set -e
+
 if [ "$1" = configure ]; then
     if ! getent passwd cloud >/dev/null; then
         adduser --quiet --system --group --no-create-home --home /var/lib/cloudstack/management cloud
@@ -26,8 +29,6 @@ if [ "$1" = configure ]; then
     rm -fr /var/cache/cloudstack/management/work/*
 
     for i in /var/cache/cloudstack/management \
-        /var/cache/cloudstack/management/work \
-        /var/cache/cloudstack/management/temp \
         /var/log/cloudstack/management \
         /var/lib/cloudstack/management
     do
@@ -47,12 +48,21 @@ if [ "$1" = configure ]; then
                 cp -a $OLDCONFDIR/$FILE $NEWCONFDIR/$FILE
             fi
         done
-        if [ -f "$OLDCONFDIR/cloud.keystore" ]; then
-            cp -a $OLDCONFDIR/cloud.keystore $NEWCONFDIR/cloudmanagementserver.keystore
-        fi
     fi
 
-    chmod 0640 /etc/cloudstack/management/db.properties
-    chgrp cloud /etc/cloudstack/management/db.properties
-    service tomcat6 stop || true
+    CONFDIR="/etc/cloudstack/management"
+    DBPROPS="db.properties"
+
+    chmod 0640 ${CONFDIR}/${DBPROPS}
+    chgrp cloud ${CONFDIR}/${DBPROPS}
+    chown -R cloud:cloud /var/log/cloudstack/management
+
+    ln -sf ${CONFDIR}/log4j-cloud.xml ${CONFDIR}/log4j.xml
+
+    # Add jdbc MySQL driver settings to db.properties if not present
+    grep -s -q "db.cloud.driver=jdbc:mysql" ${CONFDIR}/${DBPROPS} || sed -i -e "\$adb.cloud.driver=jdbc:mysql" ${CONFDIR}/${DBPROPS}
+    grep -s -q "db.usage.driver=jdbc:mysql" ${CONFDIR}/${DBPROPS} || sed -i -e "\$adb.usage.driver=jdbc:mysql" ${CONFDIR}/${DBPROPS}
+    grep -s -q "db.simulator.driver=jdbc:mysql" ${CONFDIR}/${DBPROPS} || sed -i -e "\$adb.simulator.driver=jdbc:mysql" ${CONFDIR}/${DBPROPS}
 fi
+
+#DEBHELPER#

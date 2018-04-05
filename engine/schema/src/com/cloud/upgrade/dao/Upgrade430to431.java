@@ -21,7 +21,7 @@ import com.cloud.network.Networks.BroadcastDomainType;
 import com.cloud.utils.exception.CloudRuntimeException;
 import org.apache.log4j.Logger;
 
-import java.io.File;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -47,7 +47,7 @@ public class Upgrade430to431 implements DbUpgrade {
     }
 
     @Override
-    public File[] getPrepareScripts() {
+    public InputStream[] getPrepareScripts() {
         return null;
     }
 
@@ -120,7 +120,7 @@ public class Upgrade430to431 implements DbUpgrade {
     }
 
     @Override
-    public File[] getCleanupScripts() {
+    public InputStream[] getCleanupScripts() {
         return null;
     }
 

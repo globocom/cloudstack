@@ -43,7 +43,8 @@ from marvin.lib.common import (get_domain,
                                            wait_for_cleanup,
                                            list_virtual_machines,
                                            list_hosts,
-                                           findSuitableHostForMigration)
+                                           findSuitableHostForMigration,
+                                           verifyGuestTrafficPortGroups)
 
 from marvin.codes import PASS, ERROR_NO_HOST_FOR_MIGRATION
 
@@ -352,7 +353,7 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
                                 services=cls.services["lbrule"],
                                 traffictype='Ingress'
                                 )
-
+        cls.services["icmp_rule"]["protocol"] = "all"
         cls.nwacl_internet_1 = NetworkACL.create(
                                         cls.api_client,
                                         networkid=cls.network_1.id,
@@ -491,7 +492,7 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
                          )
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan", "dvs"])
     def test_01_deploy_instance_in_network(self):
         """ Test deploy an instance in VPC networks
         """
@@ -524,7 +525,7 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
                              )
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan", "dvs"])
     def test_02_stop_instance_in_network(self):
         """ Test stop an instance in VPC networks
         """
@@ -566,7 +567,7 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
                          )
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan", "dvs"], required_hardware="true")
     def test_03_start_instance_in_network(self):
         """ Test start an instance in VPC networks
         """
@@ -591,7 +592,7 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan", "dvs"], required_hardware="true")
     def test_04_reboot_instance_in_network(self):
         """ Test reboot an instance in VPC networks
         """
@@ -620,7 +621,7 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan", "dvs"], required_hardware="true")
     def test_05_destroy_instance_in_network(self):
         """ Test destroy an instance in VPC networks
         """
@@ -628,6 +629,11 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
         # Validate the following
         # 1. Destory the virtual machines.
         # 2. Rules should be still configured on virtual router.
+        # 3. Recover the virtual machines.
+        # 4. Vm should be in stopped state. State both the instances
+        # 5. Make sure that all the PF,LB and Static NAT rules on this VM
+        #    works as expected.
+        # 6. Make sure that we are able to access google.com from this user Vm
 
         self.debug("Validating if the network rules work properly or not?")
         self.validate_network_rules()
@@ -636,10 +642,23 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
                                                 self.account.name)
         try:
             self.vm_1.delete(self.apiclient, expunge=False)
-            self.vm_2.delete(self.apiclient, expunge=False)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_1.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Destroyed',
+                    "VM state should be destroyed"
+                    )
+            
         except Exception as e:
             self.fail("Failed to stop the virtual instances, %s" % e)
-
+            
         # Check if the network rules still exists after Vm stop
         self.debug("Checking if NAT rules ")
         nat_rules = NATRule.list(
@@ -664,47 +683,112 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
                          "List LB rules shall return a valid list"
                          )
 
-        #Recover the instances so that they don't get expunged before runing next test case in the suite
+        self.debug("Recovering the expunged virtual machine vm1 in account: %s" %
+                                                self.account.name)
         try:
             self.vm_1.recover(self.apiclient)
-            self.vm_2.recover(self.apiclient)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_1.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Stopped',
+                    "VM state should be stopped"
+                    )
+
         except Exception as e:
             self.fail("Failed to recover the virtual instances, %s" % e)
-        return
-
-    @attr(tags=["advanced", "intervlan"])
-    def test_06_recover_instance_in_network(self):
-        """ Test recover an instance in VPC networks
-        """
-
-        self.debug("Deleted instacnes ..")
+            
         try:
-            self.vm_1.delete(self.apiclient, expunge=False)
             self.vm_2.delete(self.apiclient, expunge=False)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_2.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Destroyed',
+                    "VM state should be destroyed"
+                    )
+
+
+
+
         except Exception as e:
             self.fail("Failed to stop the virtual instances, %s" % e)
 
+        self.debug("Recovering the expunged virtual machine vm2 in account: %s" %
+                                                self.account.name)            
         try:
-            self.vm_1.recover(self.apiclient)
             self.vm_2.recover(self.apiclient)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_2.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Stopped',
+                    "VM state should be stopped"
+                    )
         except Exception as e:
             self.fail("Failed to recover the virtual instances, %s" % e)
 
         self.debug("Starting the two instances..")
         try:
             self.vm_1.start(self.apiclient)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_1.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Running',
+                    "VM state should be running"
+                    )
+
             self.vm_2.start(self.apiclient)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_2.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Running',
+                    "VM state should be running"
+                    )
         except Exception as e:
             self.fail("Failed to start the instances, %s" % e)
 
         # Wait until vms are up
         time.sleep(120)
-
         self.debug("Validating if the network rules work properly or not?")
         self.validate_network_rules()
+
         return
 
-    @attr(tags=["advanced", "intervlan"])
+
+    @attr(tags=["advanced", "intervlan", "dvs"], required_hardware="true")
     def test_07_migrate_instance_in_network(self):
         """ Test migrate an instance in VPC networks
         """
@@ -715,6 +799,9 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
         # 3. Make sure that all the PF,LB and Static NAT rules on this VM
         #    works as expected.
         # 3. Make sure that we are able to access google.com from this user Vm
+        self.hypervisor = self.testClient.getHypervisorInfo()
+        if self.hypervisor.lower() in ['lxc']:
+            self.skipTest("vm migrate is not supported in %s" % self.hypervisor)
 
         self.debug("Validating if the network rules work properly or not?")
         self.validate_network_rules()
@@ -737,7 +824,7 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan", "dvs"], required_hardware="true")
     def test_08_user_data(self):
         """ Test user data in virtual machines
         """
@@ -756,6 +843,7 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
                                 ipaddress=self.public_ip_1.ipaddress.ipaddress,
                                 reconnect=True)
             self.debug("SSH into VM is successfully")
+            ssh.execute("yum install wget -y")
         except Exception as e:
             self.fail("Failed to SSH into instance")
 
@@ -780,7 +868,7 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
                         )
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan", "dvs"], required_hardware="true")
     def test_09_meta_data(self):
         """ Test meta data in virtual machines
         """
@@ -822,7 +910,7 @@ class TestVMLifeCycleVPC(cloudstackTestCase):
                         )
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan", "dvs"], required_hardware="true")
     def test_10_expunge_instance_in_network(self):
         """ Test expunge an instance in VPC networks
         """
@@ -874,7 +962,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
     @classmethod
     def setUpClass(cls):
         cls.testClient = super(TestVMLifeCycleSharedNwVPC, cls).getClsTestClient()
-	cls.api_client = cls.testClient.getApiClient()
+        cls.api_client = cls.testClient.getApiClient()
 
         cls.services = Services().services
         # Get Zone, Domain and templates
@@ -1059,7 +1147,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
                                 services=cls.services["lbrule"],
                                 traffictype='Ingress'
                                 )
-
+        cls.services["icmp_rule"]["protocol"] = "all"
         cls.nwacl_internet_1 = NetworkACL.create(
                                         cls.api_client,
                                         networkid=cls.network_1.id,
@@ -1203,7 +1291,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
                                     (self.public_ip_1.ipaddress.ipaddress, e))
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_01_deploy_instance_in_network(self):
         """ Test deploy an instance in VPC networks
         """
@@ -1238,7 +1326,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_02_stop_instance_in_network(self):
         """ Test stop an instance in VPC networks
         """
@@ -1261,7 +1349,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_03_start_instance_in_network(self):
         """ Test start an instance in VPC networks
         """
@@ -1302,7 +1390,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_04_reboot_instance_in_network(self):
         """ Test reboot an instance in VPC networks
         """
@@ -1345,7 +1433,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_05_destroy_instance_in_network(self):
         """ Test destroy an instance in VPC networks
         """
@@ -1380,7 +1468,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_06_recover_instance_in_network(self):
         """ Test recover an instance in VPC networks
         """
@@ -1454,7 +1542,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_07_migrate_instance_in_network(self):
         """ Test migrate an instance in VPC networks
         """
@@ -1465,6 +1553,9 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
         # 3. Make sure that all the PF,LB and Static NAT rules on this VM
         #    works as expected.
         # 3. Make sure that we are able to access google.com from this user Vm
+        self.hypervisor = self.testClient.getHypervisorInfo()
+        if self.hypervisor.lower() in ['lxc']:
+            self.skipTest("vm migrate is not supported in %s" % self.hypervisor)
 
         self.debug("Validating if network rules are coonfigured properly?")
         self.validate_network_rules()
@@ -1487,7 +1578,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_08_user_data(self):
         """ Test user data in virtual machines
         """
@@ -1506,6 +1597,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
                                 ipaddress=self.public_ip_1.ipaddress.ipaddress,
                                 reconnect=True)
             self.debug("SSH into VM is successfully")
+            ssh.execute("yum install wget -y")
         except Exception as e:
             self.fail("Failed to SSH into instance")
 
@@ -1530,7 +1622,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
                         )
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_09_meta_data(self):
         """ Test meta data in virtual machines
         """
@@ -1572,7 +1664,7 @@ class TestVMLifeCycleSharedNwVPC(cloudstackTestCase):
                         )
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_10_expunge_instance_in_network(self):
         """ Test expunge an instance in VPC networks
         """
@@ -1642,9 +1734,10 @@ class TestVMLifeCycleBothIsolated(cloudstackTestCase):
     @classmethod
     def setUpClass(cls):
         cls.testClient = super(TestVMLifeCycleBothIsolated, cls).getClsTestClient()
-	cls.api_client = cls.testClient.getApiClient()
+        cls.api_client = cls.testClient.getApiClient()
 
         cls.services = Services().services
+        cls.hypervisor = cls.testClient.getHypervisorInfo()
         # Get Zone, Domain and templates
         cls.domain = get_domain(cls.api_client)
         cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
@@ -1971,12 +2064,23 @@ class TestVMLifeCycleBothIsolated(cloudstackTestCase):
                          )
         return
 
+    @attr(tags=["dvs"], required_hardware="true")
+    def test_guest_traffic_port_groups_vpc_network(self):
+        """ Verify port groups are created for guest traffic
+        used by vpc network """
+
+        if self.hypervisor.lower() == "vmware":
+            response = verifyGuestTrafficPortGroups(self.apiclient,
+                                                    self.config,
+                                                    self.zone)
+            assert response[0] == PASS, response[1]
+
 class TestVMLifeCycleStoppedVPCVR(cloudstackTestCase):
 
     @classmethod
     def setUpClass(cls):
         cls.testClient = super(TestVMLifeCycleStoppedVPCVR, cls).getClsTestClient()
-	cls.api_client = cls.testClient.getApiClient()
+        cls.api_client = cls.testClient.getApiClient()
 
         cls.services = Services().services
         # Get Zone, Domain and templates
@@ -2362,7 +2466,7 @@ class TestVMLifeCycleStoppedVPCVR(cloudstackTestCase):
                          )
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_03_start_instance_in_network(self):
         """ Test start an instance in VPC networks
         """
@@ -2385,7 +2489,7 @@ class TestVMLifeCycleStoppedVPCVR(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced", "intervlan"], required_hardware="true")
     def test_04_reboot_instance_in_network(self):
         """ Test reboot an instance in VPC networks
         """
@@ -2412,7 +2516,7 @@ class TestVMLifeCycleStoppedVPCVR(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan"], required_hardware="true")
     def test_05_destroy_instance_in_network(self):
         """ Test destroy an instance in VPC networks
         """
@@ -2420,6 +2524,11 @@ class TestVMLifeCycleStoppedVPCVR(cloudstackTestCase):
         # Validate the following
         # 1. Destory the virtual machines.
         # 2. Rules should be still configured on virtual router.
+        # 3. Recover the virtual machines.
+        # 4. Vm should be in stopped state. State both the instances
+        # 5. Make sure that all the PF,LB and Static NAT rules on this VM
+        #    works as expected.
+        # 6. Make sure that we are able to access google.com from this user Vm
 
         self.debug("Validating if the network rules work properly or not?")
         self.validate_network_rules()
@@ -2428,10 +2537,23 @@ class TestVMLifeCycleStoppedVPCVR(cloudstackTestCase):
                                                 self.account.name)
         try:
             self.vm_1.delete(self.apiclient, expunge=False)
-            self.vm_2.delete(self.apiclient, expunge=False)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_1.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Destroyed',
+                    "VM state should be destroyed"
+                    )
+            
         except Exception as e:
             self.fail("Failed to stop the virtual instances, %s" % e)
-
+            
         # Check if the network rules still exists after Vm stop
         self.debug("Checking if NAT rules ")
         nat_rules = NATRule.list(
@@ -2455,429 +2577,328 @@ class TestVMLifeCycleStoppedVPCVR(cloudstackTestCase):
                          True,
                          "List LB rules shall return a valid list"
                          )
-        return
 
-    @attr(tags=["advanced", "intervlan"])
-    def test_06_recover_instance_in_network(self):
-        """ Test recover an instance in VPC networks
-        """
-
-        # Validate the following
-        # 1. Recover the virtual machines.
-        # 2. Vm should be in stopped state. State both the instances
-        # 3. Make sure that all the PF,LB and Static NAT rules on this VM
-        #    works as expected.
-        # 3. Make sure that we are able to access google.com from this user Vm
-
-        self.debug("Recovering the expunged virtual machines in account: %s" %
+        self.debug("Recovering the expunged virtual machine vm1 in account: %s" %
                                                 self.account.name)
         try:
             self.vm_1.recover(self.apiclient)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_1.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Stopped',
+                    "VM state should be stopped"
+                    )
+
+        except Exception as e:
+            self.fail("Failed to recover the virtual instances, %s" % e)
+            
+        try:
+            self.vm_2.delete(self.apiclient, expunge=False)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_2.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Destroyed',
+                    "VM state should be destroyed"
+                    )
+
+        except Exception as e:
+            self.fail("Failed to stop the virtual instances, %s" % e)
+
+        self.debug("Recovering the expunged virtual machine vm2 in account: %s" %
+                                                self.account.name)            
+        try:
             self.vm_2.recover(self.apiclient)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_2.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Stopped',
+                    "VM state should be stopped"
+                    )
         except Exception as e:
             self.fail("Failed to recover the virtual instances, %s" % e)
 
         self.debug("Starting the two instances..")
         try:
             self.vm_1.start(self.apiclient)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_1.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Running',
+                    "VM state should be running"
+                    )
+
             self.vm_2.start(self.apiclient)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_2.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Running',
+                    "VM state should be running"
+                    )
         except Exception as e:
             self.fail("Failed to start the instances, %s" % e)
 
-        self.debug("Validating if the network rules work properly or not?")
-        self.validate_network_rules()
-        return
-
-    @attr(tags=["advanced", "intervlan"])
-    def test_07_migrate_instance_in_network(self):
-        """ Test migrate an instance in VPC networks
-        """
-
-        # Validate the following
-        # 1. Migrate the virtual machines to other hosts
-        # 2. Vm should be in stopped state. State both the instances
-        # 3. Make sure that all the PF,LB and Static NAT rules on this VM
-        #    works as expected.
-        # 3. Make sure that we are able to access google.com from this user Vm
-
+        # Wait until vms are up
+        time.sleep(120)
         self.debug("Validating if the network rules work properly or not?")
         self.validate_network_rules()
 
-        host = findSuitableHostForMigration(self.apiclient, self.vm_1.id)
-        if host is None:
-            self.skipTest(ERROR_NO_HOST_FOR_MIGRATION)
-
-        self.debug("Migrating VM-ID: %s on Host: %s to Host: %s" % (
-                                                        self.vm_1.id,
-                                                        self.vm_1.hostid,
-                                                        host.id
-                                                        ))
-
-        try:
-            self.vm_1.migrate(self.apiclient, hostid=host.id)
-        except Exception as e:
-            self.fail("Failed to migrate instance, %s" % e)
-
-        self.debug("Validating if the network rules work properly or not?")
-        self.validate_network_rules()
-        return
-
-    @attr(tags=["advanced", "intervlan"])
-    def test_08_user_data(self):
-        """ Test user data in virtual machines
-        """
-
-        # Validate the following
-        # 1. Create a VPC with cidr - 10.1.1.1/16
-        # 2. Add network1(10.1.1.1/24) and network2(10.1.2.1/24) to this VPC.
-        # 3. Deploy a vm in network1 and a vm in network2 using userdata
-        # Steps
-        # 1.Query for the user data for both the user vms from both networks
-        #   User should be able to query the user data for the vms belonging to
-        #   both the networks from the VR
-
-        try:
-            ssh = self.vm_1.get_ssh_client(
-                                ipaddress=self.public_ip_1.ipaddress.ipaddress,
-                                reconnect=True)
-            self.debug("SSH into VM is successfully")
-        except Exception as e:
-            self.fail("Failed to SSH into instance")
-
-        self.debug("check the userdata with that of present in router")
-        try:
-            cmds = [
-               "wget http://%s/latest/user-data" % self.network_1.gateway,
-               "cat user-data",
-               ]
-            for c in cmds:
-                result = ssh.execute(c)
-                self.debug("%s: %s" % (c, result))
-        except Exception as e:
-            self.fail("Failed to SSH in Virtual machine: %s" % e)
-
-        res = str(result)
-        self.assertEqual(
-                            res.count(
-                                self.services["virtual_machine"]["userdata"]),
-                            1,
-                            "Verify user data from router"
-                        )
-        return
-
-    @attr(tags=["advanced", "intervlan"])
-    def test_09_meta_data(self):
-        """ Test meta data in virtual machines
-        """
-
-        # Validate the following
-        # 1. Create a VPC with cidr - 10.1.1.1/16
-        # 2. Add network1(10.1.1.1/24) and network2(10.1.2.1/24) to this VPC.
-        # 3. Deploy a vm in network1 and a vm in network2 using userdata
-        # Steps
-        # 1.Query for the meta data for both the user vms from both networks
-        #   User should be able to query the user data for the vms belonging to
-        #   both the networks from the VR
-
-        try:
-            ssh = self.vm_1.get_ssh_client(
-                                ipaddress=self.public_ip_1.ipaddress.ipaddress,
-                                reconnect=True)
-            self.debug("SSH into VM is successfully")
-        except Exception as e:
-            self.fail("Failed to SSH into instance")
-
-        self.debug("check the metadata with that of present in router")
-        try:
-            cmds = [
-               "wget http://%s/latest/vm-id" % self.network_1.gateway,
-               "cat vm-id",
-               ]
-            for c in cmds:
-                result = ssh.execute(c)
-                self.debug("%s: %s" % (c, result))
-        except Exception as e:
-            self.fail("Failed to SSH in Virtual machine: %s" % e)
-
-        res = str(result)
-        self.assertNotEqual(
-                         res,
-                         None,
-                         "Meta data should be returned from router"
-                        )
-        return
-
-    @attr(tags=["advanced", "intervlan"])
-    def test_10_expunge_instance_in_network(self):
-        """ Test expunge an instance in VPC networks
-        """
-
-        # Validate the following
-        # 1. Recover the virtual machines.
-        # 2. Vm should be in stopped state. State both the instances
-        # 3. Make sure that all the PF,LB and Static NAT rules on this VM
-        #    works as expected.
-        # 3. Make sure that we are able to access google.com from this user Vm
-
-        self.debug("Validating if the network rules work properly or not?")
-        self.validate_network_rules()
-
-        self.debug("Delete virtual machines in account: %s" %
-                                                self.account.name)
-        try:
-            self.vm_1.delete(self.apiclient)
-            self.vm_2.delete(self.apiclient)
-        except Exception as e:
-            self.fail("Failed to destroy the virtual instances, %s" % e)
-
-        self.debug(
-            "Waiting for expunge interval to cleanup the network and VMs")
-
-        wait_for_cleanup(
-                         self.apiclient,
-                         ["expunge.interval", "expunge.delay"]
-                        )
-
-        # Check if the network rules still exists after Vm expunged
-        self.debug("Checking if NAT rules existed ")
-        with self.assertRaises(Exception):
-            NATRule.list(
-                         self.apiclient,
-                         id=self.nat_rule.id,
-                         listall=True
-                         )
-
-            LoadBalancerRule.list(
-                                  self.apiclient,
-                                  id=self.lb_rule.id,
-                                  listall=True
-                                  )
         return
 
 class TestVMLifeCycleDiffHosts(cloudstackTestCase):
 
     @classmethod
     def setUpClass(cls):
-        try:
+        cls.testClient = super(TestVMLifeCycleDiffHosts, cls).getClsTestClient()
+        cls.api_client = cls.testClient.getApiClient()
 
-            cls.testClient = super(TestVMLifeCycleDiffHosts, cls).getClsTestClient()
-            cls.api_client = cls.testClient.getApiClient()
-
-            cls.services = Services().services
-            # Get Zone, Domain and templates
-            cls.domain = get_domain(cls.api_client)
-            cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
-            cls.template = get_template(
-                            cls.api_client,
-                            cls.zone.id,
-                            cls.services["ostype"]
-                            )
-            cls.services["virtual_machine"]["zoneid"] = cls.zone.id
-            cls.services["virtual_machine"]["template"] = cls.template.id
+        cls.services = Services().services
+        # Get Zone, Domain and templates
+        cls.domain = get_domain(cls.api_client)
+        cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
+        cls.template = get_template(
+                        cls.api_client,
+                        cls.zone.id,
+                        cls.services["ostype"]
+                        )
+        cls.services["virtual_machine"]["zoneid"] = cls.zone.id
+        cls.services["virtual_machine"]["template"] = cls.template.id
 
             # 2 hosts are needed within cluster to run the test cases and
             # 3rd host is needed to run the migrate test case
             # Even if only 2 hosts are present, remaining test cases will be run and
             # migrate test will be skipped automatically
-            cluster = cls.FindClusterWithSufficientHosts(numberofhosts = 3)
-            if cluster is None:
-                raise unittest.SkipTest("Skipping as unable to find a cluster with\
-                        sufficient number of hosts")
+        cluster = cls.FindClusterWithSufficientHosts(numberofhosts = 3)
+        if cluster is None:
+            raise unittest.SkipTest("Skipping as unable to find a cluster with\
+                    sufficient number of hosts")
 
-            hosts = list_hosts(cls.api_client, type="Routing", listall=True, clusterid=cluster.id)
 
-            assert isinstance(hosts, list), "list_hosts should return a list response,\
-                                        instead got %s" % hosts
+        hosts = list_hosts(cls.api_client, type="Routing", listall=True, clusterid=cluster.id)
 
-            Host.update(cls.api_client, id=hosts[0].id, hosttags="host1")
-            Host.update(cls.api_client, id=hosts[1].id, hosttags="host2")
+        assert isinstance(hosts, list), "list_hosts should return a list response,\
+                                    instead got %s" % hosts
 
-            if len(hosts) > 2:
-                Host.update(cls.api_client, id=hosts[2].id, hosttags="host1")
+        Host.update(cls.api_client, id=hosts[0].id, hosttags="host1")
+        Host.update(cls.api_client, id=hosts[1].id, hosttags="host2")
 
-            cls.service_offering_1 = ServiceOffering.create(
-                                            cls.api_client,
-                                            cls.services["service_offering_1"]
-                                            )
-            cls.service_offering_2 = ServiceOffering.create(
-                                            cls.api_client,
-                                            cls.services["service_offering_2"]
-                                            )
+        if len(hosts) > 2:
+            Host.update(cls.api_client, id=hosts[2].id, hosttags="host1")
 
-            cls.account = Account.create(
-                                     cls.api_client,
-                                     cls.services["account"],
-                                     admin=True,
-                                     domainid=cls.domain.id
-                                     )
+        cls.service_offering_1 = ServiceOffering.create(
+                                        cls.api_client,
+                                        cls.services["service_offering_1"]
+                                        )
+        cls.service_offering_2 = ServiceOffering.create(
+                                        cls.api_client,
+                                        cls.services["service_offering_2"]
+                                        )
 
-            cls.vpc_off = VpcOffering.create(
-                                     cls.api_client,
-                                     cls.services["vpc_offering"]
-                                     )
+        cls.account = Account.create(
+                                 cls.api_client,
+                                 cls.services["account"],
+                                 admin=True,
+                                 domainid=cls.domain.id
+                                 )
 
-            cls.vpc_off.update(cls.api_client, state='Enabled')
+        cls.vpc_off = VpcOffering.create(
+                                 cls.api_client,
+                                 cls.services["vpc_offering"]
+                                 )
 
-            cls.services["vpc"]["cidr"] = '10.1.1.1/16'
-            cls.vpc = VPC.create(
-                         cls.api_client,
-                         cls.services["vpc"],
-                         vpcofferingid=cls.vpc_off.id,
-                         zoneid=cls.zone.id,
-                         account=cls.account.name,
-                         domainid=cls.account.domainid
-                         )
+        cls.vpc_off.update(cls.api_client, state='Enabled')
 
-            cls.nw_off = NetworkOffering.create(
-                                            cls.api_client,
-                                            cls.services["network_offering"],
-                                            conservemode=False
-                                            )
-            # Enable Network offering
-            cls.nw_off.update(cls.api_client, state='Enabled')
+        cls.services["vpc"]["cidr"] = '10.1.1.1/16'
+        cls.vpc = VPC.create(
+                     cls.api_client,
+                     cls.services["vpc"],
+                     vpcofferingid=cls.vpc_off.id,
+                     zoneid=cls.zone.id,
+                     account=cls.account.name,
+                     domainid=cls.account.domainid
+                     )
 
-            # Creating network using the network offering created
-            cls.network_1 = Network.create(
+        cls.nw_off = NetworkOffering.create(
+                                        cls.api_client,
+                                        cls.services["network_offering"],
+                                        conservemode=False
+                                        )
+        # Enable Network offering
+        cls.nw_off.update(cls.api_client, state='Enabled')
+
+        # Creating network using the network offering created
+        cls.network_1 = Network.create(
+                            cls.api_client,
+                            cls.services["network"],
+                            accountid=cls.account.name,
+                            domainid=cls.account.domainid,
+                            networkofferingid=cls.nw_off.id,
+                            zoneid=cls.zone.id,
+                            gateway='10.1.1.1',
+                            vpcid=cls.vpc.id
+                            )
+        cls.nw_off_no_lb = NetworkOffering.create(
                                 cls.api_client,
-                                cls.services["network"],
-                                accountid=cls.account.name,
-                                domainid=cls.account.domainid,
-                                networkofferingid=cls.nw_off.id,
-                                zoneid=cls.zone.id,
-                                gateway='10.1.1.1',
-                                vpcid=cls.vpc.id
+                                cls.services["network_offering_no_lb"],
+                                conservemode=False
                                 )
-            cls.nw_off_no_lb = NetworkOffering.create(
-                                    cls.api_client,
-                                    cls.services["network_offering_no_lb"],
-                                    conservemode=False
-                                    )
-            # Enable Network offering
-            cls.nw_off_no_lb.update(cls.api_client, state='Enabled')
+        # Enable Network offering
+        cls.nw_off_no_lb.update(cls.api_client, state='Enabled')
 
-            # Creating network using the network offering created
-            cls.network_2 = Network.create(
-                                cls.api_client,
-                                cls.services["network"],
-                                accountid=cls.account.name,
-                                domainid=cls.account.domainid,
-                                networkofferingid=cls.nw_off_no_lb.id,
-                                zoneid=cls.zone.id,
-                                gateway='10.1.2.1',
-                                vpcid=cls.vpc.id
-                                )
-            # Spawn an instance in that network
-            cls.vm_1 = VirtualMachine.create(
-                                  cls.api_client,
-                                  cls.services["virtual_machine"],
-                                  accountid=cls.account.name,
-                                  domainid=cls.account.domainid,
-                                  serviceofferingid=cls.service_offering_1.id,
-                                  networkids=[str(cls.network_1.id)]
-                                  )
-            # Spawn an instance in that network
-            cls.vm_2 = VirtualMachine.create(
-                                  cls.api_client,
-                                  cls.services["virtual_machine"],
-                                  accountid=cls.account.name,
-                                  domainid=cls.account.domainid,
-                                  serviceofferingid=cls.service_offering_1.id,
-                                  networkids=[str(cls.network_1.id)]
-                                  )
-
-            cls.vm_3 = VirtualMachine.create(
-                                  cls.api_client,
-                                  cls.services["virtual_machine"],
-                                  accountid=cls.account.name,
-                                  domainid=cls.account.domainid,
-                                  serviceofferingid=cls.service_offering_2.id,
-                                  networkids=[str(cls.network_2.id)]
-                                  )
-
-            cls.public_ip_static = PublicIPAddress.create(
-                                cls.api_client,
-                                accountid=cls.account.name,
-                                zoneid=cls.zone.id,
-                                domainid=cls.account.domainid,
-                                networkid=cls.network_1.id,
-                                vpcid=cls.vpc.id
-                                )
-            StaticNATRule.enable(
+        # Creating network using the network offering created
+        cls.network_2 = Network.create(
+                            cls.api_client,
+                            cls.services["network"],
+                            accountid=cls.account.name,
+                            domainid=cls.account.domainid,
+                            networkofferingid=cls.nw_off_no_lb.id,
+                            zoneid=cls.zone.id,
+                            gateway='10.1.2.1',
+                            vpcid=cls.vpc.id
+                            )
+        # Spawn an instance in that network
+        cls.vm_1 = VirtualMachine.create(
                               cls.api_client,
-                              ipaddressid=cls.public_ip_static.ipaddress.id,
-                              virtualmachineid=cls.vm_1.id,
-                              networkid=cls.network_1.id
+                              cls.services["virtual_machine"],
+                              accountid=cls.account.name,
+                              domainid=cls.account.domainid,
+                              serviceofferingid=cls.service_offering_1.id,
+                              networkids=[str(cls.network_1.id)]
+                              )
+        # Spawn an instance in that network
+        cls.vm_2 = VirtualMachine.create(
+                              cls.api_client,
+                              cls.services["virtual_machine"],
+                              accountid=cls.account.name,
+                              domainid=cls.account.domainid,
+                              serviceofferingid=cls.service_offering_1.id,
+                              networkids=[str(cls.network_1.id)]
                               )
 
-            cls.public_ip_1 = PublicIPAddress.create(
+        cls.vm_3 = VirtualMachine.create(
+                              cls.api_client,
+                              cls.services["virtual_machine"],
+                              accountid=cls.account.name,
+                              domainid=cls.account.domainid,
+                              serviceofferingid=cls.service_offering_2.id,
+                              networkids=[str(cls.network_2.id)]
+                              )
+
+        cls.public_ip_static = PublicIPAddress.create(
+                            cls.api_client,
+                            accountid=cls.account.name,
+                            zoneid=cls.zone.id,
+                            domainid=cls.account.domainid,
+                            networkid=cls.network_1.id,
+                            vpcid=cls.vpc.id
+                            )
+        StaticNATRule.enable(
+                          cls.api_client,
+                          ipaddressid=cls.public_ip_static.ipaddress.id,
+                          virtualmachineid=cls.vm_1.id,
+                          networkid=cls.network_1.id
+                          )
+
+        cls.public_ip_1 = PublicIPAddress.create(
+                            cls.api_client,
+                            accountid=cls.account.name,
+                            zoneid=cls.zone.id,
+                            domainid=cls.account.domainid,
+                            networkid=cls.network_1.id,
+                            vpcid=cls.vpc.id
+                            )
+
+        cls.nat_rule = NATRule.create(
+                              cls.api_client,
+                              cls.vm_1,
+                              cls.services["natrule"],
+                              ipaddressid=cls.public_ip_1.ipaddress.id,
+                              openfirewall=False,
+                              networkid=cls.network_1.id,
+                              vpcid=cls.vpc.id
+                              )
+
+        cls.public_ip_2 = PublicIPAddress.create(
+                            cls.api_client,
+                            accountid=cls.account.name,
+                            zoneid=cls.zone.id,
+                            domainid=cls.account.domainid,
+                            networkid=cls.network_1.id,
+                            vpcid=cls.vpc.id
+                            )
+
+        cls.lb_rule = LoadBalancerRule.create(
                                 cls.api_client,
+                                cls.services["lbrule"],
+                                ipaddressid=cls.public_ip_2.ipaddress.id,
                                 accountid=cls.account.name,
-                                zoneid=cls.zone.id,
-                                domainid=cls.account.domainid,
                                 networkid=cls.network_1.id,
-                                vpcid=cls.vpc.id
+                                vpcid=cls.vpc.id,
+                                domainid=cls.account.domainid
+                            )
+        cls.lb_rule.assign(cls.api_client, [cls.vm_1, cls.vm_2])
+
+        # Opening up the ports in VPC
+        cls.nwacl_nat = NetworkACL.create(
+                                     cls.api_client,
+                                     networkid=cls.network_1.id,
+                                     services=cls.services["natrule"],
+                                     traffictype='Ingress'
                                 )
 
-            cls.nat_rule = NATRule.create(
-                                  cls.api_client,
-                                  cls.vm_1,
-                                  cls.services["natrule"],
-                                  ipaddressid=cls.public_ip_1.ipaddress.id,
-                                  openfirewall=False,
-                                  networkid=cls.network_1.id,
-                                  vpcid=cls.vpc.id
-                                  )
-
-            cls.public_ip_2 = PublicIPAddress.create(
-                                cls.api_client,
-                                accountid=cls.account.name,
-                                zoneid=cls.zone.id,
-                                domainid=cls.account.domainid,
-                                networkid=cls.network_1.id,
-                                vpcid=cls.vpc.id
-                                )
-
-            cls.lb_rule = LoadBalancerRule.create(
+        cls.nwacl_lb = NetworkACL.create(
+                            cls.api_client,
+                            networkid=cls.network_1.id,
+                            services=cls.services["lbrule"],
+                            traffictype='Ingress'
+                            )
+        cls.services["icmp_rule"]["protocol"] = "all"
+        cls.nwacl_internet = NetworkACL.create(
                                     cls.api_client,
-                                    cls.services["lbrule"],
-                                    ipaddressid=cls.public_ip_2.ipaddress.id,
-                                    accountid=cls.account.name,
                                     networkid=cls.network_1.id,
-                                    vpcid=cls.vpc.id,
-                                    domainid=cls.account.domainid
-                                )
-            cls.lb_rule.assign(cls.api_client, [cls.vm_1, cls.vm_2])
-
-            # Opening up the ports in VPC
-            cls.nwacl_nat = NetworkACL.create(
-                                         cls.api_client,
-                                         networkid=cls.network_1.id,
-                                         services=cls.services["natrule"],
-                                         traffictype='Ingress'
+                                    services=cls.services["icmp_rule"],
+                                    traffictype='Egress'
                                     )
-
-            cls.nwacl_lb = NetworkACL.create(
-                                cls.api_client,
-                                networkid=cls.network_1.id,
-                                services=cls.services["lbrule"],
-                                traffictype='Ingress'
-                                )
-
-            cls.nwacl_internet = NetworkACL.create(
-                                        cls.api_client,
-                                        networkid=cls.network_1.id,
-                                        services=cls.services["icmp_rule"],
-                                        traffictype='Egress'
-                                        )
-            cls._cleanup = [
-                        cls.service_offering_1,
-                        cls.service_offering_2,
-                        cls.nw_off,
-                        cls.nw_off_no_lb,
-                        ]
-
-        except Exception as e:
-            raise Exception("Warning: Exception during setup : %s" % e)
+        cls._cleanup = [
+                    cls.service_offering_1,
+                    cls.service_offering_2,
+                    cls.nw_off,
+                    cls.nw_off_no_lb,
+                    ]
 
         return
 
@@ -3056,7 +3077,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
 
         return
 
-    @attr(tags=["advanced","multihost", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan", "dvs"], required_hardware="true")
     def test_01_deploy_instance_in_network(self):
         """ Test deploy an instance in VPC networks
         """
@@ -3090,7 +3111,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
                              )
         return
 
-    @attr(tags=["advanced","multihost", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan", "dvs"], required_hardware="true")
     def test_02_stop_instance_in_network(self):
         """ Test stop an instance in VPC networks
         """
@@ -3132,7 +3153,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
                          )
         return
 
-    @attr(tags=["advanced","multihost", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan", "dvs"], required_hardware="true")
     def test_03_start_instance_in_network(self):
         """ Test start an instance in VPC networks
         """
@@ -3183,7 +3204,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced","multihost", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan", "dvs"], required_hardware="true")
     def test_04_reboot_instance_in_network(self):
         """ Test reboot an instance in VPC networks
         """
@@ -3210,7 +3231,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced","multihost", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan", "dvs"], required_hardware="true")
     def test_05_destroy_instance_in_network(self):
         """ Test destroy an instance in VPC networks
         """
@@ -3244,25 +3265,10 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
                     'Destroyed',
                     "VM state should be destroyed"
                     )
-
-            self.vm_2.delete(self.apiclient, expunge=False)
-
-            list_vm_response = list_virtual_machines(
-                                                 self.apiclient,
-                                                 id=self.vm_2.id
-                                                 )
-
-            vm_response = list_vm_response[0]
-
-            self.assertEqual(
-                    vm_response.state,
-                    'Destroyed',
-                    "VM state should be destroyed"
-                    )
-
+            
         except Exception as e:
             self.fail("Failed to stop the virtual instances, %s" % e)
-
+            
         # Check if the network rules still exists after Vm stop
         self.debug("Checking if NAT rules ")
         nat_rules = NATRule.list(
@@ -3287,7 +3293,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
                          "List LB rules shall return a valid list"
                          )
 
-        self.debug("Recovering the expunged virtual machines in account: %s" %
+        self.debug("Recovering the expunged virtual machine vm1 in account: %s" %
                                                 self.account.name)
         try:
             self.vm_1.recover(self.apiclient)
@@ -3305,6 +3311,31 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
                     "VM state should be stopped"
                     )
 
+        except Exception as e:
+            self.fail("Failed to recover the virtual instances, %s" % e)
+            
+        try:
+            self.vm_2.delete(self.apiclient, expunge=False)
+
+            list_vm_response = list_virtual_machines(
+                                                 self.apiclient,
+                                                 id=self.vm_2.id
+                                                 )
+
+            vm_response = list_vm_response[0]
+
+            self.assertEqual(
+                    vm_response.state,
+                    'Destroyed',
+                    "VM state should be destroyed"
+                    )
+
+        except Exception as e:
+            self.fail("Failed to stop the virtual instances, %s" % e)
+
+        self.debug("Recovering the expunged virtual machine vm2 in account: %s" %
+                                                self.account.name)            
+        try:
             self.vm_2.recover(self.apiclient)
 
             list_vm_response = list_virtual_machines(
@@ -3363,7 +3394,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
 
         return
 
-    @attr(tags=["advanced","multihost", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan", "dvs"], required_hardware="true")
     def test_06_migrate_instance_in_network(self):
         """ Test migrate an instance in VPC networks
         """
@@ -3374,6 +3405,9 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
         # 3. Make sure that all the PF,LB and Static NAT rules on this VM
         #    works as expected.
         # 3. Make sure that we are able to access google.com from this user Vm
+        self.hypervisor = self.testClient.getHypervisorInfo()
+        if self.hypervisor.lower() in ['lxc']:
+            self.skipTest("vm migrate is not supported in %s" % self.hypervisor)
 
         self.debug("Validating if the network rules work properly or not?")
         self.validate_network_rules()
@@ -3396,7 +3430,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
         self.validate_network_rules()
         return
 
-    @attr(tags=["advanced","multihost", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan", "dvs"], required_hardware="true")
     def test_07_user_data(self):
         """ Test user data in virtual machines
         """
@@ -3420,6 +3454,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
                                 "get_ssh_client should return ssh handle")
 
             self.debug("SSH into VM is successfully")
+            ssh.execute("yum install wget -y")
         except Exception as e:
             self.fail("Failed to SSH into instance: %s" % e)
 
@@ -3444,7 +3479,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
                         )
         return
 
-    @attr(tags=["advanced","multihost", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan", "dvs"], required_hardware="true")
     def test_08_meta_data(self):
         """ Test meta data in virtual machines
         """
@@ -3491,7 +3526,7 @@ class TestVMLifeCycleDiffHosts(cloudstackTestCase):
                         )
         return
 
-    @attr(tags=["advanced","multihost", "intervlan"])
+    @attr(tags=["advanced","multihost", "intervlan", "dvs"], required_hardware="true")
     def test_09_expunge_instance_in_network(self):
         """ Test expunge an instance in VPC networks
         """

@@ -20,7 +20,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
@@ -60,7 +59,6 @@ import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.dao.DomainRouterDao;
 import com.cloud.vm.dao.UserVmDao;
 
-@Local(value = NetworkElement.class)
 public class CloudZonesNetworkElement extends AdapterBase implements NetworkElement, UserDataServiceProvider {
     private static final Logger s_logger = Logger.getLogger(CloudZonesNetworkElement.class);
 
@@ -214,7 +212,7 @@ public class CloudZonesNetworkElement extends AdapterBase implements NetworkElem
 
             Commands cmds = new Commands(Command.OnError.Continue);
             if (password != null && nic.isDefaultNic()) {
-                SavePasswordCommand cmd = new SavePasswordCommand(password, nic.getIp4Address(), uservm.getHostName(), _networkMgr.getExecuteInSeqNtwkElmtCmd());
+                SavePasswordCommand cmd = new SavePasswordCommand(password, nic.getIPv4Address(), uservm.getHostName(), _networkMgr.getExecuteInSeqNtwkElmtCmd());
                 cmds.addCommand("password", cmd);
             }
             String serviceOffering = _serviceOfferingDao.findByIdIncludingRemoved(uservm.getServiceOfferingId()).getDisplayText();
@@ -222,7 +220,7 @@ public class CloudZonesNetworkElement extends AdapterBase implements NetworkElem
 
             cmds.addCommand(
                 "vmdata",
-                generateVmDataCommand(nic.getIp4Address(), userData, serviceOffering, zoneName, nic.getIp4Address(), uservm.getHostName(), uservm.getInstanceName(),
+                generateVmDataCommand(nic.getIPv4Address(), userData, serviceOffering, zoneName, nic.getIPv4Address(), uservm.getHostName(), uservm.getInstanceName(),
                     uservm.getId(), uservm.getUuid(), sshPublicKey));
             try {
                 _agentManager.send(dest.getHost().getId(), cmds);

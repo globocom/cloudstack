@@ -239,7 +239,7 @@ public class ManagementServerMock {
         long id = _userVmDao.getNextInSequence(Long.class, "id");
         UserVmVO vm =
             new UserVmVO(id, name, name, tmpl.getId(), HypervisorType.XenServer, tmpl.getGuestOSId(), false, false, _zone.getDomainId(), Account.ACCOUNT_ID_SYSTEM,
-                small.getId(), null, name, null);
+                    1, small.getId(), null, name, null);
         vm.setState(com.cloud.vm.VirtualMachine.State.Running);
         vm.setHostId(_hostId);
         vm.setDataCenterId(network.getDataCenterId());
@@ -327,7 +327,7 @@ public class ManagementServerMock {
             _znet = _networkService.getPhysicalNetwork(id);
             List<PhysicalNetworkVO> nets = _physicalNetworkDao.listByZoneAndTrafficType(_zone.getId(), TrafficType.Public);
             if (nets == null || nets.isEmpty()) {
-                _networkService.addTrafficTypeToPhysicalNetwork(_znet.getId(), TrafficType.Public.toString(), "vlan", null, null, null, null, null, null);
+                _networkService.addTrafficTypeToPhysicalNetwork(_znet.getId(), TrafficType.Public.toString(), "vlan", null, null, null, null, null, null, null);
             }
         } catch (InvalidParameterValueException e) {
             List<String> isolationMethods = new ArrayList<String>();
@@ -337,7 +337,7 @@ public class ManagementServerMock {
                     "znet");
             List<PhysicalNetworkVO> nets = _physicalNetworkDao.listByZoneAndTrafficType(_zone.getId(), TrafficType.Public);
             if (nets == null || nets.isEmpty()) {
-                _networkService.addTrafficTypeToPhysicalNetwork(_znet.getId(), TrafficType.Public.toString(), "vlan", null, null, null, null, null, null);
+                _networkService.addTrafficTypeToPhysicalNetwork(_znet.getId(), TrafficType.Public.toString(), "vlan", null, null, null, null, null, null, null);
             }
         }
         if (_znet.getState() != PhysicalNetwork.State.Enabled) {
@@ -353,7 +353,7 @@ public class ManagementServerMock {
             }
         }
         if (!found) {
-            _networkService.addTrafficTypeToPhysicalNetwork(_znet.getId(), TrafficType.Guest.toString(), "vlan", null, null, null, null, null, null);
+            _networkService.addTrafficTypeToPhysicalNetwork(_znet.getId(), TrafficType.Guest.toString(), "vlan", null, null, null, null, null, null, null);
         }
 
         Pair<List<? extends PhysicalNetworkServiceProvider>, Integer> providers =

@@ -19,7 +19,6 @@ package org.apache.cloudstack.region;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -35,6 +34,7 @@ import org.apache.cloudstack.api.command.admin.domain.UpdateDomainCmd;
 import org.apache.cloudstack.api.command.admin.user.DeleteUserCmd;
 import org.apache.cloudstack.api.command.admin.user.DisableUserCmd;
 import org.apache.cloudstack.api.command.admin.user.EnableUserCmd;
+import org.apache.cloudstack.api.command.admin.user.MoveUserCmd;
 import org.apache.cloudstack.api.command.admin.user.UpdateUserCmd;
 import org.apache.cloudstack.api.command.user.region.ListRegionsCmd;
 
@@ -47,7 +47,6 @@ import com.cloud.utils.component.Manager;
 import com.cloud.utils.component.ManagerBase;
 
 @Component
-@Local(value = {RegionService.class})
 public class RegionServiceImpl extends ManagerBase implements RegionService, Manager {
     public static final Logger s_logger = Logger.getLogger(RegionServiceImpl.class);
 
@@ -151,6 +150,14 @@ public class RegionServiceImpl extends ManagerBase implements RegionService, Man
     @Override
     public boolean deleteUser(DeleteUserCmd cmd) {
         return _regionMgr.deleteUser(cmd);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean moveUser(MoveUserCmd cmd) {
+        return _regionMgr.moveUser(cmd);
     }
 
     /**

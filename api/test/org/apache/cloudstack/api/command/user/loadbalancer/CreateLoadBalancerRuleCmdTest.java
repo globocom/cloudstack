@@ -184,6 +184,11 @@ public class CreateLoadBalancerRuleCmdTest extends TestCase{
             }
 
             @Override
+            public List<String> getDestinationCidrList() {
+                return null;
+            }
+
+            @Override
             public Long getRelated() {
                 return null;
             }

@@ -35,9 +35,9 @@
             var topFieldForm, bottomFieldForm, $topFieldForm, $bottomFieldForm;
             var topfields = forms.topFields;
 
-            var $healthCheckDesc = $('<div>Your load balancer will automatically perform health checks on your cloudstack instances and only route traffic to instances that pass the health check </div>').addClass('health-check-description');
-            var $healthCheckConfigTitle = $('<div><br><br>Configuration Options :</div>').addClass('health-check-config-title');
-            var $healthCheckAdvancedTitle = $('<div><br><br> Advanced Options : </div>').addClass('health-check-advanced-title');
+            var $healthCheckDesc = $('<div>' + _l('label.health.check.message.desc') + '</div>').addClass('health-check-description');
+            var $healthCheckConfigTitle = $('<div><br><br>' + _l('label.health.check.configurations.options') + '</div>').addClass('health-check-config-title');
+            var $healthCheckAdvancedTitle = $('<div><br><br>' + _l('label.health.check.advanced.options') + '</div>').addClass('health-check-advanced-title');
 
             var $healthCheckDialog = $('<div>').addClass('health-check');
             $healthCheckDialog.append($healthCheckDesc);
@@ -200,7 +200,7 @@
                             error: function(json) {
 
                                 cloudStack.dialog.notice({
-                                    message: _s(json.responseText)
+                                    message: parseXMLHttpResponse(json)
                                 }); //Error message in the API needs to be improved
                                 $healthCheckDialog.dialog('close');
                                 $('.overlay').remove();
@@ -361,8 +361,8 @@
             }
 
             $healthCheckDialog.dialog({
-                title: 'Health Check Wizard',
-                width: 600,
+                title: _l('label.health.check.wizard'),
+                width: 630,
                 height: 600,
                 draggable: true,
                 closeonEscape: false,

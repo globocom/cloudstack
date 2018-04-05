@@ -16,14 +16,20 @@
 // under the License.
 package com.cloud.hypervisor.kvm.resource;
 
-import org.apache.commons.lang.StringEscapeUtils;
-
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.log4j.Logger;
+
+import com.google.common.collect.Maps;
+
 public class LibvirtVMDef {
+    private static final Logger s_logger = Logger.getLogger(LibvirtVMDef.class);
+
     private String _hvsType;
     private static long s_libvirtVersion;
     private static long s_qemuVersion;
@@ -34,15 +40,15 @@ public class LibvirtVMDef {
     private final Map<String, Object> components = new HashMap<String, Object>();
 
     public static class GuestDef {
-        enum guestType {
+        enum GuestType {
             KVM, XEN, EXE, LXC
         }
 
-        enum bootOrder {
+        enum BootOrder {
             HARDISK("hd"), CDROM("cdrom"), FLOPPY("fd"), NETWORK("network");
             String _order;
 
-            bootOrder(String order) {
+            BootOrder(String order) {
                 _order = order;
             }
 
@@ -52,21 +58,22 @@ public class LibvirtVMDef {
             }
         }
 
-        private guestType _type;
+        private GuestType _type;
         private String _arch;
         private String _loader;
         private String _kernel;
         private String _initrd;
         private String _root;
         private String _cmdline;
-        private final List<bootOrder> _bootdevs = new ArrayList<bootOrder>();
+        private String _uuid;
+        private final List<BootOrder> _bootdevs = new ArrayList<BootOrder>();
         private String _machine;
 
-        public void setGuestType(guestType type) {
+        public void setGuestType(GuestType type) {
             _type = type;
         }
 
-        public guestType getGuestType() {
+        public GuestType getGuestType() {
             return _type;
         }
 
@@ -89,14 +96,27 @@ public class LibvirtVMDef {
             _cmdline = cmdline;
         }
 
-        public void setBootOrder(bootOrder order) {
+        public void setBootOrder(BootOrder order) {
             _bootdevs.add(order);
+        }
+
+        public void setUuid(String uuid) {
+            _uuid = uuid;
         }
 
         @Override
         public String toString() {
-            if (_type == guestType.KVM) {
+            if (_type == GuestType.KVM) {
                 StringBuilder guestDef = new StringBuilder();
+
+                guestDef.append("<sysinfo type='smbios'>\n");
+                guestDef.append("<system>\n");
+                guestDef.append("<entry name='manufacturer'>Apache Software Foundation</entry>\n");
+                guestDef.append("<entry name='product'>CloudStack " + _type.toString() + " Hypervisor</entry>\n");
+                guestDef.append("<entry name='uuid'>" + _uuid + "</entry>\n");
+                guestDef.append("</system>\n");
+                guestDef.append("</sysinfo>\n");
+
                 guestDef.append("<os>\n");
                 guestDef.append("<type ");
                 if (_arch != null) {
@@ -107,13 +127,14 @@ public class LibvirtVMDef {
                 }
                 guestDef.append(">hvm</type>\n");
                 if (!_bootdevs.isEmpty()) {
-                    for (bootOrder bo : _bootdevs) {
+                    for (BootOrder bo : _bootdevs) {
                         guestDef.append("<boot dev='" + bo + "'/>\n");
                     }
                 }
+                guestDef.append("<smbios mode='sysinfo'/>\n");
                 guestDef.append("</os>\n");
                 return guestDef.toString();
-            } else if (_type == guestType.LXC) {
+            } else if (_type == GuestType.LXC) {
                 StringBuilder guestDef = new StringBuilder();
                 guestDef.append("<os>\n");
                 guestDef.append("<type>exe</type>\n");
@@ -176,22 +197,57 @@ public class LibvirtVMDef {
     }
 
     public static class HyperVEnlightenmentFeatureDef {
-        private final Map<String, String> features = new HashMap<String,String>();
-        public void setRelaxed(boolean on) {
-            String state = on ? "On":"Off";
-            features.put("relaxed", state);
+        enum Enlight {
+            RELAX("relaxed"),
+            VAPIC("vapic"),
+            SPIN("spinlocks");
+
+            private final String featureName;
+            Enlight(String featureName) { this.featureName = featureName; }
+            String getFeatureName() { return featureName; }
+
+            static boolean isValidFeature(String featureName) {
+                Enlight[] enlights = Enlight.values();
+                for(Enlight e : enlights) {
+                    if(e.getFeatureName().equals(featureName))
+                        return true;
+                }
+                return false;
+            }
         }
+
+        private final Map<String, String> features = new HashMap<String, String>();
+        private int retries = 4096; // set to sane default
+
+        public void setFeature(String feature, boolean on) {
+            if(on && Enlight.isValidFeature(feature))
+                setFeature(feature);
+        }
+
+        private void setFeature(String feature) {
+            features.put(feature, "on");
+        }
+
+        public void setRetries(int retry) {
+            if(retry>=retries)
+                retries=retry;
+        }
+
+        public int getRetries() {
+            return retries;
+        }
+
         @Override
         public String toString() {
-            if (features.isEmpty()) {
-                return "";
-            }
             StringBuilder feaBuilder = new StringBuilder();
             feaBuilder.append("<hyperv>\n");
             for (Map.Entry<String, String> e : features.entrySet()) {
                 feaBuilder.append("<");
                 feaBuilder.append(e.getKey());
-                feaBuilder.append(" state='" + e.getValue() + "'");
+
+                if(e.getKey().equals("spinlocks"))  feaBuilder.append(" state='" + e.getValue() + "' retries='" + getRetries() + "'");
+                else                                feaBuilder.append(" state='" + e.getValue() + "'");
+
                 feaBuilder.append("/>\n");
             }
             feaBuilder.append("</hyperv>\n");
@@ -338,7 +394,7 @@ public class LibvirtVMDef {
 
     public static class DevicesDef {
         private String _emulator;
-        private GuestDef.guestType _guestType;
+        private GuestDef.GuestType _guestType;
         private final Map<String, List<?>> devices = new HashMap<String, List<?>>();
 
         public boolean addDevice(Object device) {
@@ -358,7 +414,7 @@ public class LibvirtVMDef {
             _emulator = emulator;
         }
 
-        public void setGuestType(GuestDef.guestType guestType) {
+        public void setGuestType(GuestDef.GuestType guestType) {
             _guestType = guestType;
         }
 
@@ -372,7 +428,7 @@ public class LibvirtVMDef {
 
             for (List<?> devs : devices.values()) {
                 for (Object dev : devs) {
-                    if (_guestType == GuestDef.guestType.LXC) {
+                    if (_guestType == GuestDef.GuestType.LXC) {
                         if (dev instanceof GraphicDef || dev instanceof InputDef) {
                             continue;
                         }
@@ -403,11 +459,11 @@ public class LibvirtVMDef {
     }
 
     public static class DiskDef {
-        public enum deviceType {
-            FLOPPY("floppy"), DISK("disk"), CDROM("cdrom");
+        public enum DeviceType {
+            FLOPPY("floppy"), DISK("disk"), CDROM("cdrom"), LUN("lun");
             String _type;
 
-            deviceType(String type) {
+            DeviceType(String type) {
                 _type = type;
             }
 
@@ -417,11 +473,11 @@ public class LibvirtVMDef {
             }
         }
 
-        enum diskType {
+        enum DiskType {
             FILE("file"), BLOCK("block"), DIRECTROY("dir"), NETWORK("network");
             String _diskType;
 
-            diskType(String type) {
+            DiskType(String type) {
                 _diskType = type;
             }
 
@@ -431,11 +487,11 @@ public class LibvirtVMDef {
             }
         }
 
-        public enum diskProtocol {
+        public enum DiskProtocol {
             RBD("rbd"), SHEEPDOG("sheepdog"), GLUSTER("gluster");
             String _diskProtocol;
 
-            diskProtocol(String protocol) {
+            DiskProtocol(String protocol) {
                 _diskProtocol = protocol;
             }
 
@@ -445,11 +501,11 @@ public class LibvirtVMDef {
             }
         }
 
-        public enum diskBus {
+        public enum DiskBus {
             IDE("ide"), SCSI("scsi"), VIRTIO("virtio"), XEN("xen"), USB("usb"), UML("uml"), FDC("fdc");
             String _bus;
 
-            diskBus(String bus) {
+            DiskBus(String bus) {
                 _bus = bus;
             }
 
@@ -459,11 +515,11 @@ public class LibvirtVMDef {
             }
         }
 
-        public enum diskFmtType {
+        public enum DiskFmtType {
             RAW("raw"), QCOW2("qcow2");
             String _fmtType;
 
-            diskFmtType(String fmt) {
+            DiskFmtType(String fmt) {
                 _fmtType = fmt;
             }
 
@@ -473,11 +529,11 @@ public class LibvirtVMDef {
             }
         }
 
-        public enum diskCacheMode {
+        public enum DiskCacheMode {
             NONE("none"), WRITEBACK("writeback"), WRITETHROUGH("writethrough");
             String _diskCacheMode;
 
-            diskCacheMode(String cacheMode) {
+            DiskCacheMode(String cacheMode) {
                 _diskCacheMode = cacheMode;
             }
 
@@ -490,17 +546,34 @@ public class LibvirtVMDef {
             }
         }
 
-        private deviceType _deviceType; /* floppy, disk, cdrom */
-        private diskType _diskType;
-        private diskProtocol _diskProtocol;
+        public enum DiscardType {
+            IGNORE("ignore"), UNMAP("unmap");
+            String _discardType;
+            DiscardType(String discardType) {
+                _discardType = discardType;
+            }
+
+            @Override
+            public String toString() {
+                if (_discardType == null) {
+                    return "ignore";
+                }
+                return _discardType;
+            }
+
+        }
+
+        private DeviceType _deviceType; /* floppy, disk, cdrom */
+        private DiskType _diskType;
+        private DiskProtocol _diskProtocol;
         private String _sourcePath;
         private String _sourceHost;
         private int _sourcePort;
         private String _authUserName;
         private String _authSecretUUID;
         private String _diskLabel;
-        private diskBus _bus;
-        private diskFmtType _diskFmtType; /* qcow2, raw etc. */
+        private DiskBus _bus;
+        private DiskFmtType _diskFmtType; /* qcow2, raw etc. */
         private boolean _readonly = false;
         private boolean _shareable = false;
         private boolean _deferAttach = false;
@@ -508,17 +581,27 @@ public class LibvirtVMDef {
         private Long _bytesWriteRate;
         private Long _iopsReadRate;
         private Long _iopsWriteRate;
-        private diskCacheMode _diskCacheMode;
+        private DiskCacheMode _diskCacheMode;
+        private String _serial;
         private boolean qemuDriver = true;
+        private DiscardType _discard = DiscardType.IGNORE;
 
-        public void setDeviceType(deviceType deviceType) {
+        public DiscardType getDiscard() {
+            return _discard;
+        }
+
+        public void setDiscard(DiscardType discard) {
+            this._discard = discard;
+        }
+
+        public void setDeviceType(DeviceType deviceType) {
             _deviceType = deviceType;
         }
 
-        public void defFileBasedDisk(String filePath, String diskLabel, diskBus bus, diskFmtType diskFmtType) {
-            _diskType = diskType.FILE;
-            _deviceType = deviceType.DISK;
-            _diskCacheMode = diskCacheMode.NONE;
+        public void defFileBasedDisk(String filePath, String diskLabel, DiskBus bus, DiskFmtType diskFmtType) {
+            _diskType = DiskType.FILE;
+            _deviceType = DeviceType.DISK;
+            _diskCacheMode = DiskCacheMode.NONE;
             _sourcePath = filePath;
             _diskLabel = diskLabel;
             _diskFmtType = diskFmtType;
@@ -526,86 +609,120 @@ public class LibvirtVMDef {
 
         }
 
-        /* skip iso label */
-        private String getDevLabel(int devId, diskBus bus) {
-            if (devId == 2) {
-                devId++;
+        /* skip iso labels */
+        private String getDevLabel(int devId, DiskBus bus, boolean forIso) {
+            if (devId < 0) {
+                return "";
             }
 
-            char suffix = (char)('a' + devId);
-            if (bus == diskBus.SCSI) {
-                return "sd" + suffix;
-            } else if (bus == diskBus.VIRTIO) {
-                return "vd" + suffix;
+            if (bus == DiskBus.SCSI) {
+                return "sd" + getDevLabelSuffix(devId);
+            } else if (bus == DiskBus.VIRTIO) {
+                return "vd" + getDevLabelSuffix(devId);
             }
-            return "hd" + suffix;
+            if (forIso) {
+                devId --;
+            } else if(devId >= 2) {
+                devId += 2;
+            }
+            return "hd" + getDevLabelSuffix(devId);
 
         }
 
-        public void defFileBasedDisk(String filePath, int devId, diskBus bus, diskFmtType diskFmtType) {
+        private String getDevLabelSuffix(int deviceIndex) {
+            if (deviceIndex < 0) {
+                return "";
+            }
 
-            _diskType = diskType.FILE;
-            _deviceType = deviceType.DISK;
-            _diskCacheMode = diskCacheMode.NONE;
+            int base = 'z' - 'a' + 1;
+            String labelSuffix = "";
+            do {
+                char suffix = (char)('a' + (deviceIndex % base));
+                labelSuffix = suffix + labelSuffix;
+                deviceIndex = (deviceIndex / base) - 1;
+            } while (deviceIndex >= 0);
+
+            return labelSuffix;
+        }
+
+        public void defFileBasedDisk(String filePath, int devId, DiskBus bus, DiskFmtType diskFmtType) {
+
+            _diskType = DiskType.FILE;
+            _deviceType = DeviceType.DISK;
+            _diskCacheMode = DiskCacheMode.NONE;
             _sourcePath = filePath;
-            _diskLabel = getDevLabel(devId, bus);
+            _diskLabel = getDevLabel(devId, bus, false);
             _diskFmtType = diskFmtType;
             _bus = bus;
 
         }
 
         public void defISODisk(String volPath) {
-            _diskType = diskType.FILE;
-            _deviceType = deviceType.CDROM;
+            _diskType = DiskType.FILE;
+            _deviceType = DeviceType.CDROM;
             _sourcePath = volPath;
-            _diskLabel = "hdc";
-            _diskFmtType = diskFmtType.RAW;
-            _diskCacheMode = diskCacheMode.NONE;
-            _bus = diskBus.IDE;
+            _diskLabel = getDevLabel(3, DiskBus.IDE, true);
+            _diskFmtType = DiskFmtType.RAW;
+            _diskCacheMode = DiskCacheMode.NONE;
+            _bus = DiskBus.IDE;
         }
 
-        public void defBlockBasedDisk(String diskName, int devId, diskBus bus) {
-            _diskType = diskType.BLOCK;
-            _deviceType = deviceType.DISK;
-            _diskFmtType = diskFmtType.RAW;
-            _diskCacheMode = diskCacheMode.NONE;
+        public void defISODisk(String volPath, Integer devId) {
+            if (devId == null) {
+                defISODisk(volPath);
+            } else {
+                _diskType = DiskType.FILE;
+                _deviceType = DeviceType.CDROM;
+                _sourcePath = volPath;
+                _diskLabel = getDevLabel(devId, DiskBus.IDE, true);
+                _diskFmtType = DiskFmtType.RAW;
+                _diskCacheMode = DiskCacheMode.NONE;
+                _bus = DiskBus.IDE;
+            }
+        }
+
+        public void defBlockBasedDisk(String diskName, int devId, DiskBus bus) {
+            _diskType = DiskType.BLOCK;
+            _deviceType = DeviceType.DISK;
+            _diskFmtType = DiskFmtType.RAW;
+            _diskCacheMode = DiskCacheMode.NONE;
             _sourcePath = diskName;
-            _diskLabel = getDevLabel(devId, bus);
+            _diskLabel = getDevLabel(devId, bus, false);
             _bus = bus;
         }
 
-        public void defBlockBasedDisk(String diskName, String diskLabel, diskBus bus) {
-            _diskType = diskType.BLOCK;
-            _deviceType = deviceType.DISK;
-            _diskFmtType = diskFmtType.RAW;
-            _diskCacheMode = diskCacheMode.NONE;
+        public void defBlockBasedDisk(String diskName, String diskLabel, DiskBus bus) {
+            _diskType = DiskType.BLOCK;
+            _deviceType = DeviceType.DISK;
+            _diskFmtType = DiskFmtType.RAW;
+            _diskCacheMode = DiskCacheMode.NONE;
             _sourcePath = diskName;
             _diskLabel = diskLabel;
             _bus = bus;
         }
 
-        public void defNetworkBasedDisk(String diskName, String sourceHost, int sourcePort, String authUserName, String authSecretUUID, int devId, diskBus bus,
-                diskProtocol protocol, diskFmtType diskFmtType) {
-            _diskType = diskType.NETWORK;
-            _deviceType = deviceType.DISK;
+        public void defNetworkBasedDisk(String diskName, String sourceHost, int sourcePort, String authUserName, String authSecretUUID, int devId, DiskBus bus,
+                DiskProtocol protocol, DiskFmtType diskFmtType) {
+            _diskType = DiskType.NETWORK;
+            _deviceType = DeviceType.DISK;
             _diskFmtType = diskFmtType;
-            _diskCacheMode = diskCacheMode.NONE;
+            _diskCacheMode = DiskCacheMode.NONE;
             _sourcePath = diskName;
             _sourceHost = sourceHost;
             _sourcePort = sourcePort;
             _authUserName = authUserName;
             _authSecretUUID = authSecretUUID;
-            _diskLabel = getDevLabel(devId, bus);
+            _diskLabel = getDevLabel(devId, bus, false);
             _bus = bus;
             _diskProtocol = protocol;
         }
 
-        public void defNetworkBasedDisk(String diskName, String sourceHost, int sourcePort, String authUserName, String authSecretUUID, String diskLabel, diskBus bus,
-                diskProtocol protocol, diskFmtType diskFmtType) {
-            _diskType = diskType.NETWORK;
-            _deviceType = deviceType.DISK;
+        public void defNetworkBasedDisk(String diskName, String sourceHost, int sourcePort, String authUserName, String authSecretUUID, String diskLabel, DiskBus bus,
+                DiskProtocol protocol, DiskFmtType diskFmtType) {
+            _diskType = DiskType.NETWORK;
+            _deviceType = DeviceType.DISK;
             _diskFmtType = diskFmtType;
-            _diskCacheMode = diskCacheMode.NONE;
+            _diskCacheMode = DiskCacheMode.NONE;
             _sourcePath = diskName;
             _sourceHost = sourceHost;
             _sourcePort = sourcePort;
@@ -640,11 +757,11 @@ public class LibvirtVMDef {
             return _diskLabel;
         }
 
-        public diskType getDiskType() {
+        public DiskType getDiskType() {
             return _diskType;
         }
 
-        public deviceType getDeviceType() {
+        public DeviceType getDeviceType() {
             return _deviceType;
         }
 
@@ -652,17 +769,12 @@ public class LibvirtVMDef {
             _sourcePath = volPath;
         }
 
-        public diskBus getBusType() {
+        public DiskBus getBusType() {
             return _bus;
         }
 
-        public diskFmtType getDiskFormatType() {
+        public DiskFmtType getDiskFormatType() {
             return _diskFmtType;
-        }
-
-        public int getDiskSeq() {
-            char suffix = _diskLabel.charAt(_diskLabel.length() - 1);
-            return suffix - 'a';
         }
 
         public void setBytesReadRate(Long bytesReadRate) {
@@ -681,16 +793,20 @@ public class LibvirtVMDef {
             _iopsWriteRate = iopsWriteRate;
         }
 
-        public void setCacheMode(diskCacheMode cacheMode) {
+        public void setCacheMode(DiskCacheMode cacheMode) {
             _diskCacheMode = cacheMode;
         }
 
-        public diskCacheMode getCacheMode() {
+        public DiskCacheMode getCacheMode() {
             return _diskCacheMode;
         }
 
         public void setQemuDriver(boolean qemuDriver){
             this.qemuDriver = qemuDriver;
+        }
+
+        public void setSerial(String serial) {
+            this._serial = serial;
         }
 
         @Override
@@ -704,24 +820,28 @@ public class LibvirtVMDef {
             diskBuilder.append(">\n");
             if(qemuDriver) {
                 diskBuilder.append("<driver name='qemu'" + " type='" + _diskFmtType
-                        + "' cache='" + _diskCacheMode + "' " + "/>\n");
+                        + "' cache='" + _diskCacheMode + "' ");
+                if(_discard != null && _discard != DiscardType.IGNORE) {
+                    diskBuilder.append("discard='" + _discard.toString() + "' ");
+                }
+                diskBuilder.append("/>\n");
             }
 
-            if (_diskType == diskType.FILE) {
+            if (_diskType == DiskType.FILE) {
                 diskBuilder.append("<source ");
                 if (_sourcePath != null) {
                     diskBuilder.append("file='" + _sourcePath + "'");
-                } else if (_deviceType == deviceType.CDROM) {
+                } else if (_deviceType == DeviceType.CDROM) {
                     diskBuilder.append("file=''");
                 }
                 diskBuilder.append("/>\n");
-            } else if (_diskType == diskType.BLOCK) {
+            } else if (_diskType == DiskType.BLOCK) {
                 diskBuilder.append("<source");
                 if (_sourcePath != null) {
                     diskBuilder.append(" dev='" + _sourcePath + "'");
                 }
                 diskBuilder.append("/>\n");
-            } else if (_diskType == diskType.NETWORK) {
+            } else if (_diskType == DiskType.NETWORK) {
                 diskBuilder.append("<source ");
                 diskBuilder.append(" protocol='" + _diskProtocol + "'");
                 diskBuilder.append(" name='" + _sourcePath + "'");
@@ -746,7 +866,11 @@ public class LibvirtVMDef {
             }
             diskBuilder.append("/>\n");
 
-            if ((_deviceType != deviceType.CDROM) &&
+            if (_serial != null && !_serial.isEmpty() && _deviceType != DeviceType.LUN) {
+                diskBuilder.append("<serial>" + _serial + "</serial>");
+            }
+
+            if ((_deviceType != DeviceType.CDROM) &&
                     (s_libvirtVersion >= 9008) &&
                     (s_qemuVersion >= 1001000) &&
                     (((_bytesReadRate != null) && (_bytesReadRate > 0)) || ((_bytesWriteRate != null) && (_bytesWriteRate > 0)) ||
@@ -769,11 +893,11 @@ public class LibvirtVMDef {
     }
 
     public static class InterfaceDef {
-        enum guestNetType {
+        enum GuestNetType {
             BRIDGE("bridge"), DIRECT("direct"), NETWORK("network"), USER("user"), ETHERNET("ethernet"), INTERNAL("internal");
             String _type;
 
-            guestNetType(String type) {
+            GuestNetType(String type) {
                 _type = type;
             }
 
@@ -783,11 +907,11 @@ public class LibvirtVMDef {
             }
         }
 
-        enum nicModel {
+        public enum NicModel {
             E1000("e1000"), VIRTIO("virtio"), RTL8139("rtl8139"), NE2KPCI("ne2k_pci"), VMXNET3("vmxnet3");
             String _model;
 
-            nicModel(String model) {
+            NicModel(String model) {
                 _model = model;
             }
 
@@ -797,34 +921,36 @@ public class LibvirtVMDef {
             }
         }
 
-        enum hostNicType {
+        enum HostNicType {
             DIRECT_ATTACHED_WITHOUT_DHCP, DIRECT_ATTACHED_WITH_DHCP, VNET, VLAN;
         }
 
-        private guestNetType _netType; /*
+        private GuestNetType _netType; /*
          * bridge, ethernet, network, user,
          * internal
          */
-        private hostNicType _hostNetType; /* Only used by agent java code */
+        private HostNicType _hostNetType; /* Only used by agent java code */
         private String _netSourceMode;
         private String _sourceName;
         private String _networkName;
         private String _macAddr;
         private String _ipAddr;
         private String _scriptPath;
-        private nicModel _model;
+        private NicModel _model;
         private Integer _networkRateKBps;
         private String _virtualPortType;
         private String _virtualPortInterfaceId;
         private int _vlanTag = -1;
         private boolean _pxeDisable = false;
+        private boolean _linkStateUp = true;
+        private Integer _slot;
 
-        public void defBridgeNet(String brName, String targetBrName, String macAddr, nicModel model) {
+        public void defBridgeNet(String brName, String targetBrName, String macAddr, NicModel model) {
             defBridgeNet(brName, targetBrName, macAddr, model, 0);
         }
 
-        public void defBridgeNet(String brName, String targetBrName, String macAddr, nicModel model, Integer networkRateKBps) {
-            _netType = guestNetType.BRIDGE;
+        public void defBridgeNet(String brName, String targetBrName, String macAddr, NicModel model, Integer networkRateKBps) {
+            _netType = GuestNetType.BRIDGE;
             _sourceName = brName;
             _networkName = targetBrName;
             _macAddr = macAddr;
@@ -832,12 +958,12 @@ public class LibvirtVMDef {
             _networkRateKBps = networkRateKBps;
         }
 
-        public void defDirectNet(String sourceName, String targetName, String macAddr, nicModel model, String sourceMode) {
+        public void defDirectNet(String sourceName, String targetName, String macAddr, NicModel model, String sourceMode) {
             defDirectNet(sourceName, targetName, macAddr, model, sourceMode, 0);
         }
 
-        public void defDirectNet(String sourceName, String targetName, String macAddr, nicModel model, String sourceMode, Integer networkRateKBps) {
-            _netType = guestNetType.DIRECT;
+        public void defDirectNet(String sourceName, String targetName, String macAddr, NicModel model, String sourceMode, Integer networkRateKBps) {
+            _netType = GuestNetType.DIRECT;
             _netSourceMode = sourceMode;
             _sourceName = sourceName;
             _networkName = targetName;
@@ -846,12 +972,12 @@ public class LibvirtVMDef {
             _networkRateKBps = networkRateKBps;
         }
 
-        public void defPrivateNet(String networkName, String targetName, String macAddr, nicModel model) {
+        public void defPrivateNet(String networkName, String targetName, String macAddr, NicModel model) {
             defPrivateNet(networkName, targetName, macAddr, model, 0);
         }
 
-        public void defPrivateNet(String networkName, String targetName, String macAddr, nicModel model, Integer networkRateKBps) {
-            _netType = guestNetType.NETWORK;
+        public void defPrivateNet(String networkName, String targetName, String macAddr, NicModel model, Integer networkRateKBps) {
+            _netType = GuestNetType.NETWORK;
             _sourceName = networkName;
             _networkName = targetName;
             _macAddr = macAddr;
@@ -859,12 +985,12 @@ public class LibvirtVMDef {
             _networkRateKBps = networkRateKBps;
         }
 
-        public void defEthernet(String targetName, String macAddr, nicModel model, String scriptPath) {
+        public void defEthernet(String targetName, String macAddr, NicModel model, String scriptPath) {
             defEthernet(targetName, macAddr, model, scriptPath, 0);
         }
 
-        public void defEthernet(String targetName, String macAddr, nicModel model, String scriptPath, Integer networkRateKBps) {
-            _netType = guestNetType.ETHERNET;
+        public void defEthernet(String targetName, String macAddr, NicModel model, String scriptPath, Integer networkRateKBps) {
+            _netType = GuestNetType.ETHERNET;
             _networkName = targetName;
             _sourceName = targetName;
             _macAddr = macAddr;
@@ -873,15 +999,15 @@ public class LibvirtVMDef {
             _networkRateKBps = networkRateKBps;
         }
 
-        public void defEthernet(String targetName, String macAddr, nicModel model) {
+        public void defEthernet(String targetName, String macAddr, NicModel model) {
             defEthernet(targetName, macAddr, model, null);
         }
 
-        public void setHostNetType(hostNicType hostNetType) {
+        public void setHostNetType(HostNicType hostNetType) {
             _hostNetType = hostNetType;
         }
 
-        public hostNicType getHostNetType() {
+        public HostNicType getHostNetType() {
             return _hostNetType;
         }
 
@@ -893,7 +1019,7 @@ public class LibvirtVMDef {
             return _sourceName;
         }
 
-        public guestNetType getNetType() {
+        public GuestNetType getNetType() {
             return _netType;
         }
 
@@ -905,11 +1031,15 @@ public class LibvirtVMDef {
             return _networkName;
         }
 
+        public void setDevName(String networkName) {
+            _networkName = networkName;
+        }
+
         public String getMacAddress() {
             return _macAddr;
         }
 
-        public nicModel getModel() {
+        public NicModel getModel() {
             return _model;
         }
 
@@ -937,15 +1067,31 @@ public class LibvirtVMDef {
             return _vlanTag;
         }
 
+        public void setSlot(Integer slot) {
+            _slot = slot;
+        }
+
+        public Integer getSlot() {
+            return _slot;
+        }
+
+        public void setLinkStateUp(boolean linkStateUp) {
+            _linkStateUp = linkStateUp;
+        }
+
+        public boolean isLinkStateUp() {
+            return _linkStateUp;
+        }
+
         @Override
         public String toString() {
             StringBuilder netBuilder = new StringBuilder();
             netBuilder.append("<interface type='" + _netType + "'>\n");
-            if (_netType == guestNetType.BRIDGE) {
+            if (_netType == GuestNetType.BRIDGE) {
                 netBuilder.append("<source bridge='" + _sourceName + "'/>\n");
-            } else if (_netType == guestNetType.NETWORK) {
+            } else if (_netType == GuestNetType.NETWORK) {
                 netBuilder.append("<source network='" + _sourceName + "'/>\n");
-            } else if (_netType == guestNetType.DIRECT) {
+            } else if (_netType == GuestNetType.DIRECT) {
                 netBuilder.append("<source dev='" + _sourceName + "' mode='" + _netSourceMode + "'/>\n");
             }
             if (_networkName != null) {
@@ -978,6 +1124,12 @@ public class LibvirtVMDef {
             }
             if (_vlanTag > 0 && _vlanTag < 4095) {
                 netBuilder.append("<vlan trunk='no'>\n<tag id='" + _vlanTag + "'/>\n</vlan>");
+            }
+
+            netBuilder.append("<link state='" + (_linkStateUp ? "up" : "down") +"'/>\n");
+
+            if (_slot  != null) {
+                netBuilder.append(String.format("<address type='pci' domain='0x0000' bus='0x00' slot='0x%02x' function='0x0'/>\n", _slot));
             }
             netBuilder.append("</interface>\n");
             return netBuilder.toString();
@@ -1146,25 +1298,95 @@ public class LibvirtVMDef {
         }
     }
 
-    public static class VirtioSerialDef {
-        private final String _name;
-        private String _path;
+    public final static class ChannelDef {
+        enum ChannelType {
+            UNIX("unix"), SERIAL("serial");
+            String type;
 
-        public VirtioSerialDef(String name, String path) {
-            _name = name;
-            _path = path;
+            ChannelType(String type) {
+                this.type = type;
+            }
+
+            @Override
+            public String toString() {
+                return this.type;
+            }
+        }
+
+        enum ChannelState {
+            DISCONNECTED("disconnected"), CONNECTED("connected");
+            String type;
+
+            ChannelState(String type) {
+                this.type = type;
+            }
+
+            @Override
+            public String toString() {
+                return type;
+            }
+        }
+
+        private final String name;
+        private File path = new File("");
+        private final ChannelType type;
+        private ChannelState state;
+
+        public ChannelDef(String name, ChannelType type) {
+            this.name = name;
+            this.type = type;
+        }
+
+        public ChannelDef(String name, ChannelType type, File path) {
+            this.name = name;
+            this.path = path;
+            this.type = type;
+        }
+
+        public ChannelDef(String name, ChannelType type, ChannelState state) {
+            this.name = name;
+            this.state = state;
+            this.type = type;
+        }
+
+        public ChannelDef(String name, ChannelType type, ChannelState state, File path) {
+            this.name = name;
+            this.path = path;
+            this.state = state;
+            this.type = type;
+        }
+
+        public ChannelType getChannelType() {
+            return type;
+        }
+
+        public ChannelState getChannelState() {
+            return state;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public File getPath() {
+            return path;
         }
 
         @Override
         public String toString() {
             StringBuilder virtioSerialBuilder = new StringBuilder();
-            if (_path == null) {
-                _path = "/var/lib/libvirt/qemu";
+            virtioSerialBuilder.append("<channel type='" + type.toString() + "'>\n");
+            if (path == null) {
+                virtioSerialBuilder.append("<source mode='bind'/>\n");
+            } else {
+                virtioSerialBuilder.append("<source mode='bind' path='" + path.toString() + "'/>\n");
             }
-            virtioSerialBuilder.append("<channel type='unix'>\n");
-            virtioSerialBuilder.append("<source mode='bind' path='" + _path + "/" + _name + ".agent'/>\n");
-            virtioSerialBuilder.append("<target type='virtio' name='" + _name + ".vport'/>\n");
             virtioSerialBuilder.append("<address type='virtio-serial'/>\n");
+            if (state == null) {
+                virtioSerialBuilder.append("<target type='virtio' name='" + name + "'/>\n");
+            } else {
+                virtioSerialBuilder.append("<target type='virtio' name='" + name + "' state='" + state.toString() + "'/>\n");
+            }
             virtioSerialBuilder.append("</channel>\n");
             return virtioSerialBuilder.toString();
         }
@@ -1211,6 +1433,37 @@ public class LibvirtVMDef {
         }
     }
 
+    public static class SCSIDef {
+        private short index = 0;
+        private int domain = 0;
+        private int bus = 0;
+        private int slot = 9;
+        private int function = 0;
+
+        public SCSIDef(short index, int domain, int bus, int slot, int function) {
+            this.index = index;
+            this.domain = domain;
+            this.bus = bus;
+            this.slot = slot;
+            this.function = function;
+        }
+
+        public SCSIDef() {
+
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder scsiBuilder = new StringBuilder();
+
+            scsiBuilder.append(String.format("<controller type='scsi' index='%d' model='virtio-scsi'>\n", this.index ));
+            scsiBuilder.append(String.format("<address type='pci' domain='0x%04X' bus='0x%02X' slot='0x%02X' function='0x%01X'/>\n",
+                    this.domain, this.bus, this.slot, this.function ) );
+            scsiBuilder.append("</controller>\n");
+            return scsiBuilder.toString();
+        }
+    }
+
     public static class InputDef {
         private final String _type; /* tablet, mouse */
         private final String _bus; /* ps2, usb, xen */
@@ -1252,6 +1505,219 @@ public class LibvirtVMDef {
         }
     }
 
+    public static class MetadataDef {
+        Map<String, Object> customNodes = new HashMap<>();
+
+        public <T> T getMetadataNode(Class<T> fieldClass) {
+            T field = (T) customNodes.get(fieldClass.getName());
+            if (field == null) {
+                try {
+                    field = fieldClass.newInstance();
+                    customNodes.put(field.getClass().getName(), field);
+                } catch (InstantiationException | IllegalAccessException e) {
+                    s_logger.debug("No default constructor available in class " + fieldClass.getName() + ", ignoring exception", e);
+                }
+            }
+            return field;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder fsBuilder = new StringBuilder();
+            fsBuilder.append("<metadata>\n");
+            for (Object field : customNodes.values()) {
+                fsBuilder.append(field.toString());
+            }
+            fsBuilder.append("</metadata>\n");
+            return fsBuilder.toString();
+        }
+    }
+
+    public static class NuageExtensionDef {
+        private Map<String, String> addresses = Maps.newHashMap();
+
+        public void addNuageExtension(String macAddress, String vrIp) {
+            addresses.put(macAddress, vrIp);
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder fsBuilder = new StringBuilder();
+            for (Map.Entry<String, String> address : addresses.entrySet()) {
+                fsBuilder.append("<nuage-extension xmlns='nuagenetworks.net/nuage/cna'>\n")
+                        .append("  <interface mac='")
+                        .append(address.getKey())
+                        .append("' vsp-vr-ip='")
+                        .append(address.getValue())
+                        .append("'></interface>\n")
+                        .append("</nuage-extension>\n");
+            }
+            return fsBuilder.toString();
+        }
+    }
+
+    public static class RngDef {
+        enum RngModel {
+            VIRTIO("virtio");
+            String model;
+
+            RngModel(String model) {
+                this.model = model;
+            }
+
+            @Override
+            public String toString() {
+                return model;
+            }
+        }
+
+        enum RngBackendModel {
+            RANDOM("random"), EGD("egd");
+            String model;
+
+            RngBackendModel(String model) {
+                this.model = model;
+            }
+
+            @Override
+            public String toString() {
+                return model;
+            }
+        }
+
+        private String path = "/dev/random";
+        private RngModel rngModel = RngModel.VIRTIO;
+        private RngBackendModel rngBackendModel = RngBackendModel.RANDOM;
+        private int rngRateBytes = 2048;
+        private int rngRatePeriod = 1000;
+
+        public RngDef(String path) {
+            this.path = path;
+        }
+
+        public RngDef(String path, int rngRateBytes, int rngRatePeriod) {
+            this.path = path;
+            this.rngRateBytes = rngRateBytes;
+            this.rngRatePeriod = rngRatePeriod;
+        }
+
+        public RngDef(RngModel rngModel) {
+            this.rngModel = rngModel;
+        }
+
+        public RngDef(RngBackendModel rngBackendModel) {
+            this.rngBackendModel = rngBackendModel;
+        }
+
+        public RngDef(String path, RngBackendModel rngBackendModel) {
+            this.path = path;
+            this.rngBackendModel = rngBackendModel;
+        }
+
+        public RngDef(String path, RngBackendModel rngBackendModel, int rngRateBytes, int rngRatePeriod) {
+            this.path = path;
+            this.rngBackendModel = rngBackendModel;
+            this.rngRateBytes = rngRateBytes;
+            this.rngRatePeriod = rngRatePeriod;
+        }
+
+        public RngDef(String path, RngModel rngModel) {
+            this.path = path;
+            this.rngModel = rngModel;
+        }
+
+        public String getPath() {
+           return path;
+        }
+
+        public RngBackendModel getRngBackendModel() {
+            return rngBackendModel;
+        }
+
+        public RngModel getRngModel() {
+            return rngModel;
+        }
+
+        public int getRngRateBytes() {
+            return rngRateBytes;
+        }
+
+        public int getRngRatePeriod() {
+            return rngRatePeriod;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder rngBuilder = new StringBuilder();
+            rngBuilder.append("<rng model='" + rngModel + "'>\n");
+            rngBuilder.append("<rate period='" + rngRatePeriod + "' bytes='" + rngRateBytes + "' />\n");
+            rngBuilder.append("<backend model='" + rngBackendModel + "'>" + path + "</backend>");
+            rngBuilder.append("</rng>\n");
+            return rngBuilder.toString();
+        }
+    }
+
+    public static class WatchDogDef {
+        enum WatchDogModel {
+            I6300ESB("i6300esb"), IB700("ib700"), DIAG288("diag288");
+            String model;
+
+            WatchDogModel(String model) {
+                this.model = model;
+            }
+
+            @Override
+            public String toString() {
+                return model;
+            }
+        }
+
+        enum WatchDogAction {
+            RESET("reset"), SHUTDOWN("shutdown"), POWEROFF("poweroff"), PAUSE("pause"), NONE("none"), DUMP("dump");
+            String action;
+
+            WatchDogAction(String action) {
+                this.action = action;
+            }
+
+            @Override
+            public String toString() {
+                return action;
+            }
+        }
+
+        WatchDogModel model = WatchDogModel.I6300ESB;
+        WatchDogAction action = WatchDogAction.NONE;
+
+        public WatchDogDef(WatchDogAction action) {
+            this.action = action;
+        }
+
+        public WatchDogDef(WatchDogModel model) {
+            this.model = model;
+        }
+
+        public WatchDogDef(WatchDogAction action, WatchDogModel model) {
+            this.action = action;
+            this.model = model;
+        }
+
+        public WatchDogAction getAction() {
+            return action;
+        }
+
+        public WatchDogModel getModel() {
+            return model;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder wacthDogBuilder = new StringBuilder();
+            wacthDogBuilder.append("<watchdog model='" + model + "' action='" + action + "'/>\n");
+            return wacthDogBuilder.toString();
+        }
+    }
+
     public void setHvsType(String hvs) {
         _hvsType = hvs;
     }
@@ -1260,12 +1726,20 @@ public class LibvirtVMDef {
         return _hvsType;
     }
 
-    public void setLibvirtVersion(long libvirtVersion) {
+    public static void setGlobalLibvirtVersion(long libvirtVersion) {
         s_libvirtVersion = libvirtVersion;
     }
 
-    public void setQemuVersion(long qemuVersion) {
+    public void setLibvirtVersion(long libvirtVersion) {
+        setGlobalLibvirtVersion(libvirtVersion);
+    }
+
+    public static void setGlobalQemuVersion(long qemuVersion) {
         s_qemuVersion = qemuVersion;
+    }
+
+    public void setQemuVersion(long qemuVersion) {
+        setGlobalQemuVersion(qemuVersion);
     }
 
     public void setDomainName(String domainName) {
@@ -1302,6 +1776,15 @@ public class LibvirtVMDef {
             return (DevicesDef)o;
         }
         return null;
+    }
+
+    public MetadataDef getMetaData() {
+        MetadataDef o = (MetadataDef) components.get(MetadataDef.class.toString());
+        if (o == null) {
+            o = new MetadataDef();
+            addComp(o);
+        }
+        return o;
     }
 
     @Override

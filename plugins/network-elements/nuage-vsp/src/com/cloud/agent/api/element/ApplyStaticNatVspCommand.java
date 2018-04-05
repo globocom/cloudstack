@@ -20,38 +20,31 @@
 package com.cloud.agent.api.element;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
+
+import net.nuage.vsp.acs.client.api.model.VspNetwork;
+import net.nuage.vsp.acs.client.api.model.VspStaticNat;
+
+import org.apache.commons.lang.builder.HashCodeBuilder;
 
 import com.cloud.agent.api.Command;
 
 public class ApplyStaticNatVspCommand extends Command {
 
-    String _networkDomainUuid;
-    String _vpcOrSubnetUuid;
-    boolean _isL3Network;
-    List<Map<String, Object>> _staticNatDetails;
+    private final VspNetwork _network;
+    private final List<VspStaticNat> _staticNatDetails;
 
-    public ApplyStaticNatVspCommand(String networkDomainUuid, String vpcOrSubnetUuid, boolean isL3Network, List<Map<String, Object>> staticNatDetails) {
+    public ApplyStaticNatVspCommand(VspNetwork network, List<VspStaticNat> staticNatDetails) {
         super();
-        this._networkDomainUuid = networkDomainUuid;
-        this._vpcOrSubnetUuid = vpcOrSubnetUuid;
-        this._isL3Network = isL3Network;
+        this._network = network;
         this._staticNatDetails = staticNatDetails;
     }
 
-    public String getNetworkDomainUuid() {
-        return _networkDomainUuid;
+    public VspNetwork getNetwork() {
+        return _network;
     }
 
-    public String getVpcOrSubnetUuid() {
-        return _vpcOrSubnetUuid;
-    }
-
-    public boolean isL3Network() {
-        return _isL3Network;
-    }
-
-    public List<Map<String, Object>> getStaticNatDetails() {
+    public List<VspStaticNat> getStaticNatDetails() {
         return _staticNatDetails;
     }
 
@@ -60,4 +53,28 @@ public class ApplyStaticNatVspCommand extends Command {
         return false;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+
+        if (!(o instanceof ApplyStaticNatVspCommand)) {
+            return false;
+        }
+
+        ApplyStaticNatVspCommand that = (ApplyStaticNatVspCommand) o;
+
+        return super.equals(that)
+                && Objects.equals(_network, that._network)
+                && Objects.equals(_staticNatDetails, that._staticNatDetails);
+    }
+
+    @Override
+    public int hashCode() {
+        return new HashCodeBuilder()
+                .appendSuper(super.hashCode())
+                .append(_network)
+                .toHashCode();
+    }
 }

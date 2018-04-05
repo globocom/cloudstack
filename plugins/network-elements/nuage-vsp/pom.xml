@@ -25,9 +25,25 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack-plugins</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.0.0</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
+  <repositories>
+    <repository>
+      <id>nuage-vsp</id>
+      <url>http://cs.mv.nuagenetworks.net/releases/</url>
+    </repository>
+  </repositories>
+  <properties>
+      <nuage.vsp.client.version>1.0.7</nuage.vsp.client.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>net.nuagenetworks.vsp</groupId>
+      <artifactId>nuage-vsp-acs-client</artifactId>
+      <version>${nuage.vsp.client.version}</version>
+    </dependency>
+  </dependencies>
   <build>
     <plugins>
       <plugin>

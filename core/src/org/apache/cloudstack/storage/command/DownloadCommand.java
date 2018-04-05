@@ -25,7 +25,7 @@ import org.apache.cloudstack.storage.to.VolumeObjectTO;
 
 import com.cloud.agent.api.storage.AbstractDownloadCommand;
 import com.cloud.agent.api.storage.PasswordAuth;
-import com.cloud.agent.api.storage.Proxy;
+import com.cloud.utils.net.Proxy;
 import com.cloud.agent.api.to.DataStoreTO;
 import com.cloud.agent.api.to.NfsTO;
 import com.cloud.storage.Storage.ImageFormat;
@@ -63,6 +63,7 @@ public class DownloadCommand extends AbstractDownloadCommand implements Internal
         resourceType = that.resourceType;
         installPath = that.installPath;
         _store = that._store;
+        _proxy = that._proxy;
     }
 
     public DownloadCommand(TemplateObjectTO template, Long maxDownloadSizeInBytes) {

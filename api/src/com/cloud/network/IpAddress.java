@@ -93,4 +93,8 @@ public interface IpAddress extends ControlledEntity, Identity, InternalIdentity,
 
     public Date getCreated();
 
+    State getRuleState();
+
+    void setRuleState(State ruleState);
+
 }

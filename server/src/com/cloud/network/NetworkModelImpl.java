@@ -19,6 +19,8 @@ package com.cloud.network;
 
 import java.math.BigInteger;
 import java.security.InvalidParameterException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,17 +29,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-
-import javax.ejb.Local;
+import java.util.Collections;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.log4j.Logger;
+
+import org.apache.cloudstack.engine.orchestration.service.NetworkOrchestrationService;
+import org.apache.cloudstack.framework.config.ConfigKey;
+import org.apache.cloudstack.framework.config.Configurable;
 
 import org.apache.cloudstack.acl.ControlledEntity.ACLType;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 import org.apache.cloudstack.lb.dao.ApplicationLoadBalancerRuleDao;
-
 import com.cloud.api.ApiDBUtils;
 import com.cloud.configuration.Config;
 import com.cloud.configuration.ConfigurationManager;
@@ -59,6 +64,7 @@ import com.cloud.hypervisor.Hypervisor.HypervisorType;
 import com.cloud.network.IpAddress.State;
 import com.cloud.network.Network.Capability;
 import com.cloud.network.Network.GuestType;
+import com.cloud.network.Network.IpAddresses;
 import com.cloud.network.Network.Provider;
 import com.cloud.network.Network.Service;
 import com.cloud.network.Networks.TrafficType;
@@ -95,12 +101,12 @@ import com.cloud.offerings.dao.NetworkOfferingDao;
 import com.cloud.offerings.dao.NetworkOfferingDetailsDao;
 import com.cloud.offerings.dao.NetworkOfferingServiceMapDao;
 import com.cloud.projects.dao.ProjectAccountDao;
-import com.cloud.server.ConfigurationServer;
 import com.cloud.user.Account;
 import com.cloud.user.AccountManager;
 import com.cloud.user.AccountVO;
 import com.cloud.user.DomainManager;
 import com.cloud.user.dao.AccountDao;
+import com.cloud.utils.StringUtils;
 import com.cloud.utils.component.AdapterBase;
 import com.cloud.utils.component.ManagerBase;
 import com.cloud.utils.db.DB;
@@ -122,8 +128,7 @@ import com.cloud.vm.dao.NicDao;
 import com.cloud.vm.dao.NicSecondaryIpDao;
 import com.cloud.vm.dao.VMInstanceDao;
 
-@Local(value = {NetworkModel.class})
-public class NetworkModelImpl extends ManagerBase implements NetworkModel {
+public class NetworkModelImpl extends ManagerBase implements NetworkModel, Configurable {
     static final Logger s_logger = Logger.getLogger(NetworkModelImpl.class);
     @Inject
     EntityManager _entityMgr;
@@ -141,23 +146,18 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
     AccountManager _accountMgr;
     @Inject
     ConfigurationDao _configDao;
-
     @Inject
     ConfigurationManager _configMgr;
-
     @Inject
     NetworkOfferingDao _networkOfferingDao = null;
     @Inject
     NetworkDao _networksDao = null;
     @Inject
     NicDao _nicDao = null;
-
     @Inject
     PodVlanMapDao _podVlanMapDao;
-    @Inject
-    ConfigurationServer _configServer;
 
-    List<NetworkElement> networkElements;
+    private List<NetworkElement> networkElements;
 
     public List<NetworkElement> getNetworkElements() {
         return networkElements;
@@ -560,7 +560,8 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
 
     @Override
     public String getNextAvailableMacAddressInNetwork(long networkId) throws InsufficientAddressCapacityException {
-        String mac = _networksDao.getNextAvailableMacAddress(networkId);
+        NetworkVO network = _networksDao.findById(networkId);
+        String mac = _networksDao.getNextAvailableMacAddress(networkId, MACIdentifier.value());
         if (mac == null) {
             throw new InsufficientAddressCapacityException("Unable to create another mac address", Network.class, networkId);
         }
@@ -577,6 +578,9 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
     public boolean canUseForDeploy(Network network) {
         if (network.getTrafficType() != TrafficType.Guest) {
             return false;
+        }
+        if (listNetworkOfferingServices(network.getNetworkOfferingId()).isEmpty()) {
+            return true; // do not check free IPs if there is no service in the network
         }
         boolean hasFreeIps = true;
         if (network.getGuestType() == GuestType.Shared) {
@@ -823,15 +827,15 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
     @Override
     public String getIpInNetwork(long vmId, long networkId) {
         Nic guestNic = getNicInNetwork(vmId, networkId);
-        assert (guestNic != null && guestNic.getIp4Address() != null) : "Vm doesn't belong to network associated with " + "ipAddress or ip4 address is null";
-        return guestNic.getIp4Address();
+        assert (guestNic != null && guestNic.getIPv4Address() != null) : "Vm doesn't belong to network associated with " + "ipAddress or ip4 address is null";
+        return guestNic.getIPv4Address();
     }
 
     @Override
     public String getIpInNetworkIncludingRemoved(long vmId, long networkId) {
         Nic guestNic = getNicInNetworkIncludingRemoved(vmId, networkId);
-        assert (guestNic != null && guestNic.getIp4Address() != null) : "Vm doesn't belong to network associated with " + "ipAddress or ip4 address is null";
-        return guestNic.getIp4Address();
+        assert (guestNic != null && guestNic.getIPv4Address() != null) : "Vm doesn't belong to network associated with " + "ipAddress or ip4 address is null";
+        return guestNic.getIPv4Address();
     }
 
     @Override
@@ -895,6 +899,25 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
     }
 
     @Override
+    public  boolean isSharedNetworkWithoutServices (long networkId) {
+
+        Network network = _networksDao.findById(networkId);
+
+        if (network != null && network.getGuestType() != GuestType.Shared) {
+            return false;
+        }
+
+        List<Service> services = listNetworkOfferingServices(network.getNetworkOfferingId());
+
+        if (services == null || services.isEmpty()) {
+            return true;
+        }
+
+        return false;
+    }
+
+
+    @Override
     public boolean areServicesSupportedByNetworkOffering(long networkOfferingId, Service... services) {
         return (_ntwkOfferingSrvcDao.areServicesSupportedByNetworkOffering(networkOfferingId, services));
     }
@@ -919,7 +942,7 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
         NicVO networkElementNic = _nicDao.findByNetworkIdAndType(virtualNetwork.getId(), Type.DomainRouter);
 
         if (networkElementNic != null) {
-            return networkElementNic.getIp4Address();
+            return networkElementNic.getIPv4Address();
         } else {
             s_logger.warn("Unable to set find network element for the network id=" + virtualNetwork.getId());
             return null;
@@ -970,33 +993,43 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
         if (vmId != null) {
             vm = _vmDao.findById(vmId);
         }
-        Network network = getNetwork(networkId);
-        NetworkOffering ntwkOff = _entityMgr.findById(NetworkOffering.class, network.getNetworkOfferingId());
+        final Network network = getNetwork(networkId);
+        final NetworkOffering ntwkOff = _entityMgr.findById(NetworkOffering.class, network.getNetworkOfferingId());
 
-        // For default userVm Default network and domR guest/public network, get rate information from the service
-        // offering; for other situations get information
-        // from the network offering
-        boolean isUserVmsDefaultNetwork = false;
-        boolean isDomRGuestOrPublicNetwork = false;
-        boolean isSystemVmNetwork = false;
+        // For user VM: For default nic use network rate from the service/compute offering,
+        //              or on NULL from vm.network.throttling.rate global setting
+        // For router: Get network rate for guest and public networks from the guest network offering
+        //              or on NULL from network.throttling.rate
+        // For others: Use network rate from their network offering,
+        //              or on NULL from network.throttling.rate setting at zone > global level
+        // http://docs.cloudstack.apache.org/projects/cloudstack-administration/en/latest/service_offerings.html#network-throttling
         if (vm != null) {
-            Nic nic = _nicDao.findByNtwkIdAndInstanceId(networkId, vmId);
-            if (vm.getType() == Type.User && nic != null && nic.isDefaultNic()) {
-                isUserVmsDefaultNetwork = true;
-            } else if (vm.getType() == Type.DomainRouter && ntwkOff != null &&
-                (ntwkOff.getTrafficType() == TrafficType.Public || ntwkOff.getTrafficType() == TrafficType.Guest)) {
-                isDomRGuestOrPublicNetwork = true;
-            } else if (vm.getType() == Type.ConsoleProxy || vm.getType() == Type.SecondaryStorageVm) {
-                isSystemVmNetwork = true;
+            if (vm.getType() == Type.User) {
+                final Nic nic = _nicDao.findByNtwkIdAndInstanceId(networkId, vmId);
+                if (nic != null && nic.isDefaultNic()) {
+                    return _configMgr.getServiceOfferingNetworkRate(vm.getServiceOfferingId(), network.getDataCenterId());
+                }
+            }
+            if (vm.getType() == Type.DomainRouter && (network.getTrafficType() == TrafficType.Public || network.getTrafficType() == TrafficType.Guest)) {
+                for (final Nic nic: _nicDao.listByVmId(vmId)) {
+                    final NetworkVO nw = _networksDao.findById(nic.getNetworkId());
+                    if (nw.getTrafficType() == TrafficType.Guest) {
+                        return _configMgr.getNetworkOfferingNetworkRate(nw.getNetworkOfferingId(), network.getDataCenterId());
+                    }
+                }
+            }
+            if (vm.getType() == Type.ConsoleProxy || vm.getType() == Type.SecondaryStorageVm) {
+                return -1;
             }
         }
-        if (isUserVmsDefaultNetwork || isDomRGuestOrPublicNetwork) {
-            return _configMgr.getServiceOfferingNetworkRate(vm.getServiceOfferingId(), network.getDataCenterId());
-        } else if (isSystemVmNetwork) {
-            return -1;
-        } else {
+        if (ntwkOff != null) {
             return _configMgr.getNetworkOfferingNetworkRate(ntwkOff.getId(), network.getDataCenterId());
         }
+        final Integer networkRate = NetworkOrchestrationService.NetworkThrottlingRate.valueIn(network.getDataCenterId());
+        if (networkRate != null && networkRate > 0) {
+            return networkRate;
+        }
+        return -1;
     }
 
     @Override
@@ -1226,6 +1259,9 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
                     case Hyperv:
                         label = mgmtTraffic.getHypervNetworkLabel();
                         break;
+                    case Ovm3:
+                        label = mgmtTraffic.getOvm3NetworkLabel();
+                        break;
                 }
                 return label;
             }
@@ -1257,6 +1293,9 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
                         break;
                     case Hyperv:
                         label = storageTraffic.getHypervNetworkLabel();
+                        break;
+                    case Ovm3:
+                        label = storageTraffic.getOvm3NetworkLabel();
                         break;
                 }
                 return label;
@@ -1532,6 +1571,32 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
     }
 
     @Override
+    public boolean providerSupportsCapability(Set<Provider> providers, Service service, Capability cap) {
+        for (Provider provider : providers) {
+            NetworkElement element = getElementImplementingProvider(provider.getName());
+            if (element != null) {
+                Map<Service, Map<Capability, String>> elementCapabilities = element.getCapabilities();
+                if (elementCapabilities == null || !elementCapabilities.containsKey(service)) {
+                    throw new UnsupportedServiceException("Service " + service.getName() + " is not supported by the element=" + element.getName() +
+                            " implementing Provider=" + provider.getName());
+                }
+                Map<Capability, String> serviceCapabilities = elementCapabilities.get(service);
+                if (serviceCapabilities == null || serviceCapabilities.isEmpty()) {
+                    throw new UnsupportedServiceException("Service " + service.getName() + " doesn't have capabilites for element=" + element.getName() +
+                            " implementing Provider=" + provider.getName());
+                }
+
+                if (serviceCapabilities.containsKey(cap)) {
+                    return true;
+                }
+            } else {
+                throw new UnsupportedServiceException("Unable to find network element for provider " + provider.getName());
+            }
+        }
+        return false;
+    }
+
+    @Override
     public void checkCapabilityForProvider(Set<Provider> providers, Service service, Capability cap, String capValue) {
         for (Provider provider : providers) {
             NetworkElement element = getElementImplementingProvider(provider.getName());
@@ -1543,7 +1608,7 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
                 }
                 Map<Capability, String> serviceCapabilities = elementCapabilities.get(service);
                 if (serviceCapabilities == null || serviceCapabilities.isEmpty()) {
-                    throw new UnsupportedServiceException("Service " + service.getName() + " doesn't have capabilites for element=" + element.getName() +
+                    throw new UnsupportedServiceException("Service " + service.getName() + " doesn't have capabilities for element=" + element.getName() +
                         " implementing Provider=" + provider.getName());
                 }
 
@@ -1622,6 +1687,9 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
                     case Hyperv:
                         label = publicTraffic.getHypervNetworkLabel();
                         break;
+                    case Ovm3:
+                        label = publicTraffic.getOvm3NetworkLabel();
+                        break;
                 }
                 return label;
             }
@@ -1654,7 +1722,9 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
                     case Hyperv:
                         label = guestTraffic.getHypervNetworkLabel();
                         break;
-
+                    case Ovm3:
+                        label = guestTraffic.getOvm3NetworkLabel();
+                        break;
                 }
                 return label;
             }
@@ -1762,6 +1832,9 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
 
     @Override
     public Set<Long> getAvailableIps(Network network, String requestedIp) {
+        if (network.getCidr() == null) {
+            return Collections.emptySet();
+        }
         String[] cidr = network.getCidr().split("/");
         List<String> ips = getUsedIpsInNetwork(network);
         Set<Long> usedIps = new TreeSet<Long>();
@@ -2074,10 +2147,10 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
 
     @Override
     public void checkIp6Parameters(String startIPv6, String endIPv6, String ip6Gateway, String ip6Cidr) throws InvalidParameterValueException {
-        if (!NetUtils.isValidIpv6(startIPv6)) {
+        if (!NetUtils.isValidIp6(startIPv6)) {
             throw new InvalidParameterValueException("Invalid format for the startIPv6 parameter");
         }
-        if (!NetUtils.isValidIpv6(endIPv6)) {
+        if (!NetUtils.isValidIp6(endIPv6)) {
             throw new InvalidParameterValueException("Invalid format for the endIPv6 parameter");
         }
 
@@ -2085,7 +2158,7 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
             throw new InvalidParameterValueException("ip6Gateway and ip6Cidr should be defined when startIPv6/endIPv6 are passed in");
         }
 
-        if (!NetUtils.isValidIpv6(ip6Gateway)) {
+        if (!NetUtils.isValidIp6(ip6Gateway)) {
             throw new InvalidParameterValueException("Invalid ip6Gateway");
         }
         if (!NetUtils.isValidIp6Cidr(ip6Cidr)) {
@@ -2109,15 +2182,18 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
     }
 
     @Override
-    public void checkRequestedIpAddresses(long networkId, String ip4, String ip6) throws InvalidParameterValueException {
+    public void checkRequestedIpAddresses(long networkId, IpAddresses ips) throws InvalidParameterValueException {
+        String ip4 = ips.getIp4Address();
+        String ip6 = ips.getIp6Address();
+        String mac = ips.getMacAddress();
         if (ip4 != null) {
-            if (!NetUtils.isValidIp(ip4)) {
+            if (!NetUtils.isValidIp4(ip4)) {
                 throw new InvalidParameterValueException("Invalid specified IPv4 address " + ip4);
             }
             //Other checks for ipv4 are done in assignPublicIpAddress()
         }
         if (ip6 != null) {
-            if (!NetUtils.isValidIpv6(ip6)) {
+            if (!NetUtils.isValidIp6(ip6)) {
                 throw new InvalidParameterValueException("Invalid specified IPv6 address " + ip6);
             }
             if (_ipv6Dao.findByNetworkIdAndIp(networkId, ip6) != null) {
@@ -2137,6 +2213,15 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
             if (ipVlan == null) {
                 throw new InvalidParameterValueException("Requested IPv6 is not in the predefined range!");
             }
+        }
+        if (mac != null) {
+            if(!NetUtils.isValidMac(mac)) {
+                throw new InvalidParameterValueException("Invalid specified MAC address " + mac);
+            }
+            if (_nicDao.findByNetworkIdAndMacAddress(networkId, mac) != null) {
+                throw new InvalidParameterValueException("The requested Mac address is already taken! " + mac);
+            }
+
         }
     }
 
@@ -2160,24 +2245,29 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
     @Override
     public NicVO getPlaceholderNicForRouter(Network network, Long podId) {
         List<NicVO> nics = _nicDao.listPlaceholderNicsByNetworkIdAndVmType(network.getId(), VirtualMachine.Type.DomainRouter);
+        List<? extends Vlan> vlans = new ArrayList<VlanVO>();
+        if (podId != null) {
+            vlans = _vlanDao.listVlansForPod(podId);
+        }
         for (NicVO nic : nics) {
-            if (nic.getReserver() == null && (nic.getIp4Address() != null || nic.getIp6Address() != null)) {
+            if (nic.getReserver() == null && (nic.getIPv4Address() != null || nic.getIPv6Address() != null)) {
                 if (podId == null) {
                     return nic;
                 } else {
+                    IpAddress ip = null;
+                    UserIpv6AddressVO ipv6 = null;
+
+                    if (nic.getIPv4Address() != null) {
+                        ip = _ipAddressDao.findByIpAndSourceNetworkId(network.getId(), nic.getIPv4Address());
+                    } else {
+                        ipv6 = _ipv6Dao.findByNetworkIdAndIp(network.getId(), nic.getIPv6Address());
+                    }
                     //return nic only when its ip address belong to the pod range (for the Basic zone case)
-                    List<? extends Vlan> vlans = _vlanDao.listVlansForPod(podId);
                     for (Vlan vlan : vlans) {
-                        if (nic.getIp4Address() != null) {
-                            IpAddress ip = _ipAddressDao.findByIpAndSourceNetworkId(network.getId(), nic.getIp4Address());
-                            if (ip != null && ip.getVlanId() == vlan.getId()) {
-                                return nic;
-                            }
-                        } else {
-                            UserIpv6AddressVO ipv6 = _ipv6Dao.findByNetworkIdAndIp(network.getId(), nic.getIp6Address());
-                            if (ipv6 != null && ipv6.getVlanId() == vlan.getId()) {
-                                return nic;
-                            }
+                        if (ip != null && ip.getVlanId() == vlan.getId()) {
+                            return nic;
+                        } else if (ipv6 != null && ipv6.getVlanId() == vlan.getId()) {
+                            return nic;
                         }
                     }
                 }
@@ -2250,5 +2340,72 @@ public class NetworkModelImpl extends ManagerBase implements NetworkModel {
             InvalidParameterValueException ex = new InvalidParameterValueException("network with network id does not exist");
             throw ex;
         }
+    }
+
+    @Override
+    public List<String[]> generateVmData(String userData, String serviceOffering, String zoneName,
+                                         String vmName, long vmId, String publicKey, String password, Boolean isWindows) {
+        final List<String[]> vmData = new ArrayList<String[]>();
+
+        if (userData != null) {
+            vmData.add(new String[]{USERDATA_DIR, USERDATA_FILE, new String(Base64.decodeBase64(userData),StringUtils.getPreferredCharset())});
+        }
+        vmData.add(new String[]{METATDATA_DIR, SERVICE_OFFERING_FILE, StringUtils.unicodeEscape(serviceOffering)});
+        vmData.add(new String[]{METATDATA_DIR, AVAILABILITY_ZONE_FILE, StringUtils.unicodeEscape(zoneName)});
+        vmData.add(new String[]{METATDATA_DIR, LOCAL_HOSTNAME_FILE, StringUtils.unicodeEscape(vmName)});
+        vmData.add(new String[]{METATDATA_DIR, INSTANCE_ID_FILE, vmName});
+        vmData.add(new String[]{METATDATA_DIR, VM_ID_FILE, String.valueOf(vmId)});
+        vmData.add(new String[]{METATDATA_DIR, PUBLIC_KEYS_FILE, publicKey});
+
+        String cloudIdentifier = _configDao.getValue("cloud.identifier");
+        if (cloudIdentifier == null) {
+            cloudIdentifier = "";
+        } else {
+            cloudIdentifier = "CloudStack-{" + cloudIdentifier + "}";
+        }
+        vmData.add(new String[]{METATDATA_DIR, CLOUD_IDENTIFIER_FILE, cloudIdentifier});
+
+        if (password != null && !password.isEmpty() && !password.equals("saved_password")) {
+
+            // Here we are calculating MD5 checksum to reduce the over head of calculating MD5 checksum
+            // in windows VM in password reset script.
+
+            if (isWindows) {
+                MessageDigest md5 = null;
+                try {
+                    md5 = MessageDigest.getInstance("MD5");
+                } catch (NoSuchAlgorithmException e) {
+                    s_logger.error("Unexpected exception " + e.getMessage(), e);
+                    throw new CloudRuntimeException("Unable to get MD5 MessageDigest", e);
+                }
+                md5.reset();
+                md5.update(password.getBytes(StringUtils.getPreferredCharset()));
+                byte[] digest = md5.digest();
+                BigInteger bigInt = new BigInteger(1, digest);
+                String hashtext = bigInt.toString(16);
+
+                vmData.add(new String[]{PASSWORD_DIR, PASSWORD_CHECKSUM_FILE, hashtext});
+            }
+
+            vmData.add(new String[]{PASSWORD_DIR, PASSWORD_FILE, password});
+        }
+
+        return vmData;
+    }
+
+    @Override
+    public String getConfigComponentName() {
+        return NetworkModel.class.getSimpleName();
+    }
+
+    @Override
+    public ConfigKey<?>[] getConfigKeys() {
+        return new ConfigKey<?>[] {MACIdentifier};
+    }
+
+    @Override
+    public String getValidNetworkCidr(Network guestNetwork) {
+        String networkCidr = guestNetwork.getNetworkCidr();
+        return networkCidr == null ? guestNetwork.getCidr() : networkCidr;
     }
 }

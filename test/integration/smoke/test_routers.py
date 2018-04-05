@@ -31,7 +31,7 @@ from marvin.lib.base import (Account,
                              VirtualMachine)
 from marvin.lib.common import (get_domain,
                                get_zone,
-                               get_template,
+                               get_test_template,
                                list_hosts,
                                list_routers,
                                list_networks,
@@ -57,17 +57,15 @@ class TestRouterServices(cloudstackTestCase):
         # Get Zone, Domain and templates
         cls.domain = get_domain(cls.apiclient)
         cls.zone = get_zone(cls.apiclient, testClient.getZoneForTests())
+        cls.hypervisor = testClient.getHypervisorInfo()
         cls.services['mode'] = cls.zone.networktype
-        template = get_template(
+        template = get_test_template(
             cls.apiclient,
             cls.zone.id,
-            cls.services["ostype"]
+            cls.hypervisor
         )
         if template == FAILED:
-            cls.fail(
-                "get_template() failed to return template\
-                        with description %s" %
-                cls.services["ostype"])
+            cls.fail("get_test_template() failed to return template")
 
         cls.services["virtual_machine"]["zoneid"] = cls.zone.id
 
@@ -79,7 +77,7 @@ class TestRouterServices(cloudstackTestCase):
         )
         cls.service_offering = ServiceOffering.create(
             cls.apiclient,
-            cls.services["service_offerings"]
+            cls.services["service_offerings"]["tiny"]
         )
         cls.vm_1 = VirtualMachine.create(
             cls.apiclient,
@@ -171,7 +169,7 @@ class TestRouterServices(cloudstackTestCase):
                 self.apiclient.connection.user,
                 self.apiclient.connection.passwd,
                 router.linklocalip,
-                "service dnsmasq status",
+                "systemctl is-active dnsmasq",
                 hypervisor=self.hypervisor
             )
         else:
@@ -184,7 +182,7 @@ class TestRouterServices(cloudstackTestCase):
                     host.user,
                     host.passwd,
                     router.linklocalip,
-                    "service dnsmasq status"
+                    "systemctl is-active dnsmasq"
                 )
 
             except KeyError:
@@ -195,7 +193,7 @@ class TestRouterServices(cloudstackTestCase):
         self.debug("Dnsmasq process status: %s" % res)
 
         self.assertEqual(
-            res.count("running"),
+            res.count("active"),
             1,
             "Check dnsmasq service is running or not"
         )
@@ -251,7 +249,7 @@ class TestRouterServices(cloudstackTestCase):
                 self.apiclient.connection.user,
                 self.apiclient.connection.passwd,
                 router.linklocalip,
-                "service dnsmasq status",
+                "systemctl is-active dnsmasq",
                 hypervisor=self.hypervisor
             )
         else:
@@ -264,7 +262,7 @@ class TestRouterServices(cloudstackTestCase):
                     host.user,
                     host.passwd,
                     router.linklocalip,
-                    "service dnsmasq status"
+                    "systemctl is-active dnsmasq"
                 )
             except KeyError:
                 self.skipTest(
@@ -273,7 +271,7 @@ class TestRouterServices(cloudstackTestCase):
         res = str(result)
         self.debug("Dnsmasq process status: %s" % res)
         self.assertEqual(
-            res.count("running"),
+            res.count("active"),
             1,
             "Check dnsmasq service is running or not"
         )
@@ -285,7 +283,7 @@ class TestRouterServices(cloudstackTestCase):
                 self.apiclient.connection.user,
                 self.apiclient.connection.passwd,
                 router.linklocalip,
-                "service haproxy status",
+                "systemctl is-active haproxy",
                 hypervisor=self.hypervisor
             )
         else:
@@ -298,7 +296,7 @@ class TestRouterServices(cloudstackTestCase):
                     host.user,
                     host.passwd,
                     router.linklocalip,
-                    "service haproxy status"
+                    "systemctl is-active haproxy"
                 )
             except KeyError:
                 self.skipTest(
@@ -306,14 +304,21 @@ class TestRouterServices(cloudstackTestCase):
                             to check router services")
         res = str(result)
         self.assertEqual(
-            res.count("running"),
+            res.count("active"),
             1,
             "Check haproxy service is running or not"
         )
         self.debug("Haproxy process status: %s" % res)
         return
 
-    @attr(tags=["advanced", "advancedns", "smoke"], required_hardware="false")
+    @attr(
+        tags=[
+            "advanced",
+            "basic",
+            "advancedns",
+            "smoke",
+            "dvs"],
+        required_hardware="false")
     def test_03_restart_network_cleanup(self):
         """Test restart network
         """
@@ -323,20 +328,30 @@ class TestRouterServices(cloudstackTestCase):
         # 2. New router should have the same public IP
 
         # Find router associated with user account
-        list_router_response = list_routers(
-            self.apiclient,
-            account=self.account.name,
-            domainid=self.account.domainid
-        )
+        if self.zone.networktype.lower() == "basic":
+            list_router_response = list_routers(
+                self.apiclient,
+                listall="true"
+            )
+        else:
+            list_router_response = list_routers(
+                self.apiclient,
+                account=self.account.name,
+                domainid=self.account.domainid
+            )
         self.assertEqual(
             isinstance(list_router_response, list),
             True,
             "Check list response returns a valid list"
         )
+
         router = list_router_response[0]
 
         # Store old values before restart
-        old_publicip = router.publicip
+        if self.zone.networktype.lower == "basic":
+            old_publicip = router.guestipaddress
+        else:
+            old_publicip = router.publicip
 
         timeout = 10
         # Network should be in Implemented or Setup stage before restart
@@ -371,11 +386,17 @@ class TestRouterServices(cloudstackTestCase):
         self.apiclient.restartNetwork(cmd)
 
         # Get router details after restart
-        list_router_response = list_routers(
-            self.apiclient,
-            account=self.account.name,
-            domainid=self.account.domainid
-        )
+        if self.zone.networktype.lower() == "basic":
+            list_router_response = list_routers(
+                self.apiclient,
+                listall="true"
+            )
+        else:
+            list_router_response = list_routers(
+                self.apiclient,
+                account=self.account.name,
+                domainid=self.account.domainid
+            )
         self.assertEqual(
             isinstance(list_router_response, list),
             True,
@@ -383,14 +404,18 @@ class TestRouterServices(cloudstackTestCase):
         )
         router = list_router_response[0]
 
+        if self.zone.networktype.lower() == "basic":
+            new_publicip = router.guestipaddress
+        else:
+            new_publicip = router.publicip
         self.assertEqual(
-            router.publicip,
+            new_publicip,
             old_publicip,
             "Public IP of the router should remain same after network restart"
         )
         return
 
-    @attr(tags=["advanced", "advancedns", "smoke"], required_hardware="true")
+    @attr(tags=["advanced", "advancedns", "smoke", "dvs"], required_hardware="true")
     def test_04_restart_network_wo_cleanup(self):
         """Test restart network without cleanup
         """
@@ -752,7 +777,7 @@ class TestRouterServices(cloudstackTestCase):
             return True
         return False
 
-    @attr(tags=["advanced", "advancedns", "smoke"], required_hardware="false")
+    @attr(tags=["advanced", "advancedns", "smoke", "dvs"], required_hardware="false")
     def test_09_reboot_router(self):
         """Test reboot router
         """

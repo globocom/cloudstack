@@ -23,9 +23,6 @@ import java.util.Map;
 
 import javax.inject.Inject;
 
-import org.apache.log4j.Logger;
-import org.springframework.stereotype.Component;
-
 import org.apache.cloudstack.engine.subsystem.api.storage.ClusterScope;
 import org.apache.cloudstack.engine.subsystem.api.storage.CopyCommandResult;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataMotionStrategy;
@@ -41,7 +38,6 @@ import org.apache.cloudstack.engine.subsystem.api.storage.SnapshotInfo;
 import org.apache.cloudstack.engine.subsystem.api.storage.StorageAction;
 import org.apache.cloudstack.engine.subsystem.api.storage.StorageCacheManager;
 import org.apache.cloudstack.engine.subsystem.api.storage.StrategyPriority;
-import org.apache.cloudstack.engine.subsystem.api.storage.TemplateInfo;
 import org.apache.cloudstack.engine.subsystem.api.storage.VolumeInfo;
 import org.apache.cloudstack.engine.subsystem.api.storage.ZoneScope;
 import org.apache.cloudstack.framework.async.AsyncCompletionCallback;
@@ -49,6 +45,9 @@ import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 import org.apache.cloudstack.storage.RemoteHostEndPoint;
 import org.apache.cloudstack.storage.command.CopyCommand;
 import org.apache.cloudstack.storage.image.datastore.ImageStoreEntity;
+import org.apache.cloudstack.storage.to.PrimaryDataStoreTO;
+import org.apache.log4j.Logger;
+import org.springframework.stereotype.Component;
 
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.storage.MigrateVolumeAnswer;
@@ -58,12 +57,14 @@ import com.cloud.agent.api.to.DataStoreTO;
 import com.cloud.agent.api.to.DataTO;
 import com.cloud.agent.api.to.NfsTO;
 import com.cloud.agent.api.to.VirtualMachineTO;
+import com.cloud.capacity.CapacityManager;
 import com.cloud.configuration.Config;
 import com.cloud.host.Host;
+import com.cloud.hypervisor.Hypervisor;
 import com.cloud.storage.DataStoreRole;
+import com.cloud.storage.Storage.StoragePoolType;
 import com.cloud.storage.StoragePool;
 import com.cloud.storage.VolumeVO;
-import com.cloud.storage.Storage.StoragePoolType;
 import com.cloud.storage.dao.VolumeDao;
 import com.cloud.utils.NumbersUtil;
 import com.cloud.utils.db.DB;
@@ -99,22 +100,14 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
         DataStoreTO srcStoreTO = srcTO.getDataStore();
 
         if (srcStoreTO instanceof NfsTO || srcStoreTO.getRole() == DataStoreRole.ImageCache) {
-            //||
-            //    (srcStoreTO instanceof PrimaryDataStoreTO && ((PrimaryDataStoreTO)srcStoreTO).getPoolType() == StoragePoolType.NetworkFilesystem)) {
             return false;
         }
-
         DataTO destTO = destData.getTO();
         DataStoreTO destStoreTO = destTO.getDataStore();
 
         if (destStoreTO instanceof NfsTO || destStoreTO.getRole() == DataStoreRole.ImageCache) {
             return false;
         }
-
-        if (srcData.getType() == DataObjectType.TEMPLATE) {
-            TemplateInfo template = (TemplateInfo)srcData;
-        }
-
         if (s_logger.isDebugEnabled()) {
             s_logger.debug("needCacheStorage true, dest at " + destTO.getPath() + " dest role " + destStoreTO.getRole().toString() + srcTO.getPath() + " src role " +
                 srcStoreTO.getRole().toString());
@@ -163,7 +156,7 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
                 srcForCopy = cacheData = cacheMgr.createCacheObject(srcData, destScope);
             }
 
-            CopyCommand cmd = new CopyCommand(srcForCopy.getTO(), destData.getTO(), _primaryStorageDownloadWait, VirtualMachineManager.ExecuteInSequence.value());
+            CopyCommand cmd = new CopyCommand(srcForCopy.getTO(), addFullCloneFlagOnVMwareDest(destData.getTO()), _primaryStorageDownloadWait, VirtualMachineManager.ExecuteInSequence.value());
             EndPoint ep = destHost != null ? RemoteHostEndPoint.getHypervisorHostEndPoint(destHost) : selector.select(srcForCopy, destData);
             if (ep == null) {
                 String errMsg = "No remote endpoint to send command, check if host or ssvm is down?";
@@ -190,7 +183,7 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
                     // for template, we want to leave it on cache for performance reason
                     if ((answer == null || !answer.getResult()) && srcForCopy.getRefCount() < 2) {
                         // cache object created by this copy, not already there
-                        s_logger.warn("Copy may not be handled correctly by agent(id: " + ep.getId() + ")." +
+                        s_logger.warn("Copy may not be handled correctly by agent(id: " + (ep != null ? ep.getId() : "\"unspecified\"") + ")." +
                                       " Delete " + cacheType + " cache(id: " + cacheId +
                                       ", uuid: " + cacheUuid + ")");
                         cacheMgr.deleteCacheObject(srcForCopy);
@@ -209,6 +202,23 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
             }
             throw new CloudRuntimeException(e.toString());
         }
+    }
+
+    /**
+     * Adds {@code 'vmware.create.full.clone'} value for a given primary storage, whose HV is VMware, on datastore's {@code fullCloneFlag} field
+     * @param dataTO Dest data store TO
+     * @return dataTO including fullCloneFlag, if provided
+     */
+    protected DataTO addFullCloneFlagOnVMwareDest(DataTO dataTO) {
+        if (dataTO != null && dataTO.getHypervisorType().equals(Hypervisor.HypervisorType.VMware)){
+            DataStoreTO dataStoreTO = dataTO.getDataStore();
+            if (dataStoreTO != null && dataStoreTO instanceof PrimaryDataStoreTO){
+                PrimaryDataStoreTO primaryDataStoreTO = (PrimaryDataStoreTO) dataStoreTO;
+                Boolean value = CapacityManager.VmwareCreateCloneFull.valueIn(primaryDataStoreTO.getId());
+                primaryDataStoreTO.setFullCloneFlag(value);
+            }
+        }
+        return dataTO;
     }
 
     protected Answer copyObject(DataObject srcData, DataObject destData) {
@@ -267,7 +277,7 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
                 ep = selector.select(srcData, volObj);
             }
 
-            CopyCommand cmd = new CopyCommand(srcData.getTO(), volObj.getTO(), _createVolumeFromSnapshotWait, VirtualMachineManager.ExecuteInSequence.value());
+            CopyCommand cmd = new CopyCommand(srcData.getTO(), addFullCloneFlagOnVMwareDest(volObj.getTO()), _createVolumeFromSnapshotWait, VirtualMachineManager.ExecuteInSequence.value());
             Answer answer = null;
             if (ep == null) {
                 String errMsg = "No remote endpoint to send command, check if host or ssvm is down?";
@@ -290,7 +300,7 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
     }
 
     protected Answer cloneVolume(DataObject template, DataObject volume) {
-        CopyCommand cmd = new CopyCommand(template.getTO(), volume.getTO(), 0, VirtualMachineManager.ExecuteInSequence.value());
+        CopyCommand cmd = new CopyCommand(template.getTO(), addFullCloneFlagOnVMwareDest(volume.getTO()), 0, VirtualMachineManager.ExecuteInSequence.value());
         try {
             EndPoint ep = selector.select(volume.getDataStore());
             Answer answer = null;
@@ -340,7 +350,7 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
 
             objOnImageStore.processEvent(Event.CopyingRequested);
 
-            CopyCommand cmd = new CopyCommand(objOnImageStore.getTO(), destData.getTO(), _copyvolumewait, VirtualMachineManager.ExecuteInSequence.value());
+            CopyCommand cmd = new CopyCommand(objOnImageStore.getTO(), addFullCloneFlagOnVMwareDest(destData.getTO()), _copyvolumewait, VirtualMachineManager.ExecuteInSequence.value());
             EndPoint ep = selector.select(objOnImageStore, destData);
             if (ep == null) {
                 String errMsg = "No remote endpoint to send command, check if host or ssvm is down?";
@@ -407,6 +417,10 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
             VolumeVO volumeVo = volDao.findById(volume.getId());
             Long oldPoolId = volume.getPoolId();
             volumeVo.setPath(((MigrateVolumeAnswer)answer).getVolumePath());
+            String chainInfo = ((MigrateVolumeAnswer)answer).getVolumeChainInfo();
+            if (chainInfo != null) {
+                volumeVo.setChainInfo(chainInfo);
+            }
             volumeVo.setPodId(destPool.getPodId());
             volumeVo.setPoolId(destPool.getId());
             volumeVo.setLastPoolId(oldPoolId);
@@ -425,12 +439,11 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
 
     // Note: destHost is currently only used if the copyObject method is invoked
     @Override
-    public Void copyAsync(DataObject srcData, DataObject destData, Host destHost, AsyncCompletionCallback<CopyCommandResult> callback) {
+    public void copyAsync(DataObject srcData, DataObject destData, Host destHost, AsyncCompletionCallback<CopyCommandResult> callback) {
         Answer answer = null;
         String errMsg = null;
         try {
             s_logger.debug("copyAsync inspecting src type " + srcData.getType().toString() + " copyAsync inspecting dest type " + destData.getType().toString());
-
             if (srcData.getType() == DataObjectType.SNAPSHOT && destData.getType() == DataObjectType.VOLUME) {
                 answer = copyVolumeFromSnapshot(srcData, destData);
             } else if (srcData.getType() == DataObjectType.SNAPSHOT && destData.getType() == DataObjectType.TEMPLATE) {
@@ -461,12 +474,6 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
         CopyCommandResult result = new CopyCommandResult(null, answer);
         result.setResult(errMsg);
         callback.complete(result);
-        return null;
-    }
-
-    @Override
-    public Void copyAsync(DataObject srcData, DataObject destData, AsyncCompletionCallback<CopyCommandResult> callback) {
-        return copyAsync(srcData, destData, null, callback);
     }
 
     @DB
@@ -489,7 +496,7 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
             ep = selector.select(srcData, destData);
         }
 
-        CopyCommand cmd = new CopyCommand(srcData.getTO(), destData.getTO(), _createprivatetemplatefromsnapshotwait, VirtualMachineManager.ExecuteInSequence.value());
+        CopyCommand cmd = new CopyCommand(srcData.getTO(), addFullCloneFlagOnVMwareDest(destData.getTO()), _createprivatetemplatefromsnapshotwait, VirtualMachineManager.ExecuteInSequence.value());
         Answer answer = null;
         if (ep == null) {
             String errMsg = "No remote endpoint to send command, check if host or ssvm is down?";
@@ -512,10 +519,10 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
 
         DataObject cacheData = null;
         SnapshotInfo snapshotInfo = (SnapshotInfo)srcData;
-        Object payload = snapshotInfo.getPayload();
+        Boolean snapshotFullBackup = snapshotInfo.getFullBackup();
         Boolean fullSnapshot = true;
-        if (payload != null) {
-            fullSnapshot = (Boolean)payload;
+        if (snapshotFullBackup != null) {
+            fullSnapshot = snapshotFullBackup;
         }
         Map<String, String> options = new HashMap<String, String>();
         options.put("fullSnapshot", fullSnapshot.toString());
@@ -525,7 +532,7 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
                 Scope selectedScope = pickCacheScopeForCopy(srcData, destData);
                 cacheData = cacheMgr.getCacheObject(srcData, selectedScope);
 
-                CopyCommand cmd = new CopyCommand(srcData.getTO(), destData.getTO(), _backupsnapshotwait, VirtualMachineManager.ExecuteInSequence.value());
+                CopyCommand cmd = new CopyCommand(srcData.getTO(), addFullCloneFlagOnVMwareDest(destData.getTO()), _backupsnapshotwait, VirtualMachineManager.ExecuteInSequence.value());
                 cmd.setCacheTO(cacheData.getTO());
                 cmd.setOptions(options);
                 EndPoint ep = selector.select(srcData, destData);
@@ -537,6 +544,7 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
                     answer = ep.sendMessage(cmd);
                 }
             } else {
+                addFullCloneFlagOnVMwareDest(destData.getTO());
                 CopyCommand cmd = new CopyCommand(srcData.getTO(), destData.getTO(), _backupsnapshotwait, VirtualMachineManager.ExecuteInSequence.value());
                 cmd.setOptions(options);
                 EndPoint ep = selector.select(srcData, destData, StorageAction.BACKUPSNAPSHOT);
@@ -565,11 +573,9 @@ public class AncientDataMotionStrategy implements DataMotionStrategy {
     }
 
     @Override
-    public Void copyAsync(Map<VolumeInfo, DataStore> volumeMap, VirtualMachineTO vmTo, Host srcHost, Host destHost, AsyncCompletionCallback<CopyCommandResult> callback) {
+    public void copyAsync(Map<VolumeInfo, DataStore> volumeMap, VirtualMachineTO vmTo, Host srcHost, Host destHost, AsyncCompletionCallback<CopyCommandResult> callback) {
         CopyCommandResult result = new CopyCommandResult(null, null);
         result.setResult("Unsupported operation requested for copying data.");
         callback.complete(result);
-
-        return null;
     }
 }

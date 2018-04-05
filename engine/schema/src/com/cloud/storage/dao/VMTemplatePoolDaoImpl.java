@@ -22,8 +22,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import javax.ejb.Local;
 
+import javax.inject.Inject;
+import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreManager;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
@@ -42,9 +43,11 @@ import com.cloud.utils.db.TransactionLegacy;
 import com.cloud.utils.db.UpdateBuilder;
 
 @Component
-@Local(value = {VMTemplatePoolDao.class})
 public class VMTemplatePoolDaoImpl extends GenericDaoBase<VMTemplateStoragePoolVO, Long> implements VMTemplatePoolDao {
     public static final Logger s_logger = Logger.getLogger(VMTemplatePoolDaoImpl.class.getName());
+
+    @Inject
+    DataStoreManager dataStoreManager;
 
     protected final SearchBuilder<VMTemplateStoragePoolVO> PoolSearch;
     protected final SearchBuilder<VMTemplateStoragePoolVO> TemplateSearch;
@@ -120,9 +123,9 @@ public class VMTemplatePoolDaoImpl extends GenericDaoBase<VMTemplateStoragePoolV
     }
 
     @Override
-    public VMTemplateStoragePoolVO findByPoolTemplate(long hostId, long templateId) {
+    public VMTemplateStoragePoolVO findByPoolTemplate(long poolId, long templateId) {
         SearchCriteria<VMTemplateStoragePoolVO> sc = PoolTemplateSearch.create();
-        sc.setParameters("pool_id", hostId);
+        sc.setParameters("pool_id", poolId);
         sc.setParameters("template_id", templateId);
         return findOneIncludingRemovedBy(sc);
     }

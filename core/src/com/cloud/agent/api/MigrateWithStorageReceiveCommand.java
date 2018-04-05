@@ -20,39 +20,26 @@
 package com.cloud.agent.api;
 
 import java.util.List;
-import java.util.Map;
 
-import com.cloud.agent.api.to.StorageFilerTO;
 import com.cloud.agent.api.to.VirtualMachineTO;
 import com.cloud.agent.api.to.VolumeTO;
 import com.cloud.utils.Pair;
 
 public class MigrateWithStorageReceiveCommand extends Command {
     VirtualMachineTO vm;
-    Map<VolumeTO, StorageFilerTO> volumeToFiler;
-    List<Pair<VolumeTO, StorageFilerTO>> volumeToFilerAsList;
+    List<Pair<VolumeTO, String>> volumeToStorageUuid;
 
-    public MigrateWithStorageReceiveCommand(VirtualMachineTO vm, Map<VolumeTO, StorageFilerTO> volumeToFiler) {
+    public MigrateWithStorageReceiveCommand(VirtualMachineTO vm, List<Pair<VolumeTO, String>> volumeToStorageUuid) {
         this.vm = vm;
-        this.volumeToFiler = volumeToFiler;
-    }
-
-    public MigrateWithStorageReceiveCommand(VirtualMachineTO vm, List<Pair<VolumeTO, StorageFilerTO>> volumeToFilerAsList) {
-        this.vm = vm;
-        this.volumeToFiler = null;
-        this.volumeToFilerAsList = volumeToFilerAsList;
+        this.volumeToStorageUuid = volumeToStorageUuid;
     }
 
     public VirtualMachineTO getVirtualMachine() {
         return vm;
     }
 
-    public List<Pair<VolumeTO, StorageFilerTO>> getVolumeToFilerAsList() {
-        return volumeToFilerAsList;
-    }
-
-    public Map<VolumeTO, StorageFilerTO> getVolumeToFiler() {
-        return volumeToFiler;
+    public List<Pair<VolumeTO, String>> getVolumeToStorageUuid() {
+        return volumeToStorageUuid;
     }
 
     @Override

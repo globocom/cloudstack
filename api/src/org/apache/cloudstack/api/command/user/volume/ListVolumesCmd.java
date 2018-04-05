@@ -18,6 +18,7 @@ package org.apache.cloudstack.api.command.user.volume;
 
 import org.apache.log4j.Logger;
 
+import java.util.List;
 import org.apache.cloudstack.acl.RoleType;
 import org.apache.cloudstack.api.APICommand;
 import org.apache.cloudstack.api.ApiCommandJobType;
@@ -25,6 +26,7 @@ import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseListTaggedResourcesCmd;
 import org.apache.cloudstack.api.Parameter;
 import org.apache.cloudstack.api.ResponseObject.ResponseView;
+import org.apache.cloudstack.api.response.ClusterResponse;
 import org.apache.cloudstack.api.response.DiskOfferingResponse;
 import org.apache.cloudstack.api.response.HostResponse;
 import org.apache.cloudstack.api.response.ListResponse;
@@ -53,11 +55,17 @@ public class ListVolumesCmd extends BaseListTaggedResourcesCmd {
     @Parameter(name = ApiConstants.ID, type = CommandType.UUID, entityType = VolumeResponse.class, description = "the ID of the disk volume")
     private Long id;
 
+    @Parameter(name=ApiConstants.IDS, type=CommandType.LIST, collectionType=CommandType.UUID, entityType=VolumeResponse.class, description="the IDs of the volumes, mutually exclusive with id", since = "4.9")
+    private List<Long> ids;
+
     @Parameter(name = ApiConstants.NAME, type = CommandType.STRING, description = "the name of the disk volume")
     private String volumeName;
 
     @Parameter(name = ApiConstants.POD_ID, type = CommandType.UUID, entityType = PodResponse.class, description = "the pod id the disk volume belongs to")
     private Long podId;
+
+    @Parameter(name = ApiConstants.CLUSTER_ID, type = CommandType.UUID, entityType = ClusterResponse.class, description = "the cluster id the disk volume belongs to", authorized = {RoleType.Admin})
+    private Long clusterId;
 
     @Parameter(name = ApiConstants.TYPE, type = CommandType.STRING, description = "the type of disk volume")
     private String type;
@@ -92,6 +100,10 @@ public class ListVolumesCmd extends BaseListTaggedResourcesCmd {
 
     public Long getHostId() {
         return hostId;
+    }
+
+    public Long getClusterId() {
+        return clusterId;
     }
 
     public Long getId() {
@@ -152,5 +164,9 @@ public class ListVolumesCmd extends BaseListTaggedResourcesCmd {
         ListResponse<VolumeResponse> response = _queryService.searchForVolumes(this);
         response.setResponseName(getCommandName());
         setResponseObject(response);
+    }
+
+    public List<Long> getIds() {
+        return ids;
     }
 }

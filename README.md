@@ -15,7 +15,8 @@ Network-as-a-Service, user and account management, a full and open native API,
 resource accounting, and a first-class User Interface (UI).
 
 CloudStack currently supports the most popular hypervisors:
-VMware vSphere, KVM, XenServer, XenProject and Hyper-V as well as LXC containers.
+VMware vSphere, KVM, XenServer, XenProject and Hyper-V as well as
+OVM and LXC containers.
 
 Users can manage their cloud with an easy to use Web interface, command line
 tools, and/or a full-featured query based API.
@@ -41,7 +42,7 @@ For more information on Apache CloudStack, please visit the [website](http://clo
 
 Apache CloudStack project uses Git. The official Git repository is at:
 
-    https://git-wip-us.apache.org/repos/asf/cloudstack.git
+    https://gitbox.apache.org/repos/asf/cloudstack.git
 
 And a mirror is hosted on Github:
 
@@ -91,8 +92,7 @@ developer [page](http://cloudstack.apache.org/developers.html) for contributing 
 
 * [Blog](https://blogs.apache.org/cloudstack)
 * [Twitter](https://twitter.com/cloudstack)
-* [Planet CloudStack](http://planet.apache.org/cloudstack)
-* [Events and meetup](http://lanyrd.com/topics/apache-cloudstack)
+* [Events and meetup](http://cloudstackcollab.org/)
 
 ## Reporting Security Vulnerabilities
 
@@ -147,5 +147,4 @@ The following provides more details on the included cryptographic software:
 * CloudStack has a system requirement of MySQL, and uses native database encryption functionality.
 * CloudStack makes use of the Bouncy Castle general-purpose encryption library.
 * CloudStack can optionally interacts with and controls OpenSwan-based VPNs.
-* CloudStack has a dependency on Apache WSS4J as part of the AWSAPI implementation.
 * CloudStack has a dependency on and makes use of JSch - a java SSH2 implementation.

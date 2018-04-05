@@ -70,8 +70,8 @@ public class UserVmVO extends VMInstanceVO implements UserVm {
     }
 
     public UserVmVO(long id, String instanceName, String displayName, long templateId, HypervisorType hypervisorType, long guestOsId, boolean haEnabled,
-            boolean limitCpuUse, long domainId, long accountId, long serviceOfferingId, String userData, String name, Long diskOfferingId) {
-        super(id, serviceOfferingId, name, instanceName, Type.User, templateId, hypervisorType, guestOsId, domainId, accountId, haEnabled, limitCpuUse, diskOfferingId);
+                    boolean limitCpuUse, long domainId, long accountId, long userId, long serviceOfferingId, String userData, String name, Long diskOfferingId) {
+        super(id, serviceOfferingId, name, instanceName, Type.User, templateId, hypervisorType, guestOsId, domainId, accountId, userId, haEnabled, limitCpuUse, diskOfferingId);
         this.userData = userData;
         this.displayName = displayName;
         this.details = new HashMap<String, String>();
@@ -106,9 +106,7 @@ public class UserVmVO extends VMInstanceVO implements UserVm {
 
     @Override
     public String getDetail(String name) {
-        assert (details != null) : "Did you forget to load the details?";
-
-        return details != null ? details.get(name) : null;
+        return details != null ? details.get(name) : null ;
     }
 
     @Override

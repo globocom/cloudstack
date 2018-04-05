@@ -19,7 +19,6 @@ package com.cloud.api.query.dao;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.cloudstack.api.response.DomainRouterResponse;
@@ -42,7 +41,6 @@ import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
 
 @Component
-@Local(value = {DomainRouterJoinDao.class})
 public class DomainRouterJoinDaoImpl extends GenericDaoBase<DomainRouterJoinVO, Long> implements DomainRouterJoinDao {
     public static final Logger s_logger = Logger.getLogger(DomainRouterJoinDaoImpl.class);
 
@@ -118,6 +116,7 @@ public class DomainRouterJoinDaoImpl extends GenericDaoBase<DomainRouterJoinVO, 
                         routerResponse.setGuestMacAddress(router.getMacAddress());
                         routerResponse.setGuestNetmask(router.getNetmask());
                         routerResponse.setGuestNetworkId(router.getNetworkUuid());
+                        routerResponse.setGuestNetworkName(router.getNetworkName());
                         routerResponse.setNetworkDomain(router.getNetworkDomain());
                     }
                 }
@@ -168,6 +167,7 @@ public class DomainRouterJoinDaoImpl extends GenericDaoBase<DomainRouterJoinVO, 
         routerResponse.setIp6Dns2(router.getIp6Dns2());
 
         routerResponse.setVpcId(router.getVpcUuid());
+        routerResponse.setVpcName(router.getVpcName());
 
         routerResponse.setRole(router.getRole().toString());
 
@@ -210,6 +210,7 @@ public class DomainRouterJoinDaoImpl extends GenericDaoBase<DomainRouterJoinVO, 
                     vrData.setGuestMacAddress(vr.getMacAddress());
                     vrData.setGuestNetmask(vr.getNetmask());
                     vrData.setGuestNetworkId(vr.getNetworkUuid());
+                    vrData.setGuestNetworkName(vr.getNetworkName());
                     vrData.setNetworkDomain(vr.getNetworkDomain());
                 }
             }
@@ -219,6 +220,7 @@ public class DomainRouterJoinDaoImpl extends GenericDaoBase<DomainRouterJoinVO, 
             nicResponse.setGateway(vr.getGateway());
             nicResponse.setNetmask(vr.getNetmask());
             nicResponse.setNetworkid(vr.getNetworkUuid());
+            nicResponse.setNetworkName(vr.getNetworkName());
             nicResponse.setMacAddress(vr.getMacAddress());
             nicResponse.setIp6Address(vr.getIp6Address());
             nicResponse.setIp6Gateway(vr.getIp6Gateway());

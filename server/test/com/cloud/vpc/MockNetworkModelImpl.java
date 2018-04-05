@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -34,6 +33,7 @@ import com.cloud.network.IpAddress;
 import com.cloud.network.Network;
 import com.cloud.network.Network.Capability;
 import com.cloud.network.Network.GuestType;
+import com.cloud.network.Network.IpAddresses;
 import com.cloud.network.Network.Provider;
 import com.cloud.network.Network.Service;
 import com.cloud.network.NetworkModel;
@@ -56,7 +56,6 @@ import com.cloud.vm.Nic;
 import com.cloud.vm.NicProfile;
 import com.cloud.vm.VirtualMachine;
 
-@Local(value = {NetworkModel.class})
 public class MockNetworkModelImpl extends ManagerBase implements NetworkModel {
 
     @Inject
@@ -228,6 +227,11 @@ public class MockNetworkModelImpl extends ManagerBase implements NetworkModel {
     public Map<Capability, String> getNetworkServiceCapabilities(long networkId, Service service) {
         // TODO Auto-generated method stub
         return null;
+    }
+
+    @Override
+    public boolean isSharedNetworkWithoutServices(long networkId) {
+        return false;
     }
 
     /* (non-Javadoc)
@@ -505,9 +509,14 @@ public class MockNetworkModelImpl extends ManagerBase implements NetworkModel {
         return false;
     }
 
+    @Override
+    public boolean providerSupportsCapability(Set<Provider> providers, Service service, Capability cap) {
+        return false;
+    }
+
     /* (non-Javadoc)
-     * @see com.cloud.network.NetworkModel#checkCapabilityForProvider(java.util.Set, com.cloud.network.Network.Service, com.cloud.network.Network.Capability, java.lang.String)
-     */
+         * @see com.cloud.network.NetworkModel#checkCapabilityForProvider(java.util.Set, com.cloud.network.Network.Service, com.cloud.network.Network.Capability, java.lang.String)
+         */
     @Override
     public void checkCapabilityForProvider(Set<Provider> providers, Service service, Capability cap, String capValue) {
         // TODO Auto-generated method stub
@@ -837,7 +846,7 @@ public class MockNetworkModelImpl extends ManagerBase implements NetworkModel {
     }
 
     @Override
-    public void checkRequestedIpAddresses(long networkId, String ip4, String ip6) throws InvalidParameterValueException {
+    public void checkRequestedIpAddresses(long networkId, IpAddresses ips) throws InvalidParameterValueException {
         // TODO Auto-generated method stub
     }
 
@@ -901,6 +910,16 @@ public class MockNetworkModelImpl extends ManagerBase implements NetworkModel {
     @Override
     public boolean getNetworkEgressDefaultPolicy(Long networkId) {
         return false;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public List<String[]> generateVmData(String userData, String serviceOffering, String zoneName, String vmName, long vmId, String publicKey, String password, Boolean isWindows) {
+        return null;
+    }
+
+    @Override
+    public String getValidNetworkCidr(Network guestNetwork) {
+        return null;
     }
 
 }

@@ -17,6 +17,8 @@
 
 package com.cloud.hypervisor.vmware.mo;
 
+import org.apache.cloudstack.utils.volume.VirtualMachineDiskInfo;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -87,8 +89,9 @@ public class VirtualMachineDiskInfoBuilder {
     private static boolean chainContains(List<String> chain, String diskBackingFileBaseName, String dataStoreName) {
         for (String backing : chain) {
             DatastoreFile file = new DatastoreFile(backing);
+
             // Ensure matching disk exists in the right datastore
-            if (file.getFileBaseName().equals(diskBackingFileBaseName) && backing.contains(dataStoreName))
+            if (file.getFileBaseName().equals(diskBackingFileBaseName) && file.getDatastoreName().equals(dataStoreName))
                 return true;
         }
 

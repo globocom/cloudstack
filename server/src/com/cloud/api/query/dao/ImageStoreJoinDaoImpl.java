@@ -19,14 +19,11 @@ package com.cloud.api.query.dao;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
-import org.apache.cloudstack.api.ApiConstants;
-import org.apache.cloudstack.api.response.ImageStoreDetailResponse;
 import org.apache.cloudstack.api.response.ImageStoreResponse;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 
@@ -38,7 +35,6 @@ import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
 
 @Component
-@Local(value = {ImageStoreJoinDao.class})
 public class ImageStoreJoinDaoImpl extends GenericDaoBase<ImageStoreJoinVO, Long> implements ImageStoreJoinDao {
     public static final Logger s_logger = Logger.getLogger(ImageStoreJoinDaoImpl.class);
 
@@ -79,32 +75,12 @@ public class ImageStoreJoinDaoImpl extends GenericDaoBase<ImageStoreJoinVO, Long
         osResponse.setZoneId(ids.getZoneUuid());
         osResponse.setZoneName(ids.getZoneName());
 
-        String detailName = ids.getDetailName();
-        if ( detailName != null && detailName.length() > 0 && !detailName.equals(ApiConstants.PASSWORD)) {
-            String detailValue = ids.getDetailValue();
-            if (detailName.equals(ApiConstants.KEY) || detailName.equals(ApiConstants.S3_SECRET_KEY)) {
-                // ALWAYS return an empty value for the S3 secret key since that key is managed by Amazon and not CloudStack
-                detailValue = "";
-            }
-            ImageStoreDetailResponse osdResponse = new ImageStoreDetailResponse(detailName, detailValue);
-            osResponse.addDetail(osdResponse);
-        }
         osResponse.setObjectName("imagestore");
         return osResponse;
     }
 
     @Override
     public ImageStoreResponse setImageStoreResponse(ImageStoreResponse response, ImageStoreJoinVO ids) {
-        String detailName = ids.getDetailName();
-        if ( detailName != null && detailName.length() > 0 && !detailName.equals(ApiConstants.PASSWORD)) {
-            String detailValue = ids.getDetailValue();
-            if (detailName.equals(ApiConstants.KEY) || detailName.equals(ApiConstants.S3_SECRET_KEY)) {
-                // ALWAYS return an empty value for the S3 secret key since that key is managed by Amazon and not CloudStack
-                detailValue = "";
-            }
-            ImageStoreDetailResponse osdResponse = new ImageStoreDetailResponse(detailName, detailValue);
-            response.addDetail(osdResponse);
-        }
         return response;
     }
 

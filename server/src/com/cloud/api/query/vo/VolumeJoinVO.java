@@ -22,13 +22,11 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
-import javax.persistence.Id;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
-import com.cloud.server.ResourceTag.ResourceObjectType;
 import com.cloud.storage.Storage;
 import com.cloud.storage.VMTemplateStorageResourceAssoc.Status;
 import com.cloud.storage.Volume;
@@ -37,11 +35,7 @@ import com.cloud.vm.VirtualMachine;
 
 @Entity
 @Table(name = "volume_view")
-public class VolumeJoinVO extends BaseViewVO implements ControlledViewEntity {
-
-    @Id
-    @Column(name = "id")
-    private long id;
+public class VolumeJoinVO extends BaseViewWithTagInformationVO implements ControlledViewEntity {
 
     @Column(name = "uuid")
     private String uuid;
@@ -118,6 +112,21 @@ public class VolumeJoinVO extends BaseViewVO implements ControlledViewEntity {
 
     @Column(name = "pod_id")
     private long podId;
+
+    @Column(name = "pod_name")
+    private String podName;
+
+    @Column(name = "pod_uuid")
+    private String podUuid;
+
+    @Column(name = "cluster_id")
+    private long clusterId;
+
+    @Column(name = "cluster_name")
+    private String clusterName;
+
+    @Column(name = "cluster_uuid")
+    private String clusterUuid;
 
     @Column(name = "data_center_id")
     private long dataCenterId;
@@ -252,37 +261,6 @@ public class VolumeJoinVO extends BaseViewVO implements ControlledViewEntity {
     @Column(name = "job_status")
     private int jobStatus;
 
-    @Column(name = "tag_id")
-    private long tagId;
-
-    @Column(name = "tag_uuid")
-    private String tagUuid;
-
-    @Column(name = "tag_key")
-    private String tagKey;
-
-    @Column(name = "tag_value")
-    private String tagValue;
-
-    @Column(name = "tag_domain_id")
-    private long tagDomainId;
-
-    @Column(name = "tag_account_id")
-    private long tagAccountId;
-
-    @Column(name = "tag_resource_id")
-    private long tagResourceId;
-
-    @Column(name = "tag_resource_uuid")
-    private String tagResourceUuid;
-
-    @Column(name = "tag_resource_type")
-    @Enumerated(value = EnumType.STRING)
-    private ResourceObjectType tagResourceType;
-
-    @Column(name = "tag_customer")
-    private String tagCustomer;
-
     @Column(name = "display_volume", updatable = true, nullable = false)
     protected boolean displayVolume;
 
@@ -293,11 +271,6 @@ public class VolumeJoinVO extends BaseViewVO implements ControlledViewEntity {
     String chainInfo;
 
     public VolumeJoinVO() {
-    }
-
-    @Override
-    public long getId() {
-        return id;
     }
 
     @Override
@@ -511,6 +484,38 @@ public class VolumeJoinVO extends BaseViewVO implements ControlledViewEntity {
         return poolName;
     }
 
+    public String getPodName() {
+        return podName;
+    }
+
+    public void setPodName(String podName) {
+        this.podName = podName;
+    }
+
+    public String getPodUuid() {
+        return podUuid;
+    }
+
+    public void setPodUuid(String podUuid) {
+        this.podUuid = podUuid;
+    }
+
+    public void setPodId(long podId) {
+        this.podId = podId;
+    }
+
+    public long getClusterId() {
+        return clusterId;
+    }
+
+    public String getClusterName() {
+        return clusterName;
+    }
+
+    public String getClusterUuid() {
+        return clusterUuid;
+    }
+
     public long getTemplateId() {
         return templateId;
     }
@@ -563,46 +568,6 @@ public class VolumeJoinVO extends BaseViewVO implements ControlledViewEntity {
         return jobStatus;
     }
 
-    public long getTagId() {
-        return tagId;
-    }
-
-    public String getTagUuid() {
-        return tagUuid;
-    }
-
-    public String getTagKey() {
-        return tagKey;
-    }
-
-    public String getTagValue() {
-        return tagValue;
-    }
-
-    public long getTagDomainId() {
-        return tagDomainId;
-    }
-
-    public long getTagAccountId() {
-        return tagAccountId;
-    }
-
-    public long getTagResourceId() {
-        return tagResourceId;
-    }
-
-    public String getTagResourceUuid() {
-        return tagResourceUuid;
-    }
-
-    public ResourceObjectType getTagResourceType() {
-        return tagResourceType;
-    }
-
-    public String getTagCustomer() {
-        return tagCustomer;
-    }
-
     public long getDataCenterId() {
         return dataCenterId;
     }
@@ -636,4 +601,5 @@ public class VolumeJoinVO extends BaseViewVO implements ControlledViewEntity {
     public Class<?> getEntityType() {
         return Volume.class;
     }
+
 }

@@ -18,6 +18,7 @@
 """
 
 # Import Local Modules
+from marvin.config.test_data import test_data
 from marvin.cloudstackAPI import (listConfigurations,
                                   listPhysicalNetworks,
                                   listRegions,
@@ -56,23 +57,27 @@ from marvin.cloudstackAPI import (listConfigurations,
                                   listVirtualRouterElements,
                                   listNetworkOfferings,
                                   listResourceLimits,
-                                  listVPCOfferings)
-
-
-
-
+                                  listVPCOfferings,
+                                  migrateSystemVm)
 from marvin.sshClient import SshClient
 from marvin.codes import (PASS, FAILED, ISOLATED_NETWORK, VPC_NETWORK,
                           BASIC_ZONE, FAIL, NAT_RULE, STATIC_NAT_RULE,
                           RESOURCE_PRIMARY_STORAGE, RESOURCE_SECONDARY_STORAGE,
-                          RESOURCE_CPU, RESOURCE_MEMORY)
-from marvin.lib.utils import (validateList, xsplit, get_process_status)
+                          RESOURCE_CPU, RESOURCE_MEMORY, PUBLIC_TRAFFIC,
+                          GUEST_TRAFFIC, MANAGEMENT_TRAFFIC, STORAGE_TRAFFIC,
+                          VMWAREDVS)
+from marvin.lib.utils import (validateList,
+                              xsplit,
+                              get_process_status,
+                              random_gen,
+                              format_volume_to_ext3)
 from marvin.lib.base import (PhysicalNetwork,
                              PublicIPAddress,
                              NetworkOffering,
                              NATRule,
                              StaticNATRule,
                              Volume,
+                             Template,
                              Account,
                              Project,
                              Snapshot,
@@ -83,9 +88,18 @@ from marvin.lib.base import (PhysicalNetwork,
                              Network,
                              Host,
                              Resources,
-                             Configurations)
+                             Configurations,
+                             Router,
+                             PublicIpRange,
+                             StorageNetworkIpRange,
+                             TrafficType)
+from marvin.lib.vcenter import Vcenter
+from netaddr import IPAddress
 import random
-
+import re
+import itertools
+import random
+import hashlib
 
 # Import System modules
 import time
@@ -248,6 +262,17 @@ def get_zone(apiclient, zone_name=None, zone_id=None):
     '''
     return cmd_out[0]
 
+def get_physical_networks(apiclient, zoneid):
+    '''
+     @name : get_physical_networks
+     @Desc :Returns A list of the Physical Networks in the given Zone
+     @Input : zoneid: The Zone ID
+     @Output : 1. A list containing the Physical Networks
+    '''
+    cmd = listPhysicalNetworks.listPhysicalNetworksCmd()
+    cmd.zoneid = zoneid
+    physical_networks = apiclient.listPhysicalNetworks(cmd)
+    return physical_networks
 
 def get_pod(apiclient, zone_id=None, pod_id=None, pod_name=None):
     '''
@@ -273,6 +298,7 @@ def get_pod(apiclient, zone_id=None, pod_id=None, pod_name=None):
     if validateList(cmd_out)[0] != PASS:
         return FAILED
     return cmd_out[0]
+
 def get_template(
         apiclient, zone_id=None, ostype_desc=None, template_filter="featured", template_type='BUILTIN',
         template_id=None, template_name=None, account=None, domain_id=None, project_id=None,
@@ -318,6 +344,50 @@ def get_template(
     '''
     return list_templatesout[0]
 
+
+def get_test_template(apiclient, zone_id=None, hypervisor=None):
+    """
+    @Name : get_test_template
+    @Desc : Retrieves the test template used to running tests. When the template
+            is missing it will be download at most one in a zone for a hypervisor.
+    @Input : returns a template
+    """
+    test_templates = test_data["test_templates"]
+
+    if hypervisor is None:
+        return FAILED
+
+    hypervisor = hypervisor.lower()
+
+    # Return built-in template for simulator
+    if hypervisor == 'simulator':
+        return get_template(apiclient, zone_id)
+
+    if hypervisor not in test_templates.keys():
+        print "Provided hypervisor has no test template"
+        return FAILED
+
+    test_template = test_templates[hypervisor]
+
+    cmd = listTemplates.listTemplatesCmd()
+    cmd.name = test_template['name']
+    cmd.templatefilter = 'all'
+    if zone_id is not None:
+        cmd.zoneid = zone_id
+    if hypervisor is not None:
+        cmd.hypervisor = hypervisor
+    templates = apiclient.listTemplates(cmd)
+
+    if validateList(templates)[0] != PASS:
+        template = Template.register(apiclient, test_template, zoneid=zone_id, hypervisor=hypervisor.lower(), randomize_name=False)
+        template.download(apiclient)
+        return template
+
+    for template in templates:
+        if template.isready and template.ispublic:
+            return template
+
+    return FAILED
 
 
 def get_windows_template(
@@ -972,14 +1042,14 @@ def get_free_vlan(apiclient, zoneid):
 
     physical_network = list_physical_networks_response[0]
 
-    networks = list_networks(apiclient, zoneid=zoneid, type='Shared')
+    networks = list_networks(apiclient, zoneid=zoneid)
     usedVlanIds = []
 
     if isinstance(networks, list) and len(networks) > 0:
         usedVlanIds = [int(nw.vlan)
-                       for nw in networks if nw.vlan != "untagged"]
+                       for nw in networks if (nw.vlan and str(nw.vlan).lower() != "untagged")]
 
-    if hasattr(physical_network, "vlan") is False:
+    if not hasattr(physical_network, "vlan"):
         while True:
             shared_ntwk_vlan = random.randrange(1, 4095)
             if shared_ntwk_vlan in usedVlanIds:
@@ -1033,6 +1103,8 @@ def setNonContiguousVlanIds(apiclient, zoneid):
         list_physical_networks_response) > 0, "No physical networks found in zone %s" % zoneid
 
     for physical_network in list_physical_networks_response:
+        if not hasattr(physical_network, 'vlan'):
+            continue
 
         vlans = xsplit(physical_network.vlan, ['-', ','])
 
@@ -1395,3 +1467,491 @@ def isNetworkDeleted(apiclient, networkid, timeout=600):
         time.sleep(60)
     #end while
     return networkDeleted
+
+
+def createChecksum(service=None,
+                   virtual_machine=None,
+                   disk=None,
+                   disk_type=None):
+
+    """ Calculate the MD5 checksum of the disk by writing \
+		data on the disk where disk_type is either root disk or data disk
+	@return: returns the calculated checksum"""
+
+    random_data_0 = random_gen(size=100)
+    # creating checksum(MD5)
+    m = hashlib.md5()
+    m.update(random_data_0)
+    ckecksum_random_data_0 = m.hexdigest()
+    try:
+        ssh_client = SshClient(
+            virtual_machine.ssh_ip,
+            virtual_machine.ssh_port,
+            virtual_machine.username,
+            virtual_machine.password
+        )
+    except Exception:
+        raise Exception("SSH access failed for server with IP address: %s" %
+                    virtual_machine.ssh_ip)
+
+    # Format partition using ext3
+
+    format_volume_to_ext3(
+        ssh_client,
+        service["volume_write_path"][
+            virtual_machine.hypervisor.lower()][disk_type]
+    )
+    cmds = ["fdisk -l",
+            "mkdir -p %s" % service["data_write_paths"]["mount_dir"],
+            "mount -t ext3 %s1 %s" % (
+                service["volume_write_path"][
+                    virtual_machine.hypervisor.lower()][disk_type],
+                service["data_write_paths"]["mount_dir"]
+            ),
+            "mkdir -p %s/%s/%s " % (
+                service["data_write_paths"]["mount_dir"],
+                service["data_write_paths"]["sub_dir"],
+                service["data_write_paths"]["sub_lvl_dir1"],
+            ),
+            "echo %s > %s/%s/%s/%s" % (
+                random_data_0,
+                service["data_write_paths"]["mount_dir"],
+                service["data_write_paths"]["sub_dir"],
+                service["data_write_paths"]["sub_lvl_dir1"],
+                service["data_write_paths"]["random_data"]
+            ),
+            "cat %s/%s/%s/%s" % (
+                service["data_write_paths"]["mount_dir"],
+                service["data_write_paths"]["sub_dir"],
+                service["data_write_paths"]["sub_lvl_dir1"],
+                service["data_write_paths"]["random_data"]
+            )
+            ]
+
+    for c in cmds:
+        ssh_client.execute(c)
+
+    # Unmount the storage
+    cmds = [
+        "umount %s" % (service["data_write_paths"]["mount_dir"]),
+    ]
+
+    for c in cmds:
+        ssh_client.execute(c)
+
+    return ckecksum_random_data_0
+
+
+def compareChecksum(
+        apiclient,
+        service=None,
+        original_checksum=None,
+        disk_type=None,
+        virt_machine=None
+        ):
+    """
+    Create md5 checksum of the data present on the disk and compare
+    it with the given checksum
+    """
+    if virt_machine.state != "Running":
+        virt_machine.start(apiclient)
+
+    try:
+        # Login to VM to verify test directories and files
+        ssh = SshClient(
+            virt_machine.ssh_ip,
+            virt_machine.ssh_port,
+            virt_machine.username,
+            virt_machine.password
+        )
+    except Exception:
+        raise Exception("SSH access failed for server with IP address: %s" %
+                    virt_machine.ssh_ip)
+
+    # Mount datadiskdevice_1 because this is the first data disk of the new
+    # virtual machine
+    cmds = ["blkid",
+            "fdisk -l",
+            "mkdir -p %s" % service["data_write_paths"]["mount_dir"],
+            "mount -t ext3 %s1 %s" % (
+                service["volume_write_path"][
+                    virt_machine.hypervisor.lower()][disk_type],
+                service["data_write_paths"]["mount_dir"]
+            ),
+            ]
+
+    for c in cmds:
+        ssh.execute(c)
+
+    returned_data_0 = ssh.execute(
+        "cat %s/%s/%s/%s" % (
+            service["data_write_paths"]["mount_dir"],
+            service["data_write_paths"]["sub_dir"],
+            service["data_write_paths"]["sub_lvl_dir1"],
+            service["data_write_paths"]["random_data"]
+        ))
+
+    n = hashlib.md5()
+    n.update(returned_data_0[0])
+    ckecksum_returned_data_0 = n.hexdigest()
+
+    # Verify returned data
+    assert original_checksum == ckecksum_returned_data_0, \
+        "Cheskum does not match with checksum of original data"
+
+    # Unmount the Sec Storage
+    cmds = [
+        "umount %s" % (service["data_write_paths"]["mount_dir"]),
+    ]
+
+    for c in cmds:
+        ssh.execute(c)
+
+    return
+
+
+
+def verifyRouterState(apiclient, routerid, state, listall=True):
+    """List router and check if the router state matches the given state"""
+    retriesCount = 10
+    isRouterInDesiredState = False
+    exceptionOccured = False
+    exceptionMessage = ""
+    try:
+        while retriesCount >= 0:
+            routers = Router.list(apiclient, id=routerid, listall=listall)
+            assert validateList(
+                routers)[0] == PASS, "Routers list validation failed"
+            if str(routers[0].state).lower() == state:
+                isRouterInDesiredState = True
+                break
+            retriesCount -= 1
+            time.sleep(60)
+        if not isRouterInDesiredState:
+            exceptionMessage = "Router state should be %s, it is %s" %\
+                                (state, routers[0].state)
+    except Exception as e:
+        exceptionOccured = True
+        exceptionMessage = e
+        return [exceptionOccured, isRouterInDesiredState, exceptionMessage]
+    return [exceptionOccured, isRouterInDesiredState, exceptionMessage]
+
+def isIpRangeInUse(api_client, publicIpRange):
+    ''' Check that if any Ip in the IP Range is in use
+        currently
+    '''
+
+    vmList = VirtualMachine.list(api_client,
+                                 zoneid=publicIpRange.zoneid,
+                                 listall=True)
+    if not vmList:
+        return False
+
+    for vm in vmList:
+        for nic in vm.nic:
+            publicIpAddresses = PublicIPAddress.list(api_client,
+                                                 associatednetworkid=nic.networkid,
+                                                 listall=True)
+            if validateList(publicIpAddresses)[0] == PASS:
+                for ipaddress in publicIpAddresses:
+                    if IPAddress(publicIpRange.startip) <=\
+                        IPAddress(ipaddress.ipaddress) <=\
+                        IPAddress(publicIpRange.endip):
+                        return True
+    return False
+
+def verifyGuestTrafficPortGroups(api_client, config, setup_zone):
+
+    """ This function matches the given zone with
+    the zone in config file used to deploy the setup and
+    retrieves the corresponding vcenter details and forms
+    the vcenter connection object. It makes call to
+    verify the guest traffic for given zone """
+
+    try:
+        zoneDetailsInConfig = [zone for zone in config.zones
+                if zone.name == setup_zone.name][0]
+        vcenterusername = zoneDetailsInConfig.vmwaredc.username
+        vcenterpassword = zoneDetailsInConfig.vmwaredc.password
+        vcenterip = zoneDetailsInConfig.vmwaredc.vcenter
+        vcenterObj = Vcenter(
+                vcenterip,
+                vcenterusername,
+                vcenterpassword)
+        response = verifyVCenterPortGroups(
+                api_client,
+                vcenterObj,
+                traffic_types_to_validate=[
+                    GUEST_TRAFFIC],
+                zoneid=setup_zone.id,
+                switchTypes=[VMWAREDVS])
+        assert response[0] == PASS, response[1]
+    except Exception as e:
+        return [FAIL, e]
+    return [PASS, None]
+
+def analyzeTrafficType(trafficTypes, trafficTypeToFilter, switchTypes=None):
+    """ Analyze traffic types for given type and return
+        switch name and vlan Id from the
+        vmwarenetworklabel string of trafficTypeToFilter
+    """
+
+    try:
+        filteredList = [trafficType for trafficType in trafficTypes
+                        if trafficType.traffictype.lower() ==
+                        trafficTypeToFilter]
+
+        if not filteredList:
+            return [PASS, filteredList, None, None]
+
+        # Split string with , so as to extract the  switch Name and
+        # vlan ID
+        splitString = str(
+            filteredList[0].vmwarenetworklabel).split(",")
+        switchName = splitString[0]
+        vlanSpecified = splitString[1]
+        availableSwitchType = splitString[2]
+
+        if switchTypes and availableSwitchType.lower() not in switchTypes:
+            return [PASS, None, None, None]
+
+        return [PASS, filteredList, switchName, vlanSpecified]
+    except Exception as e:
+        return [FAIL, e, None, None]
+
+
+def getExpectedPortGroupNames(
+        api_client,
+        physical_network,
+        network_rate,
+        switch_name,
+        traffic_types,
+        switch_dict,
+        vcenter_conn,
+        specified_vlan,
+        traffic_type):
+    """ Return names of expected port groups that should be
+        present in vcenter
+
+        Parameters:
+        @physical_network: Physical Network of the @traffic_type
+        @network_rate:     as defined by network.throttling.rate
+        @switch_name:      Name of the switch used by the traffic in
+                           vcenter
+        @traffic_types:    List of all traffic types present in the physical
+                           network
+        @switch_dict:      Dictionary containing switch information in vcenter
+        @vcenter_conn:     vcenter connection object used to fetch information
+                           from vcenter
+        @specified_vlan:   The vlan for @traffic_type
+        @traffic_type:     Traffic type for which the port names are to be
+                           returned
+
+        Return value:
+        [PASS/FAIL, exception object if FAIL else expected port group names
+         for @traffic_type]
+        """
+
+    try:
+        expectedDVPortGroupNames = []
+
+        if traffic_type == PUBLIC_TRAFFIC:
+            publicIpRanges = PublicIpRange.list(
+                api_client,
+                physicalnetworkid=physical_network.id
+            )
+            if publicIpRanges is not None:
+                for publicIpRange in publicIpRanges:
+                    vlanInIpRange = re.findall(
+                        '\d+',
+                        str(publicIpRange.vlan))
+                    vlanId = "untagged"
+                    if len(vlanInIpRange) > 0:
+                        vlanId = vlanInIpRange[0]
+                    ipRangeInUse = isIpRangeInUse(api_client, publicIpRange)
+                    if ipRangeInUse:
+                        expectedDVPortGroupName = "cloud" + "." + \
+                                    PUBLIC_TRAFFIC + "." + vlanId + "." + \
+                                    network_rate + "." + "1" + "-" + \
+                                    switch_name
+                        expectedDVPortGroupNames.append(
+                                    expectedDVPortGroupName)
+
+                    expectedDVPortGroupName = "cloud" + "." + PUBLIC_TRAFFIC + "." + \
+                            vlanId + "." + "0" + "." + "1" + "-" + switch_name
+                    expectedDVPortGroupNames.append(expectedDVPortGroupName)
+
+        if traffic_type == GUEST_TRAFFIC:
+
+            networks = Network.list(
+                api_client,
+                physicalnetworkid=physical_network.id,
+                listall=True
+            )
+            if networks is not None:
+                for network in networks:
+                    networkVlan = re.findall(
+                        '\d+', str(network.vlan))
+                    if len(networkVlan) > 0:
+                        vlanId = networkVlan[0]
+                        expectedDVPortGroupName = "cloud" + "." + GUEST_TRAFFIC + "." + \
+                            vlanId + "." + network_rate + "." + "1" + "-" + \
+                            switch_name
+                        expectedDVPortGroupNames.append(
+                            expectedDVPortGroupName)
+
+        if traffic_type == STORAGE_TRAFFIC:
+            vlanId = ""
+            storageIpRanges = StorageNetworkIpRange.list(
+                api_client,
+                zoneid=physical_network.zoneid
+            )
+            if storageIpRanges is not None:
+                for storageIpRange in storageIpRanges:
+                    vlanInIpRange = re.findall(
+                        '\d+',
+                        str(storageIpRange.vlan))
+                    if len(vlanInIpRange) > 0:
+                        vlanId = vlanInIpRange[0]
+                    else:
+                        vlanId = "untagged"
+                    expectedDVPortGroupName = "cloud" + "." + STORAGE_TRAFFIC + \
+                        "." + vlanId + "." + "0" + "." + "1" + "-" + \
+                        switch_name
+                    expectedDVPortGroupNames.append(
+                        expectedDVPortGroupName)
+
+            else:
+                response = analyzeTrafficType(
+                    traffic_types, MANAGEMENT_TRAFFIC)
+                assert response[0] == PASS, response[1]
+                filteredList, switchName, vlanSpecified =\
+                    response[1], response[2], response[3]
+
+                if not filteredList:
+                    raise Exception("No Management traffic present and\
+                                Storage traffic does not have any IP range,\
+                                Invalid zone setting")
+
+                if switchName not in switch_dict:
+                    dvswitches = vcenter_conn.get_dvswitches(
+                        name=switchName)
+                    switch_dict[switchName] = dvswitches[0][
+                        'dvswitch']['portgroupNameList']
+
+                if vlanSpecified:
+                    vlanId = vlanSpecified
+                else:
+                    vlanId = "untagged"
+                expectedDVPortGroupName = "cloud" + "." + STORAGE_TRAFFIC + \
+                    "." + vlanId + "." + "0" + "." + "1" + "-" + switchName
+                expectedDVPortGroupNames.append(expectedDVPortGroupName)
+
+        if traffic_type == MANAGEMENT_TRAFFIC:
+            vlanId = "untagged"
+            if specified_vlan:
+                vlanId = specified_vlan
+            expectedDVPortGroupName = "cloud" + "." + "private" + "." + \
+                vlanId + "." + "0" + "." + "1" + "-" + switch_name
+            expectedDVPortGroupNames.append(expectedDVPortGroupName)
+
+    except Exception as e:
+        return [FAIL, e]
+    return [PASS, expectedDVPortGroupNames]
+
+
+def verifyVCenterPortGroups(
+        api_client,
+        vcenter_conn,
+        zoneid,
+        traffic_types_to_validate,
+        switchTypes):
+
+    """ Generate expected port groups for given traffic types and
+        verify they are present in the vcenter
+
+        Parameters:
+        @api_client:    API client of root admin account
+        @vcenter_conn:  connection object for vcenter used to fetch data
+                        using vcenterAPI
+        @zone_id:       Zone for which port groups are to be verified
+        @traffic_types_to_validate:
+                        Traffic types (public, guest, management, storage) for
+                        which verification is to be done
+        @switchTypes:   The switch types for which port groups
+                        are to be verified e.g vmwaredvs
+
+        Return value:
+        [PASS/FAIL, exception message if FAIL else None]
+    """
+    try:
+        expectedDVPortGroupNames = []
+        vcenterPortGroups = []
+        config = Configurations.list(
+            api_client,
+            name="network.throttling.rate"
+        )
+        networkRate = config[0].value
+        switchDict = {}
+        physicalNetworks = PhysicalNetwork.list(
+                api_client,
+                zoneid=zoneid
+            )
+
+        # If there are no physical networks in zone, return as PASS
+        # as there are no validations to make
+        if validateList(physicalNetworks)[0] != PASS:
+            return [PASS, None]
+
+        for physicalNetwork in physicalNetworks:
+            trafficTypes = TrafficType.list(
+                    api_client,
+                    physicalnetworkid=physicalNetwork.id)
+
+            for trafficType in traffic_types_to_validate:
+                response = analyzeTrafficType(
+                        trafficTypes, trafficType, switchTypes)
+                assert response[0] == PASS, response[1]
+                filteredList, switchName, vlanSpecified=\
+                        response[1], response[2], response[3]
+
+                if not filteredList:
+                    continue
+
+                if switchName not in switchDict:
+                    dvswitches = vcenter_conn.get_dvswitches(
+                            name=switchName)
+                    switchDict[switchName] = dvswitches[0][
+                            'dvswitch']['portgroupNameList']
+
+                response = getExpectedPortGroupNames(
+                        api_client,
+                        physicalNetwork,
+                        networkRate,
+                        switchName,
+                        trafficTypes,
+                        switchDict,
+                        vcenter_conn,
+                        vlanSpecified,
+                        trafficType)
+                assert response[0] == PASS, response[1]
+                dvPortGroups = response[1]
+                expectedDVPortGroupNames.extend(dvPortGroups)
+
+        vcenterPortGroups = list(itertools.chain(*(switchDict.values())))
+
+        for expectedDVPortGroupName in expectedDVPortGroupNames:
+            assert expectedDVPortGroupName in vcenterPortGroups,\
+                "Port group %s not present in VCenter DataCenter" %\
+                expectedDVPortGroupName
+
+    except Exception as e:
+        return [FAIL, e]
+    return [PASS, None]
+
+def migrate_router(apiclient, router_id, host_id):
+    cmd = migrateSystemVm.migrateSystemVmCmd()
+    cmd.hostid = host_id
+    cmd.virtualmachineid = router_id
+
+    apiclient.migrateSystemVm(cmd)

@@ -359,7 +359,7 @@ public class ElastistorPrimaryDataStoreLifeCycle implements PrimaryDataStoreLife
 
         PrimaryDataStoreInfo primarystore = (PrimaryDataStoreInfo) store;
         // Check if there is host up in this cluster
-        List<HostVO> allHosts = _resourceMgr.listAllUpAndEnabledHosts(Host.Type.Routing, primarystore.getClusterId(), primarystore.getPodId(), primarystore.getDataCenterId());
+        List<HostVO> allHosts = _resourceMgr.listAllUpHosts(Host.Type.Routing, primarystore.getClusterId(), primarystore.getPodId(), primarystore.getDataCenterId());
         if (allHosts.isEmpty()) {
             primaryDataStoreDao.expunge(primarystore.getId());
             throw new CloudRuntimeException("No host up to associate a storage pool with in cluster " + primarystore.getClusterId());
@@ -464,6 +464,16 @@ public class ElastistorPrimaryDataStoreLifeCycle implements PrimaryDataStoreLife
         return true;
     }
 
+    @Override
+    public void enableStoragePool(DataStore dataStore) {
+        _dataStoreHelper.enable(dataStore);
+    }
+
+    @Override
+    public void disableStoragePool(DataStore dataStore) {
+        _dataStoreHelper.disable(dataStore);
+    }
+
     @SuppressWarnings("finally")
     @Override
     public boolean deleteDataStore(DataStore store) {
@@ -545,7 +555,7 @@ public class ElastistorPrimaryDataStoreLifeCycle implements PrimaryDataStoreLife
                 if(capacityBytes != null){
                     long usedBytes = _capacityMgr.getUsedBytes(storagePoolVO);
 
-                    if (Long.valueOf(capacityBytes) < usedBytes) {
+                    if (Long.parseLong(capacityBytes) < usedBytes) {
                         throw new CloudRuntimeException("Cannot reduce the number of bytes for this storage pool as it would lead to an insufficient number of bytes");
                     }
 
@@ -553,7 +563,7 @@ public class ElastistorPrimaryDataStoreLifeCycle implements PrimaryDataStoreLife
 
                    if(updateTsmStorageCmdResponse.getStorage().getId() != null){
                     // update the cloudstack db
-                    _storagePoolDao.updateCapacityBytes(storagePool.getId(), Long.valueOf(capacityBytes));
+                    _storagePoolDao.updateCapacityBytes(storagePool.getId(), Long.parseLong(capacityBytes));
 
                     s_logger.info("elastistor TSM storage successfully updated");
                    }else{
@@ -564,8 +574,9 @@ public class ElastistorPrimaryDataStoreLifeCycle implements PrimaryDataStoreLife
                 if(capacityIops != null){
 
                     long usedIops = _capacityMgr.getUsedIops(storagePoolVO);
+                long capacity = Long.parseLong(capacityIops);
 
-                    if (Long.valueOf(capacityIops) < usedIops) {
+                if (capacity < usedIops) {
                         throw new CloudRuntimeException("Cannot reduce the number of IOPS for this storage pool as it would lead to an insufficient number of IOPS");
                     }
 
@@ -573,7 +584,7 @@ public class ElastistorPrimaryDataStoreLifeCycle implements PrimaryDataStoreLife
 
                    if(updateTsmCmdResponse.getTsm(0).getUuid() != null){
                    // update the cloudstack db
-                    _storagePoolDao.updateCapacityIops(storagePool.getId(), Long.valueOf(capacityIops));
+                    _storagePoolDao.updateCapacityIops(storagePool.getId(), capacity);
 
                     s_logger.info("elastistor TSM IOPS successfully updated");
 

@@ -54,8 +54,12 @@ Snapshot States - END
 
 RECURRING = "RECURRING"
 ENABLED = "Enabled"
+DISABLED = "Disabled"
+ENABLE = "Enable"
+DISABLE = "Disable"
 NETWORK_OFFERING = "network_offering"
 ROOT = "ROOT"
+DATA = "DATA"
 INVALID_INPUT = "INVALID INPUT"
 EMPTY_LIST = "EMPTY_LIST"
 FAIL = 0
@@ -88,6 +92,7 @@ ERROR_NO_HOST_FOR_MIGRATION = \
     "please ensure setup has required no. of hosts"
 NAT_RULE = "nat rule"
 STATIC_NAT_RULE = "static nat rule"
+LB_RULE = "Load Balancer Rule"
 UNKNOWN = "UNKNOWN"
 FAULT = "FAULT"
 MASTER = "MASTER"
@@ -110,3 +115,62 @@ CHILD_DOMAIN_ADMIN="child domain admin"
 Network states
 '''
 ALLOCATED = "Allocated"
+
+'''
+Host states
+'''
+HOST_CREATING = "Creating"
+HOST_CONNECTING = "Connecting"
+HOST_UP = "Up"
+HOST_DOWN = "Down"
+HOST_DISCONNECTED = "Disconnected"
+HOST_ALERT = "Alert"
+HOST_REMOVED = "Removed"
+HOST_ERROR = "Error"
+HOST_REBALANCING = "Rebalancing"
+HOST_UNKNOWN = "Unknown"
+
+'''
+Host resource states
+'''
+HOST_RS_CREATING = "Creating"
+HOST_RS_ENABLED = "Enabled"
+HOST_RS_DISABLED = "Disabled"
+HOST_RS_PREPARE_FOR_MAINTENANCE = "PrepareForMaintenance"
+HOST_RS_ERROR_IN_MAINTENANCE = "ErrorInMaintenance"
+HOST_RS_MAINTENANCE = "Maintenance"
+HOST_RS_ERROR = "Error"
+
+'''
+Storage Tags
+'''
+ZONETAG1 = "zwps1"
+ZONETAG2 = "zwps2"
+CLUSTERTAG1 = "cwps1"
+CLUSTERTAG2 = "cwps2"
+
+'''
+Traffic Types
+'''
+PUBLIC_TRAFFIC = "public"
+GUEST_TRAFFIC = "guest"
+MANAGEMENT_TRAFFIC = "management"
+STORAGE_TRAFFIC = "storage"
+
+'''
+Switch Type
+'''
+VMWAREDVS = "vmwaredvs"
+
+'''
+Storage Pools State
+'''
+
+UP = "up"
+
+'''
+Storage Pools Scope
+'''
+
+CLUSTER = "cluster"
+DATA = "DATA"

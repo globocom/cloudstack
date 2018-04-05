@@ -19,22 +19,24 @@
 
 package com.cloud.storage.template;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.Map;
-
-import javax.ejb.Local;
-import javax.naming.ConfigurationException;
-
-import org.apache.log4j.Logger;
-
 import com.cloud.exception.InternalErrorException;
 import com.cloud.storage.Storage.ImageFormat;
 import com.cloud.storage.StorageLayer;
 import com.cloud.utils.NumbersUtil;
 import com.cloud.utils.component.AdapterBase;
-import com.cloud.utils.exception.CloudRuntimeException;
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorInputStream;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.log4j.Logger;
+
+import javax.naming.ConfigurationException;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Map;
 
 /**
  * VhdProcessor processes the downloaded template for VHD.  It
@@ -42,16 +44,17 @@ import com.cloud.utils.exception.CloudRuntimeException;
  * into the VHD format.
  *
  */
-@Local(value = Processor.class)
 public class VhdProcessor extends AdapterBase implements Processor {
 
     private static final Logger s_logger = Logger.getLogger(VhdProcessor.class);
     StorageLayer _storage;
     private int vhdFooterSize = 512;
+    private int vhdCookieOffset = 8;
     private int vhdFooterCreatorAppOffset = 28;
     private int vhdFooterCreatorVerOffset = 32;
     private int vhdFooterCurrentSizeOffset = 48;
     private byte[][] citrixCreatorApp = { {0x74, 0x61, 0x70, 0x00}, {0x43, 0x54, 0x58, 0x53}}; /*"tap ", and "CTXS"*/
+    private String vhdIdentifierCookie = "conectix";
 
     @Override
     public FormatInfo process(String templatePath, ImageFormat format, String templateName) throws InternalErrorException {
@@ -61,85 +64,92 @@ public class VhdProcessor extends AdapterBase implements Processor {
         }
 
         String vhdPath = templatePath + File.separator + templateName + "." + ImageFormat.VHD.getFileExtension();
-
         if (!_storage.exists(vhdPath)) {
             s_logger.debug("Unable to find the vhd file: " + vhdPath);
             return null;
         }
 
+        File vhdFile = _storage.getFile(vhdPath);
+
         FormatInfo info = new FormatInfo();
         info.format = ImageFormat.VHD;
         info.filename = templateName + "." + ImageFormat.VHD.getFileExtension();
-
-        File vhdFile = _storage.getFile(vhdPath);
-
         info.size = _storage.getSize(vhdPath);
-        FileInputStream strm = null;
-        byte[] currentSize = new byte[8];
-        byte[] creatorApp = new byte[4];
+
         try {
-            strm = new FileInputStream(vhdFile);
-            long skipped = strm.skip(info.size - vhdFooterSize + vhdFooterCreatorAppOffset);
-            if (skipped == -1) {
-                throw new InternalErrorException("Unexpected end-of-file");
-            }
-            long read = strm.read(creatorApp);
-            if (read == -1) {
-                throw new InternalErrorException("Unexpected end-of-file");
-            }
-            skipped = strm.skip(vhdFooterCurrentSizeOffset - vhdFooterCreatorVerOffset);
-            if (skipped == -1) {
-                throw new InternalErrorException("Unexpected end-of-file");
-            }
-            read = strm.read(currentSize);
-            if (read == -1) {
-                throw new InternalErrorException("Unexpected end-of-file");
-            }
+            info.virtualSize = getTemplateVirtualSize(vhdFile);
         } catch (IOException e) {
-            s_logger.warn("Unable to read vhd file " + vhdPath, e);
-            throw new InternalErrorException("Unable to read vhd file " + vhdPath + ": " + e, e);
-        } finally {
-            if (strm != null) {
-                try {
-                    strm.close();
-                } catch (IOException e) {
-                }
-            }
+            s_logger.error("Unable to get the virtual size for " + vhdPath);
+            throw new InternalErrorException("unable to get virtual size from vhd file");
         }
-
-        //imageSignatureCheck(creatorApp);
-
-        long templateSize = NumbersUtil.bytesToLong(currentSize);
-        info.virtualSize = templateSize;
 
         return info;
     }
 
     @Override
-    public long getVirtualSize(File file) {
-        FileInputStream strm = null;
-        byte[] currentSize = new byte[8];
-        byte[] creatorApp = new byte[4];
+    public long getVirtualSize(File file) throws IOException {
         try {
-            strm = new FileInputStream(file);
-            strm.skip(file.length() - vhdFooterSize + vhdFooterCreatorAppOffset);
-            strm.read(creatorApp);
-            strm.skip(vhdFooterCurrentSizeOffset - vhdFooterCreatorVerOffset);
-            strm.read(currentSize);
+            long size = getTemplateVirtualSize(file);
+            return size;
         } catch (Exception e) {
-            s_logger.warn("Unable to read vhd file " + file.getAbsolutePath(), e);
-            throw new CloudRuntimeException("Unable to read vhd file " + file.getAbsolutePath() + ": " + e);
+            s_logger.info("[ignored]" + "failed to get template virtual size for VHD: " + e.getLocalizedMessage());
+        }
+        return file.length();
+    }
+
+    protected long getTemplateVirtualSize(File file) throws IOException {
+        byte[] currentSize = new byte[8];
+        byte[] cookie = new byte[8];
+        byte[] creatorApp = new byte[4];
+
+
+        BufferedInputStream fileStream = new BufferedInputStream(new FileInputStream(file));
+        InputStream strm = fileStream;
+
+        boolean isCompressed = checkCompressed(file.getAbsolutePath());
+
+        if ( isCompressed ) {
+            try {
+                strm = new CompressorStreamFactory().createCompressorInputStream(fileStream);
+            } catch (CompressorException e) {
+                s_logger.info("error opening compressed VHD file " + file.getName());
+                return file.length();
+            }
+        } try {
+
+            //read the backup footer present at the top of the VHD file
+            strm.read(cookie);
+            if (! new String(cookie).equals(vhdIdentifierCookie)) {
+                strm.close();
+                return  file.length();
+            }
+
+            long skipped = strm.skip(vhdFooterCreatorAppOffset - vhdCookieOffset);
+            if (skipped == -1) {
+                throw new IOException("Unexpected end-of-file");
+            }
+            long read = strm.read(creatorApp);
+            if (read == -1) {
+                throw new IOException("Unexpected end-of-file");
+            }
+            skipped = strm.skip(vhdFooterCurrentSizeOffset - vhdFooterCreatorVerOffset - vhdCookieOffset);
+            if (skipped == -1) {
+                throw new IOException("Unexpected end-of-file");
+            }
+            read = strm.read(currentSize);
+            if (read == -1) {
+                throw new IOException("Unexpected end-of-file");
+            }
+        } catch (IOException e) {
+            s_logger.warn("Error reading virtual size from VHD file " + e.getMessage() + " VHD: " + file.getName());
+            return file.length();
         } finally {
             if (strm != null) {
-                try {
-                    strm.close();
-                } catch (IOException e) {
-                }
+                strm.close();
             }
         }
 
-        long templateSize = NumbersUtil.bytesToLong(currentSize);
-        return templateSize;
+        return NumbersUtil.bytesToLong(currentSize);
     }
 
     @Override
@@ -153,4 +163,30 @@ public class VhdProcessor extends AdapterBase implements Processor {
         return true;
     }
 
+    private boolean checkCompressed(String fileName) throws IOException {
+
+        FileInputStream fin = null;
+        BufferedInputStream bin = null;
+        CompressorInputStream cin = null;
+
+        try {
+            fin = new FileInputStream(fileName);
+            bin = new BufferedInputStream(fin);
+            cin = new CompressorStreamFactory().createCompressorInputStream(bin);
+
+        } catch (CompressorException e) {
+            s_logger.warn(e.getMessage());
+            return false;
+
+        } catch (FileNotFoundException e) {
+            s_logger.warn(e.getMessage());
+            return false;
+        } finally {
+            if (cin != null)
+                cin.close();
+            else if (bin != null)
+                bin.close();
+        }
+        return true;
+    }
 }

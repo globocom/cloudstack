@@ -113,13 +113,14 @@ public class CreateTemplateCmd extends BaseAsyncCreateCmd {
 
     @Parameter(name = ApiConstants.URL,
                type = CommandType.STRING,
+               length = 2048,
                description = "Optional, only for baremetal hypervisor. The directory name where template stored on CIFS server")
     private String url;
 
     @Parameter(name = ApiConstants.TEMPLATE_TAG, type = CommandType.STRING, description = "the tag for this template.")
     private String templateTag;
 
-    @Parameter(name = ApiConstants.DETAILS, type = CommandType.MAP, description = "Template details in key/value pairs.")
+    @Parameter(name = ApiConstants.DETAILS, type = CommandType.MAP, description = "Template details in key/value pairs using format details[i].keyname=keyvalue. Example: details[0].hypervisortoolsversion=xenserver61")
     protected Map details;
 
     @Parameter(name = ApiConstants.IS_DYNAMICALLY_SCALABLE,
@@ -217,18 +218,18 @@ public class CreateTemplateCmd extends BaseAsyncCreateCmd {
     public long getEntityOwnerId() {
         Long volumeId = getVolumeId();
         Long snapshotId = getSnapshotId();
-        Long accountId = null;
+        Account callingAccount = CallContext.current().getCallingAccount();
         if (volumeId != null) {
             Volume volume = _entityMgr.findById(Volume.class, volumeId);
             if (volume != null) {
-                _accountService.checkAccess(CallContext.current().getCallingAccount(), SecurityChecker.AccessType.UseEntry, false, volume);
+                _accountService.checkAccess(callingAccount, SecurityChecker.AccessType.UseEntry, false, volume);
             } else {
                 throw new InvalidParameterValueException("Unable to find volume by id=" + volumeId);
             }
         } else {
             Snapshot snapshot = _entityMgr.findById(Snapshot.class, snapshotId);
             if (snapshot != null) {
-                _accountService.checkAccess(CallContext.current().getCallingAccount(), SecurityChecker.AccessType.UseEntry, false, snapshot);
+                _accountService.checkAccess(callingAccount, SecurityChecker.AccessType.UseEntry, false, snapshot);
             } else {
                 throw new InvalidParameterValueException("Unable to find snapshot by id=" + snapshotId);
             }
@@ -239,7 +240,7 @@ public class CreateTemplateCmd extends BaseAsyncCreateCmd {
             if (project != null) {
                 if (project.getState() == Project.State.Active) {
                     Account projectAccount= _accountService.getAccount(project.getProjectAccountId());
-                    _accountService.checkAccess(CallContext.current().getCallingAccount(), SecurityChecker.AccessType.UseEntry, false, projectAccount);
+                    _accountService.checkAccess(callingAccount, SecurityChecker.AccessType.UseEntry, false, projectAccount);
                     return project.getProjectAccountId();
                 } else {
                     final PermissionDeniedException ex =
@@ -253,7 +254,7 @@ public class CreateTemplateCmd extends BaseAsyncCreateCmd {
             }
         }
 
-        return CallContext.current().getCallingAccount().getId();
+        return callingAccount.getId();
     }
 
     @Override

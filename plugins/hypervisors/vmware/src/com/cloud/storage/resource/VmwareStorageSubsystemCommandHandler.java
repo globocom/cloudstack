@@ -19,9 +19,9 @@
 package com.cloud.storage.resource;
 
 import java.io.File;
+import java.util.EnumMap;
 
 import org.apache.log4j.Logger;
-
 import org.apache.cloudstack.storage.command.CopyCmdAnswer;
 import org.apache.cloudstack.storage.command.CopyCommand;
 import org.apache.cloudstack.storage.command.DeleteCommand;
@@ -38,11 +38,14 @@ import com.cloud.agent.api.to.S3TO;
 import com.cloud.agent.api.to.SwiftTO;
 import com.cloud.hypervisor.vmware.manager.VmwareStorageManager;
 import com.cloud.storage.DataStoreRole;
+import com.cloud.storage.resource.VmwareStorageProcessor.VmwareStorageProcessorConfigurableFields;
 
 public class VmwareStorageSubsystemCommandHandler extends StorageSubsystemCommandHandlerBase {
+
     private static final Logger s_logger = Logger.getLogger(VmwareStorageSubsystemCommandHandler.class);
     private VmwareStorageManager storageManager;
     private PremiumSecondaryStorageResource storageResource;
+    private Integer _nfsVersion;
 
     public PremiumSecondaryStorageResource getStorageResource() {
         return storageResource;
@@ -60,8 +63,30 @@ public class VmwareStorageSubsystemCommandHandler extends StorageSubsystemComman
         this.storageManager = storageManager;
     }
 
-    public VmwareStorageSubsystemCommandHandler(StorageProcessor processor) {
+    public VmwareStorageSubsystemCommandHandler(StorageProcessor processor, Integer nfsVersion) {
         super(processor);
+        this._nfsVersion = nfsVersion;
+    }
+
+    public boolean reconfigureStorageProcessor(EnumMap<VmwareStorageProcessorConfigurableFields,Object> params) {
+        VmwareStorageProcessor processor = (VmwareStorageProcessor) this.processor;
+        for (VmwareStorageProcessorConfigurableFields key : params.keySet()){
+            switch (key){
+            case NFS_VERSION:
+                Integer nfsVersion = (Integer) params.get(key);
+                processor.setNfsVersion(nfsVersion);
+                this._nfsVersion = nfsVersion;
+                break;
+            case FULL_CLONE_FLAG:
+                boolean fullClone = (boolean) params.get(key);
+                processor.setFullCloneFlag(fullClone);
+                break;
+            default:
+                s_logger.error("Unknown reconfigurable field " + key.getName() + " for VmwareStorageProcessor");
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -82,7 +107,7 @@ public class VmwareStorageSubsystemCommandHandler extends StorageSubsystemComman
             //need to take extra processing for vmware, such as packing to ova, before sending to S3
             if (srcData.getObjectType() == DataObjectType.VOLUME) {
                 NfsTO cacheStore = (NfsTO)srcDataStore;
-                String parentPath = storageResource.getRootDir(cacheStore.getUrl());
+                String parentPath = storageResource.getRootDir(cacheStore.getUrl(), _nfsVersion);
                 VolumeObjectTO vol = (VolumeObjectTO)srcData;
                 String path = vol.getPath();
                 int index = path.lastIndexOf(File.separator);
@@ -95,7 +120,7 @@ public class VmwareStorageSubsystemCommandHandler extends StorageSubsystemComman
             } else if (srcData.getObjectType() == DataObjectType.SNAPSHOT) {
                 // pack ova first
                 // sync snapshot from NFS cache to S3 in NFS migration to S3 case
-                String parentPath = storageResource.getRootDir(srcDataStore.getUrl());
+                String parentPath = storageResource.getRootDir(srcDataStore.getUrl(), _nfsVersion);
                 SnapshotObjectTO snap = (SnapshotObjectTO)srcData;
                 String path = snap.getPath();
                 int index = path.lastIndexOf(File.separator);
@@ -138,7 +163,7 @@ public class VmwareStorageSubsystemCommandHandler extends StorageSubsystemComman
                     return answer;
                 }
                 NfsTO cacheStore = (NfsTO)cmd.getCacheTO().getDataStore();
-                String parentPath = storageResource.getRootDir(cacheStore.getUrl());
+                String parentPath = storageResource.getRootDir(cacheStore.getUrl(), _nfsVersion);
                 SnapshotObjectTO newSnapshot = (SnapshotObjectTO)answer.getNewData();
                 String path = newSnapshot.getPath();
                 int index = path.lastIndexOf(File.separator);
@@ -168,4 +193,5 @@ public class VmwareStorageSubsystemCommandHandler extends StorageSubsystemComman
             return super.execute(cmd);
         }
     }
+
 }

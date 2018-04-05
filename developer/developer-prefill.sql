@@ -52,15 +52,19 @@ INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
 
 INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
             VALUES ('Advanced', 'DEFAULT', 'management-server',
-            'account.cleanup.interval', '60');
+            'account.cleanup.interval', '20');
 
 INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
             VALUES ('Advanced', 'DEFAULT', 'management-server',
-            'expunge.delay', '60');
+            'expunge.delay', '20');
 
 INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
             VALUES ('Advanced', 'DEFAULT', 'management-server',
-            'expunge.interval', '60');
+            'expunge.interval', '20');
+
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'management-server',
+            'expunge.workers', '3');
 
 INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
             VALUES ('Advanced', 'DEFAULT', 'management-server',
@@ -77,6 +81,48 @@ INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
 INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
             VALUES ('Advanced', 'DEFAULT', 'management-server',
             'pool.storage.capacity.disablethreshold', '0.95');
+
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'management-server',
+            'network.gc.wait', '20');
+
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'management-server',
+            'network.gc.interval', '20');
+
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'management-server',
+            'storage.cleanup.interval', '40');
+
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'management-server',
+            'vm.op.wait.interval', '5');
+
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'management-server',
+            'workers', '10');
+
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'management-server',
+            'direct.agent.load.size', '1000');
+
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'management-server',
+            'ping.interval', '10');
+
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'management-server',
+            'ping.timeout', '2.0');
+
+-- Enable dynamic RBAC by default for fresh deployments
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'RoleService',
+            'dynamic.apichecker.enabled', 'true');
+
+-- Enable RootCA auth strictness for fresh deployments
+INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)
+            VALUES ('Advanced', 'DEFAULT', 'RootCAProvider',
+            'ca.plugin.root.auth.strictness', 'true');
 
 -- Add developer configuration entry; allows management server to be run as a user other than "cloud"
 INSERT INTO `cloud`.`configuration` (category, instance, component, name, value)

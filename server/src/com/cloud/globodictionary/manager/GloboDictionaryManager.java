@@ -27,13 +27,12 @@ import org.apache.cloudstack.api.command.user.globodictionary.ListSubComponentsC
 import org.apache.cloudstack.api.command.user.globodictionary.ListProductsCmd;
 
 import org.springframework.stereotype.Component;
-import javax.ejb.Local;
+
 import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 
 @Component
-@Local({GloboDictionaryService.class, PluggableService.class})
 public class GloboDictionaryManager implements GloboDictionaryService, PluggableService {
 
     @Inject

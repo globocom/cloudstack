@@ -1,48 +1,50 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 package com.cloud.api.query.dao;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import org.apache.cloudstack.api.response.UserVmResponse;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.InjectMocks;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.PowerMockRunner;
 
-import static org.junit.Assert.assertEquals;
+import com.cloud.api.ApiDBUtils;
+import com.cloud.api.query.vo.UserVmJoinVO;
 
-public class UserVmJoinDaoImplTest {
+@RunWith(PowerMockRunner.class)
+@PrepareForTest(ApiDBUtils.class)
+public class UserVmJoinDaoImplTest extends GenericDaoBaseWithTagInformationBaseTest<UserVmJoinVO, UserVmResponse> {
+
+    @InjectMocks
+    private UserVmJoinDaoImpl _userVmJoinDaoImpl;
+
+    private UserVmJoinVO userVm = new UserVmJoinVO();
+    private UserVmResponse userVmResponse = new UserVmResponse();
+
+    @Before
+    public void setup() {
+        prepareSetup();
+    }
 
     @Test
-    public void testCreateQueryByTags() {
-        UserVmJoinDaoImpl dao = new UserVmJoinDaoImpl();
-
-        //1
-        List params = new ArrayList();
-        Map<String, String > tags = new HashMap<>();
-        String queryByTags = dao.createQueryByTags(12L, tags, params);
-
-        assertEquals("SELECT tg.resource_uuid as resource_uuid FROM resource_tag_view tg WHERE tg.resource_type = 'UserVm' AND tg.project_id = ? ", queryByTags);
-        assertEquals(1, params.size());
-
-        //2
-        tags = new HashMap<>();
-        params = new ArrayList();
-        tags.put("monitoring", "1");
-        queryByTags = dao.createQueryByTags(12L, tags, params);
-
-        assertEquals("SELECT tg.resource_uuid as resource_uuid FROM resource_tag_view tg WHERE tg.resource_type = 'UserVm' AND tg.project_id = ? " +
-                " AND ( (tg.key = ? AND tg.value = ?)) GROUP BY tg.resource_uuid HAVING count(tg.resource_uuid) = ?", queryByTags);
-        assertEquals(4, params.size());
-
-
-        //3
-        tags = new HashMap<>();
-        params = new ArrayList();
-        tags.put("monitoring", "1");
-        tags.put("abc", "123");
-        queryByTags = dao.createQueryByTags(null, tags, params);
-
-        assertEquals("SELECT tg.resource_uuid as resource_uuid FROM resource_tag_view tg WHERE tg.resource_type = 'UserVm'" +
-                " AND ( (tg.key = ? AND tg.value = ?) OR (tg.key = ? AND tg.value = ?)) GROUP BY tg.resource_uuid HAVING count(tg.resource_uuid) = ?", queryByTags);
-        assertEquals(5, params.size());
-
+    public void testUpdateUserVmTagInfo(){
+        testUpdateTagInformation(_userVmJoinDaoImpl, userVm, userVmResponse);
     }
+
 }

@@ -18,6 +18,7 @@ package com.cloud.template;
 
 import java.util.List;
 
+import com.cloud.deploy.DeployDestination;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataStore;
 import org.apache.cloudstack.engine.subsystem.api.storage.TemplateInfo;
 import org.apache.cloudstack.framework.config.ConfigKey;
@@ -38,8 +39,15 @@ import com.cloud.vm.VirtualMachineProfile;
  */
 public interface TemplateManager {
     static final String AllowPublicUserTemplatesCK = "allow.public.user.templates";
+    static final String TemplatePreloaderPoolSizeCK = "template.preloader.pool.size";
+
     static final ConfigKey<Boolean> AllowPublicUserTemplates = new ConfigKey<Boolean>("Advanced", Boolean.class, AllowPublicUserTemplatesCK, "true",
         "If false, users will not be able to create public templates.", true, ConfigKey.Scope.Account);
+
+    static final ConfigKey<Integer> TemplatePreloaderPoolSize = new ConfigKey<Integer>("Advanced", Integer.class, TemplatePreloaderPoolSizeCK, "8",
+            "Size of the TemplateManager threadpool", false, ConfigKey.Scope.Global);
+
+
 
     /**
      * Prepares a template for vm creation for a certain storage pool.
@@ -108,11 +116,11 @@ public interface TemplateManager {
 
     DataStore getImageStore(String storeUuid, Long zoneId);
 
-    String getChecksum(DataStore store, String templatePath);
+    String getChecksum(DataStore store, String templatePath, String algorithm);
 
     List<DataStore> getImageStoreByTemplate(long templateId, Long zoneId);
 
-    TemplateInfo prepareIso(long isoId, long dcId);
+    TemplateInfo prepareIso(long isoId, long dcId, Long hostId, Long poolId);
 
 
     /**
@@ -120,7 +128,7 @@ public interface TemplateManager {
      *
      * @param VirtualMachineProfile
      */
-    void prepareIsoForVmProfile(VirtualMachineProfile profile);
+    void prepareIsoForVmProfile(VirtualMachineProfile profile, DeployDestination dest);
 
     public static final String MESSAGE_REGISTER_PUBLIC_TEMPLATE_EVENT = "Message.RegisterPublicTemplate.Event";
     public static final String MESSAGE_RESET_TEMPLATE_PERMISSION_EVENT = "Message.ResetTemplatePermission.Event";

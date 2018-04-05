@@ -34,20 +34,21 @@ class TestNetworkACL(cloudstackTestCase):
         cls.services = testClient.getParsedTestDataConfig()
 
         cls.zone = get_zone(cls.apiclient, testClient.getZoneForTests())
+        cls.hypervisor = testClient.getHypervisorInfo()
         cls.domain = get_domain(cls.apiclient)
         cls.service_offering = ServiceOffering.create(
             cls.apiclient,
-            cls.services["service_offerings"]
+            cls.services["service_offerings"]["tiny"]
         )
         cls.account = Account.create(cls.apiclient, services=cls.services["account"])
-        cls.template = get_template(
+        cls.template = get_test_template(
             cls.apiclient,
             cls.zone.id,
-            cls.services["ostype"]
+            cls.hypervisor
         )
-        
+
         if cls.template == FAILED:
-            assert False, "get_template() failed to return template with description %s" % cls.services["ostype"]
+            assert False, "get_test_template() failed to return template"
 
         cls.debug("Successfully created account: %s, id: \
                    %s" % (cls.account.name,\
@@ -64,7 +65,7 @@ class TestNetworkACL(cloudstackTestCase):
         self.assert_(networkOffering is not None and len(networkOffering) > 0, "No VPC based network offering")
 
         # 1) Create VPC
-        vpcOffering = VpcOffering.list(self.apiclient,isdefault=True)
+        vpcOffering = VpcOffering.list(self.apiclient, name="Default VPC offering")
         self.assert_(vpcOffering is not None and len(vpcOffering)>0, "No VPC offerings found")
         self.services["vpc"] = {}
         self.services["vpc"]["name"] = "vpc-networkacl"

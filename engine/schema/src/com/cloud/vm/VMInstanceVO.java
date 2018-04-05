@@ -16,11 +16,14 @@
 // under the License.
 package com.cloud.vm;
 
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.Date;
-import java.util.Map;
-import java.util.UUID;
+import com.cloud.hypervisor.Hypervisor.HypervisorType;
+import com.cloud.utils.db.Encrypt;
+import com.cloud.utils.db.GenericDao;
+import com.cloud.utils.db.StateMachine;
+import com.cloud.utils.fsm.FiniteStateObject;
+import com.cloud.vm.VirtualMachine.State;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.log4j.Logger;
 
 import javax.persistence.Column;
 import javax.persistence.DiscriminatorColumn;
@@ -36,16 +39,11 @@ import javax.persistence.TableGenerator;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 import javax.persistence.Transient;
-
-import org.apache.commons.codec.binary.Base64;
-import org.apache.log4j.Logger;
-
-import com.cloud.hypervisor.Hypervisor.HypervisorType;
-import com.cloud.utils.db.Encrypt;
-import com.cloud.utils.db.GenericDao;
-import com.cloud.utils.db.StateMachine;
-import com.cloud.utils.fsm.FiniteStateObject;
-import com.cloud.vm.VirtualMachine.State;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.Date;
+import java.util.Map;
+import java.util.UUID;
 
 @Entity
 @Table(name = "vm_instance")
@@ -141,6 +139,9 @@ public class VMInstanceVO implements VirtualMachine, FiniteStateObject<State, Vi
     @Column(name = "account_id")
     protected long accountId;
 
+    @Column(name = "user_id")
+    protected long userId;
+
     @Column(name = "service_offering_id")
     protected long serviceOfferingId;
 
@@ -186,7 +187,7 @@ public class VMInstanceVO implements VirtualMachine, FiniteStateObject<State, Vi
     protected Long powerHostId;
 
     public VMInstanceVO(long id, long serviceOfferingId, String name, String instanceName, Type type, Long vmTemplateId, HypervisorType hypervisorType, long guestOSId,
-            long domainId, long accountId, boolean haEnabled) {
+                        long domainId, long accountId, long userId, boolean haEnabled) {
         this.id = id;
         hostName = name != null ? name : uuid;
         if (vmTemplateId != null) {
@@ -201,6 +202,7 @@ public class VMInstanceVO implements VirtualMachine, FiniteStateObject<State, Vi
         this.domainId = domainId;
         this.serviceOfferingId = serviceOfferingId;
         this.hypervisorType = hypervisorType;
+        this.userId = userId;
         limitCpuUse = false;
         try {
             SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
@@ -213,8 +215,8 @@ public class VMInstanceVO implements VirtualMachine, FiniteStateObject<State, Vi
     }
 
     public VMInstanceVO(long id, long serviceOfferingId, String name, String instanceName, Type type, Long vmTemplateId, HypervisorType hypervisorType, long guestOSId,
-            long domainId, long accountId, boolean haEnabled, boolean limitResourceUse, Long diskOfferingId) {
-        this(id, serviceOfferingId, name, instanceName, type, vmTemplateId, hypervisorType, guestOSId, domainId, accountId, haEnabled);
+                        long domainId, long accountId, long userId, boolean haEnabled, boolean limitResourceUse, Long diskOfferingId) {
+        this(id, serviceOfferingId, name, instanceName, type, vmTemplateId, hypervisorType, guestOSId, domainId, accountId, userId, haEnabled);
         limitCpuUse = limitResourceUse;
         this.diskOfferingId = diskOfferingId;
     }
@@ -561,5 +563,10 @@ public class VMInstanceVO implements VirtualMachine, FiniteStateObject<State, Vi
 
     public void setPowerHostId(Long hostId) {
         powerHostId = hostId;
+    }
+
+    @Override
+    public PartitionType partitionType() {
+        return PartitionType.VM;
     }
 }

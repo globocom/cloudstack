@@ -16,19 +16,31 @@
 // under the License.
 package com.cloud.hypervisor.vmware.manager;
 
-import java.io.File;
-import java.util.List;
-import java.util.Map;
-
-import com.vmware.vim25.ManagedObjectReference;
-
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
 import com.cloud.hypervisor.vmware.mo.HostMO;
 import com.cloud.hypervisor.vmware.util.VmwareContext;
 import com.cloud.utils.Pair;
+import com.vmware.vim25.ManagedObjectReference;
+import org.apache.cloudstack.framework.config.ConfigKey;
+
+import java.io.File;
+import java.util.List;
+import java.util.Map;
 
 public interface VmwareManager {
     public final String CONTEXT_STOCK_NAME = "vmwareMgr";
+
+    public static final ConfigKey<Long> s_vmwareNicHotplugWaitTimeout = new ConfigKey<Long>("Advanced", Long.class, "vmware.nic.hotplug.wait.timeout", "15000",
+            "Wait timeout (milli seconds) for hot plugged NIC of VM to be detected by guest OS.", false, ConfigKey.Scope.Global);
+
+    public static final ConfigKey<Long> templateCleanupInterval = new ConfigKey<Long>("Advanced", Long.class, "vmware.full.clone.template.cleanup.period", "0",
+            "period (in minutes) between the start of template cleanup jobs for vmware full cloned templates.", false, ConfigKey.Scope.Global);
+
+    public static final ConfigKey<Boolean> s_vmwareCleanOldWorderVMs = new ConfigKey<Boolean>("Advanced", Boolean.class, "vmware.clean.old.worker.vms", "false",
+            "If a worker vm is older then twice the 'job.expire.minutes' + 'job.cancel.threshold.minutes' , remove it.", true, ConfigKey.Scope.Global);
+
+    static final ConfigKey<String> s_vmwareSearchExcludeFolder = new ConfigKey<String>("Advanced", String.class, "vmware.search.exclude.folders", null,
+            "Comma seperated list of Datastore Folders to exclude from VMWare search", true, ConfigKey.Scope.Global);
 
     String composeWorkerName();
 
@@ -36,7 +48,7 @@ public interface VmwareManager {
 
     String getSystemVMDefaultNicAdapterType();
 
-    void prepareSecondaryStorageStore(String strStorageUrl);
+    void prepareSecondaryStorageStore(String strStorageUrl, Long storeId);
 
     void setupResourceStartupParams(Map<String, Object> params);
 
@@ -48,7 +60,7 @@ public interface VmwareManager {
 
     String getManagementPortGroupName();
 
-    String getSecondaryStorageStoreUrl(long dcId);
+    Pair<String, Long> getSecondaryStorageStoreUrlAndId(long dcId);
 
     File getSystemVMKeyFile();
 
@@ -78,5 +90,6 @@ public interface VmwareManager {
 
     boolean isLegacyZone(long dcId);
 
+    public String getDataDiskController();
     boolean hasNexusVSM(Long clusterId);
 }

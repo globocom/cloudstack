@@ -32,7 +32,6 @@ import com.cloud.utils.exception.CloudRuntimeException;
 public class LibvirtStoragePool implements KVMStoragePool {
     private static final Logger s_logger = Logger.getLogger(LibvirtStoragePool.class);
     protected String uuid;
-    protected String uri;
     protected long capacity;
     protected long used;
     protected long available;
@@ -100,10 +99,6 @@ public class LibvirtStoragePool implements KVMStoragePool {
         return this.uuid;
     }
 
-    public String uri() {
-        return this.uri;
-    }
-
     @Override
     public PhysicalDiskFormat getDefaultFormat() {
         if (getStoragePoolType() == StoragePoolType.CLVM || getStoragePoolType() == StoragePoolType.RBD) {
@@ -145,7 +140,7 @@ public class LibvirtStoragePool implements KVMStoragePool {
         if (disk != null) {
             return disk;
         }
-        s_logger.debug("find volume bypass libvirt");
+        s_logger.debug("find volume bypass libvirt volumeUid " + volumeUid);
         //For network file system or file system, try to use java file to find the volume, instead of through libvirt. BUG:CLOUDSTACK-4459
         String localPoolPath = this.getLocalPath();
         File f = new File(localPoolPath + File.separator + volumeUuid);
@@ -157,6 +152,7 @@ public class LibvirtStoragePool implements KVMStoragePool {
         disk.setFormat(PhysicalDiskFormat.QCOW2);
         disk.setSize(f.length());
         disk.setVirtualSize(f.length());
+        s_logger.debug("find volume bypass libvirt disk " + disk.toString());
         return disk;
     }
 
@@ -255,6 +251,11 @@ public class LibvirtStoragePool implements KVMStoragePool {
     public StoragePool getPool() {
         return this._pool;
     }
+
+    public void setPool(StoragePool pool) {
+        this._pool = pool;
+    }
+
 
     @Override
     public boolean delete() {

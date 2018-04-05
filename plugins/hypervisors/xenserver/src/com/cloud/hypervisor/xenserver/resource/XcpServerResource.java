@@ -16,12 +16,6 @@
 // under the License.
 package com.cloud.hypervisor.xenserver.resource;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-
-import javax.ejb.Local;
-
 import org.apache.log4j.Logger;
 import org.apache.xmlrpc.XmlRpcException;
 
@@ -30,61 +24,14 @@ import com.xensource.xenapi.Host;
 import com.xensource.xenapi.Types.XenAPIException;
 import com.xensource.xenapi.VM;
 
-import com.cloud.agent.api.Answer;
-import com.cloud.agent.api.Command;
-import com.cloud.agent.api.NetworkUsageAnswer;
-import com.cloud.agent.api.NetworkUsageCommand;
-import com.cloud.resource.ServerResource;
-import com.cloud.utils.exception.CloudRuntimeException;
-import com.cloud.utils.script.Script;
-
-@Local(value = ServerResource.class)
 public class XcpServerResource extends CitrixResourceBase {
+
     private final static Logger s_logger = Logger.getLogger(XcpServerResource.class);
-    private static final long mem_32m = 33554432L;
-    private String version;
-
-    public XcpServerResource() {
-        super();
-    }
+    private final static long mem_32m = 33554432L;
 
     @Override
-    public Answer executeRequest(Command cmd) {
-        if (cmd instanceof NetworkUsageCommand) {
-            return execute((NetworkUsageCommand)cmd);
-        } else {
-            return super.executeRequest(cmd);
-        }
-    }
-
-    @Override
-    protected List<File> getPatchFiles() {
-        List<File> files = new ArrayList<File>();
-        String patch = "scripts/vm/hypervisor/xenserver/xcpserver/patch";
-        String patchfilePath = Script.findScript("", patch);
-        if (patchfilePath == null) {
-            throw new CloudRuntimeException("Unable to find patch file " + patch);
-        }
-        File file = new File(patchfilePath);
-        files.add(file);
-        return files;
-    }
-
-    protected NetworkUsageAnswer execute(NetworkUsageCommand cmd) {
-        try {
-            Connection conn = getConnection();
-            if (cmd.getOption() != null && cmd.getOption().equals("create")) {
-                String result = networkUsage(conn, cmd.getPrivateIP(), "create", null);
-                NetworkUsageAnswer answer = new NetworkUsageAnswer(cmd, result, 0L, 0L);
-                return answer;
-            }
-            long[] stats = getNetworkStats(conn, cmd.getPrivateIP());
-            NetworkUsageAnswer answer = new NetworkUsageAnswer(cmd, "", stats[0], stats[1]);
-            return answer;
-        } catch (Exception ex) {
-            s_logger.warn("Failed to get network usage stats due to ", ex);
-            return new NetworkUsageAnswer(cmd, ex);
-        }
+    protected String getPatchFilePath() {
+        return "scripts/vm/hypervisor/xenserver/xcpserver/patch";
     }
 
     /**
@@ -137,17 +84,17 @@ public class XcpServerResource extends CitrixResourceBase {
      cf: https://wiki.xenserver.org/index.php?title=XCP_FAQ_Dynamic_Memory_Control
      */
     @Override
-    protected void setMemory(Connection conn, VM vm, long minMemsize, long maxMemsize) throws XmlRpcException, XenAPIException {
+    protected void setMemory(final Connection conn, final VM vm, final long minMemsize, final long maxMemsize) throws XmlRpcException, XenAPIException {
         //setMemoryLimits(staticMin, staticMax, dynamicMin, dynamicMax)
         if (s_logger.isDebugEnabled()) {
             s_logger.debug("Memory Limits for VM [" + vm.getNameLabel(conn) + "[staticMin:" + mem_32m + ", staticMax:" + maxMemsize + ", dynamicMin: " + minMemsize +
-                ", dynamicMax:" + maxMemsize + "]]");
+                    ", dynamicMax:" + maxMemsize + "]]");
         }
         vm.setMemoryLimits(conn, mem_32m, maxMemsize, minMemsize, maxMemsize);
     }
 
     @Override
-    protected boolean isDmcEnabled(Connection conn, Host host) {
+    public boolean isDmcEnabled(final Connection conn, final Host host) {
         //Dynamic Memory Control (DMC) is a technology provided by Xen Cloud Platform (XCP), starting from the 0.5 release
         //For the supported XCPs dmc is default enabled, XCP 1.0.0, 1.1.0, 1.4.x, 1.5 beta, 1.6.x;
         return true;

@@ -31,6 +31,8 @@ public interface NetworkDao extends GenericDao<NetworkVO, Long>, StateDao<State,
 
     List<NetworkVO> listByOwner(long ownerId);
 
+    List<NetworkVO> listByGuestType(GuestType type);
+
     List<NetworkVO> listBy(long accountId, long offeringId, long dataCenterId);
 
     List<NetworkVO> listBy(long accountId, long dataCenterId, String cidr, boolean skipVpc);
@@ -52,15 +54,14 @@ public interface NetworkDao extends GenericDao<NetworkVO, Long>, StateDao<State,
      *
      * @param networkConfigId
      *            id
+     * @param zoneMacIdentifier
      * @return mac address if there is one. null if not.
      */
-    String getNextAvailableMacAddress(long networkConfigId);
+    String getNextAvailableMacAddress(long networkConfigId, Integer zoneMacIdentifier);
 
     List<NetworkVO> listBy(long accountId, long networkId);
 
-    long countByZoneAndUri(long zoneId, String broadcastUri);
-
-    long countByZoneUriAndGuestType(long zoneId, String broadcastUri, GuestType guestType);
+    List<NetworkVO> listByZoneAndUriAndGuestType(long zoneId, String broadcastUri, GuestType guestType);
 
     List<NetworkVO> listByZone(long zoneId);
 
@@ -112,7 +113,11 @@ public interface NetworkDao extends GenericDao<NetworkVO, Long>, StateDao<State,
 
     List<NetworkVO> listRedundantNetworks();
 
+    List<NetworkVO> listVpcNetworks();
+
     List<NetworkVO> listByAclId(long aclId);
 
     int getNonSystemNetworkCountByVpcId(long vpcId);
+
+    List<NetworkVO> listNetworkVO(List<Long> idset);
 }

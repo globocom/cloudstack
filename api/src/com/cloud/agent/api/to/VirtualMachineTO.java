@@ -16,7 +16,9 @@
 // under the License.
 package com.cloud.agent.api.to;
 
+import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 import com.cloud.template.VirtualMachineTemplate.BootloaderType;
 import com.cloud.vm.VirtualMachine;
@@ -62,6 +64,13 @@ public class VirtualMachineTO {
     NicTO[] nics;
     GPUDeviceTO gpuDevice;
     Integer vcpuMaxLimit;
+    List<String[]> vmData = null;
+
+    String configDriveLabel = null;
+    String configDriveIsoRootFolder = null;
+    String configDriveIsoFile = null;
+
+    Map<String, String> guestOsDetails = new HashMap<String, String>();
 
     public VirtualMachineTO(long id, String instanceName, VirtualMachine.Type type, int cpus, Integer speed, long minRam, long maxRam, BootloaderType bootloader,
             String os, boolean enableHA, boolean limitCpuUse, String vncPassword) {
@@ -292,4 +301,43 @@ public class VirtualMachineTO {
         this.vcpuMaxLimit = vcpuMaxLimit;
     }
 
+    public List<String[]> getVmData() {
+        return vmData;
+    }
+
+    public void setVmData(List<String[]> vmData) {
+        this.vmData = vmData;
+    }
+
+    public String getConfigDriveLabel() {
+        return configDriveLabel;
+    }
+
+    public void setConfigDriveLabel(String configDriveLabel) {
+        this.configDriveLabel = configDriveLabel;
+    }
+
+    public String getConfigDriveIsoRootFolder() {
+        return configDriveIsoRootFolder;
+    }
+
+    public void setConfigDriveIsoRootFolder(String configDriveIsoRootFolder) {
+        this.configDriveIsoRootFolder = configDriveIsoRootFolder;
+    }
+
+    public String getConfigDriveIsoFile() {
+        return configDriveIsoFile;
+    }
+
+    public void setConfigDriveIsoFile(String configDriveIsoFile) {
+        this.configDriveIsoFile = configDriveIsoFile;
+    }
+
+    public Map<String, String> getGuestOsDetails() {
+        return guestOsDetails;
+    }
+
+    public void setGuestOsDetails(Map<String, String> guestOsDetails) {
+        this.guestOsDetails = guestOsDetails;
+    }
 }

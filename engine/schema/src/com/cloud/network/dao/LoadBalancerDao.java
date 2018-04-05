@@ -34,4 +34,6 @@ public interface LoadBalancerDao extends GenericDao<LoadBalancerVO, Long> {
      */
     List<LoadBalancerVO> listLinkables(String lbUUId, long networkEnvId, long accountId);
 
+    boolean isLoadBalancerRulesMappedToVmGuestIp(long instanceId, String instanceIp, long networkId);
+
 }

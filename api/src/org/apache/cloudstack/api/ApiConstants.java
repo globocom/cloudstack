@@ -21,10 +21,14 @@ public class ApiConstants {
     public static final String ACCOUNTS = "accounts";
     public static final String ACCOUNT_TYPE = "accounttype";
     public static final String ACCOUNT_ID = "accountid";
+    public static final String ACTIVITY = "activity";
+    public static final String ADDRESS = "address";
     public static final String ALGORITHM = "algorithm";
     public static final String ALLOCATED_ONLY = "allocatedonly";
     public static final String ADDITIONAL_PORT_MAP = "additionalportmap";
+    public static final String ANNOTATION = "annotation";
     public static final String API_KEY = "apikey";
+    public static final String ASYNC_BACKUP = "asyncbackup";
     public static final String USER_API_KEY = "userapikey";
     public static final String APPLIED = "applied";
     public static final String LIST_LB_VMIPS = "lbvmips";
@@ -40,12 +44,15 @@ public class ApiConstants {
     public static final String HEALTHCHECK_DESTINATION = "healthcheckdestination";
     public static final String HEALTHCHECK_TYPE = "healthchecktype";
     public static final String EXPECTED_HEALTHCHECK = "expectedhealthcheck";
+    public static final String BYPASS_VLAN_OVERLAP_CHECK = "bypassvlanoverlapcheck";
     public static final String CATEGORY = "category";
     public static final String CAN_REVERT = "canrevert";
+    public static final String CA_CERTIFICATES = "cacertificates";
     public static final String CERTIFICATE = "certificate";
     public static final String CERTIFICATE_CHAIN = "certchain";
     public static final String CERTIFICATE_FINGERPRINT = "fingerprint";
     public static final String CERTIFICATE_ID = "certid";
+    public static final String CSR = "csr";
     public static final String PRIVATE_KEY = "privatekey";
     public static final String DOMAIN_SUFFIX = "domainsuffix";
     public static final String DNS_SEARCH_ORDER = "dnssearchorder";
@@ -53,10 +60,13 @@ public class ApiConstants {
     public static final String CIDR = "cidr";
     public static final String IP6_CIDR = "ip6cidr";
     public static final String CIDR_LIST = "cidrlist";
+    public static final String DEST_CIDR_LIST = "destcidrlist";
     public static final String CLEANUP = "cleanup";
+    public static final String MAKEREDUNDANTE = "makeredundant";
     public static final String CLUSTER_ID = "clusterid";
     public static final String CLUSTER_NAME = "clustername";
     public static final String CLUSTER_TYPE = "clustertype";
+    public static final String CN = "cn";
     public static final String COMMAND = "command";
     public static final String CMD_EVENT_TYPE = "cmdeventtype";
     public static final String COMPONENT = "component";
@@ -75,13 +85,20 @@ public class ApiConstants {
     public static final String MIN_IOPS = "miniops";
     public static final String MAX_IOPS = "maxiops";
     public static final String HYPERVISOR_SNAPSHOT_RESERVE = "hypervisorsnapshotreserve";
+    public static final String DATADISK_OFFERING_LIST = "datadiskofferinglist";
     public static final String DESCRIPTION = "description";
     public static final String DESTINATION_ZONE_ID = "destzoneid";
     public static final String DETAILS = "details";
     public static final String DEVICE_ID = "deviceid";
+    public static final String DIRECT_DOWNLOAD = "directdownload";
     public static final String DISK_OFFERING_ID = "diskofferingid";
     public static final String DISK_SIZE = "disksize";
+    public static final String UTILIZATION = "utilization";
+    public static final String DRIVER = "driver";
     public static final String ROOT_DISK_SIZE = "rootdisksize";
+    public static final String DHCP_OPTIONS_NETWORK_LIST = "dhcpoptionsnetworklist";
+    public static final String DHCP_OPTIONS = "dhcpoptions";
+    public static final String DHCP_PREFIX = "dhcp:";
     public static final String DISPLAY_NAME = "displayname";
     public static final String DISPLAY_NETWORK = "displaynetwork";
     public static final String DISPLAY_NIC = "displaynic";
@@ -97,6 +114,7 @@ public class ApiConstants {
     public static final String DOMAIN_ID = "domainid";
     public static final String DOMAIN__ID = "domainId";
     public static final String DURATION = "duration";
+    public static final String ELIGIBLE = "eligible";
     public static final String EMAIL = "email";
     public static final String END_DATE = "enddate";
     public static final String END_IP = "endip";
@@ -104,12 +122,18 @@ public class ApiConstants {
     public static final String END_PORT = "endport";
     public static final String ENTRY_TIME = "entrytime";
     public static final String EXPIRES = "expires";
+    public static final String EXTRA_DHCP_OPTION = "extradhcpoption";
+    public static final String EXTRA_DHCP_OPTION_NAME = "extradhcpoptionname";
+    public static final String EXTRA_DHCP_OPTION_CODE = "extradhcpoptioncode";
+    public static final String EXTRA_DHCP_OPTION_VALUE = "extradhcpvalue";
+    public static final String FENCE = "fence";
     public static final String FETCH_LATEST = "fetchlatest";
     public static final String FIRSTNAME = "firstname";
     public static final String FORCED = "forced";
     public static final String FORCED_DESTROY_LOCAL_STORAGE = "forcedestroylocalstorage";
     public static final String FORMAT = "format";
     public static final String FOR_VIRTUAL_NETWORK = "forvirtualnetwork";
+    public static final String FOR_SYSTEM_VMS = "forsystemvms";
     public static final String GATEWAY = "gateway";
     public static final String IP6_GATEWAY = "ip6gateway";
     public static final String GROUP = "group";
@@ -122,6 +146,9 @@ public class ApiConstants {
     public static final String GUEST_CIDR_ADDRESS = "guestcidraddress";
     public static final String GUEST_VLAN_RANGE = "guestvlanrange";
     public static final String HA_ENABLE = "haenable";
+    public static final String HA_PROVIDER = "haprovider";
+    public static final String HA_STATE = "hastate";
+    public static final String HEALTH = "health";
     public static final String HOST_ID = "hostid";
     public static final String HOST_NAME = "hostname";
     public static final String HYPERVISOR = "hypervisor";
@@ -134,6 +161,7 @@ public class ApiConstants {
     public static final String INTERNAL_DNS1 = "internaldns1";
     public static final String INTERNAL_DNS2 = "internaldns2";
     public static final String INTERVAL_TYPE = "intervaltype";
+    public static final String LOCATION_TYPE = "locationtype";
     public static final String IOPS_READ_RATE = "iopsreadrate";
     public static final String IOPS_WRITE_RATE = "iopswriterate";
     public static final String IP_ADDRESS = "ipaddress";
@@ -169,6 +197,7 @@ public class ApiConstants {
     public static final String LB_LINKED_PARENT_LOAD_BALANCER = "linkedparent";
     public static final String LB_LINKED_CHILDREN_LOAD_BALANCER = "linkedchildren";
     public static final String MAX = "max";
+    public static final String MAC_ADDRESS = "macaddress";
     public static final String MAX_SNAPS = "maxsnaps";
     public static final String MEMORY = "memory";
     public static final String MODE = "mode";
@@ -188,20 +217,28 @@ public class ApiConstants {
     public static final String OS_TYPE_NAME = "ostypename";
     public static final String OS_DISPLAY_NAME = "osdisplayname";
     public static final String OS_NAME_FOR_HYPERVISOR = "osnameforhypervisor";
+    public static final String OUTOFBANDMANAGEMENT_POWERSTATE = "outofbandmanagementpowerstate";
+    public static final String OUTOFBANDMANAGEMENT_ENABLED = "outofbandmanagementenabled";
     public static final String PARAMS = "params";
+    public static final String PARENT_ID = "parentid";
     public static final String PARENT_DOMAIN_ID = "parentdomainid";
+    public static final String PARENT_TEMPLATE_ID = "parenttemplateid";
     public static final String PASSWORD = "password";
+    public static final String SHOULD_UPDATE_PASSWORD = "update_passwd_on_host";
     public static final String NEW_PASSWORD = "new_password";
     public static final String PASSWORD_ENABLED = "passwordenabled";
     public static final String SSHKEY_ENABLED = "sshkeyenabled";
     public static final String PATH = "path";
     public static final String POD_ID = "podid";
+    public static final String POD_NAME = "podname";
     public static final String POD_IDS = "podids";
     public static final String POLICY_ID = "policyid";
     public static final String PORT = "port";
     public static final String PORTAL = "portal";
     public static final String PORTABLE_IP_ADDRESS = "portableipaddress";
     public static final String PORT_FORWARDING_SERVICE_ID = "portforwardingserviceid";
+    public static final String POST_URL = "postURL";
+    public static final String POWER_STATE = "powerstate";
     public static final String PRIVATE_INTERFACE = "privateinterface";
     public static final String PRIVATE_IP = "privateip";
     public static final String PRIVATE_PORT = "privateport";
@@ -218,9 +255,12 @@ public class ApiConstants {
     public static final String PUBLIC_END_PORT = "publicendport";
     public static final String PUBLIC_ZONE = "publiczone";
     public static final String RECEIVED_BYTES = "receivedbytes";
+    public static final String RECONNECT = "reconnect";
+    public static final String RECOVER = "recover";
     public static final String REQUIRES_HVM = "requireshvm";
     public static final String RESOURCE_TYPE = "resourcetype";
     public static final String RESOURCE_KEY = "resourcekey";
+    public static final String RESOURCE_TYPE_NAME = "resourcetypename";
     public static final String RESPONSE = "response";
     public static final String REVERTABLE = "revertable";
     public static final String REGISTERED = "registered";
@@ -228,6 +268,7 @@ public class ApiConstants {
     public static final String SCHEDULE = "schedule";
     public static final String SCOPE = "scope";
     public static final String SECRET_KEY = "usersecretkey";
+    public static final String SECONDARY_IP = "secondaryip";
     public static final String SINCE = "since";
     public static final String KEY = "key";
     public static final String SEARCH_BASE = "searchbase";
@@ -237,6 +278,7 @@ public class ApiConstants {
     public static final String SECURITY_GROUP_ID = "securitygroupid";
     public static final String SENT = "sent";
     public static final String SENT_BYTES = "sentbytes";
+    public static final String SERIAL = "serial";
     public static final String SERVICE_OFFERING_ID = "serviceofferingid";
     public static final String SESSIONKEY = "sessionkey";
     public static final String SHOW_CAPACITIES = "showcapacities";
@@ -244,12 +286,14 @@ public class ApiConstants {
     public static final String SIGNATURE = "signature";
     public static final String SIGNATURE_VERSION = "signatureversion";
     public static final String SIZE = "size";
+    public static final String SNAPSHOT = "snapshot";
     public static final String SNAPSHOT_ID = "snapshotid";
     public static final String SNAPSHOT_POLICY_ID = "snapshotpolicyid";
     public static final String SNAPSHOT_TYPE = "snapshottype";
     public static final String SNAPSHOT_QUIESCEVM = "quiescevm";
     public static final String SOURCE_ZONE_ID = "sourcezoneid";
     public static final String START_DATE = "startdate";
+    public static final String START_ID = "startid";
     public static final String START_IP = "startip";
     public static final String START_IPV6 = "startipv6";
     public static final String START_PORT = "startport";
@@ -266,6 +310,7 @@ public class ApiConstants {
     public static final String ISO_ID = "isoid";
     public static final String TIMEOUT = "timeout";
     public static final String TIMEZONE = "timezone";
+    public static final String TIMEZONEOFFSET = "timezoneoffset";
     public static final String TYPE = "type";
     public static final String TRUST_STORE = "truststore";
     public static final String TRUST_STORE_PASSWORD = "truststorepass";
@@ -277,18 +322,23 @@ public class ApiConstants {
     public static final String USERNAME = "username";
     public static final String USER_SECURITY_GROUP_LIST = "usersecuritygrouplist";
     public static final String USE_VIRTUAL_NETWORK = "usevirtualnetwork";
+    public static final String Update_IN_SEQUENCE ="updateinsequence";
     public static final String VALUE = "value";
     public static final String VIRTUAL_MACHINE_ID = "virtualmachineid";
     public static final String VIRTUAL_MACHINE_IDS = "virtualmachineids";
     public static final String VIRTUAL_MACHINE_ID_IP = "vmidipmap";
     public static final String VIP_ID = "vipid";
+    public static final String VIRTUAL_MACHINE_COUNT = "virtualmachinecount";
     public static final String USAGE_ID = "usageid";
+    public static final String USAGE_TYPE = "usagetype";
+    public static final String INCLUDE_TAGS = "includetags";
 
     public static final String VLAN = "vlan";
     public static final String VLAN_RANGE = "vlanrange";
     public static final String REMOVE_VLAN = "removevlan";
     public static final String VLAN_ID = "vlanid";
     public static final String ISOLATED_PVLAN = "isolatedpvlan";
+    public static final String ISOLATION_URI = "isolationuri";
     public static final String VM_AVAILABLE = "vmavailable";
     public static final String VM_LIMIT = "vmlimit";
     public static final String VM_TOTAL = "vmtotal";
@@ -303,6 +353,7 @@ public class ApiConstants {
     public static final String COUNT = "count";
     public static final String TRAFFIC_TYPE = "traffictype";
     public static final String NETWORK_OFFERING_ID = "networkofferingid";
+    public static final String TIER_NETWORK_OFFERINGS = "tiernetworkofferings";
     public static final String NETWORK_IDS = "networkids";
     public static final String NETWORK_ID = "networkid";
     public static final String NIC_ID = "nicid";
@@ -346,6 +397,7 @@ public class ApiConstants {
     public static final String ZONE_TOKEN = "zonetoken";
     public static final String DHCP_PROVIDER = "dhcpprovider";
     public static final String RESULT = "success";
+    public static final String RESUME = "resume";
     public static final String LUN_ID = "lunId";
     public static final String IQN = "iqn";
     public static final String AGGREGATE_NAME = "aggregatename";
@@ -367,6 +419,13 @@ public class ApiConstants {
     public static final String PROJECT_IDS = "projectids";
     public static final String PROJECT = "project";
     public static final String ROLE = "role";
+    public static final String ROLE_ID = "roleid";
+    public static final String ROLE_TYPE = "roletype";
+    public static final String ROLE_NAME = "rolename";
+    public static final String PERMISSION = "permission";
+    public static final String RULE = "rule";
+    public static final String RULE_ID = "ruleid";
+    public static final String RULE_ORDER = "ruleorder";
     public static final String USER = "user";
     public static final String ACTIVE_ONLY = "activeonly";
     public static final String TOKEN = "token";
@@ -383,6 +442,7 @@ public class ApiConstants {
     public static final String CAPACITY_IOPS = "capacityiops";
     public static final String NETWORK_SPEED = "networkspeed";
     public static final String BROADCAST_DOMAIN_RANGE = "broadcastdomainrange";
+    public static final String BROADCAST_URI = "broadcasturi";
     public static final String ISOLATION_METHOD = "isolationmethod";
     public static final String ISOLATION_METHODS = "isolationmethods";
     public static final String PHYSICAL_NETWORK_ID = "physicalnetworkid";
@@ -399,6 +459,7 @@ public class ApiConstants {
     public static final String KVM_NETWORK_LABEL = "kvmnetworklabel";
     public static final String VMWARE_NETWORK_LABEL = "vmwarenetworklabel";
     public static final String HYPERV_NETWORK_LABEL = "hypervnetworklabel";
+    public static final String OVM3_NETWORK_LABEL = "ovm3networklabel";
     public static final String NETWORK_SERVICE_PROVIDER_ID = "nspid";
     public static final String SERVICE_LIST = "servicelist";
     public static final String CAN_ENABLE_INDIVIDUAL_SERVICE = "canenableindividualservice";
@@ -464,7 +525,7 @@ public class ApiConstants {
     public static final String EXTERNAL_SWITCH_MGMT_DEVICE_NAME = "vsmdevicename";
     public static final String EXTERNAL_SWITCH_MGMT_DEVICE_STATE = "vsmdevicestate";
     // Would we need to have a capacity field for Cisco N1KV VSM? Max hosts managed by it perhaps? May remove this
-// later.
+    // later.
     public static final String EXTERNAL_SWITCH_MGMT_DEVICE_CAPACITY = "vsmdevicecapacity";
     public static final String CISCO_NEXUS_VSM_NAME = "vsmname";
     public static final String VSM_USERNAME = "vsmusername";
@@ -500,20 +561,29 @@ public class ApiConstants {
     public static final String IKE_LIFETIME = "ikelifetime";
     public static final String ESP_LIFETIME = "esplifetime";
     public static final String DPD = "dpd";
+    public static final String FORCE_ENCAP = "forceencap";
     public static final String FOR_VPC = "forvpc";
     public static final String SHRINK_OK = "shrinkok";
     public static final String NICIRA_NVP_DEVICE_ID = "nvpdeviceid";
     public static final String NICIRA_NVP_TRANSPORT_ZONE_UUID = "transportzoneuuid";
     public static final String NICIRA_NVP_DEVICE_NAME = "niciradevicename";
     public static final String NICIRA_NVP_GATEWAYSERVICE_UUID = "l3gatewayserviceuuid";
+    public static final String NICIRA_NVP_L2_GATEWAYSERVICE_UUID = "l2gatewayserviceuuid";
+    public static final String NSX_LOGICAL_SWITCH = "nsxlogicalswitch";
+    public static final String NSX_LOGICAL_SWITCH_PORT = "nsxlogicalswitchport";
     public static final String S3_ACCESS_KEY = "accesskey";
     public static final String S3_SECRET_KEY = "secretkey";
     public static final String S3_END_POINT = "endpoint";
     public static final String S3_BUCKET_NAME = "bucket";
+    public static final String S3_SIGNER = "s3signer";
+    public static final String S3_V3_SIGNER = "S3SignerType";
+    public static final String S3_V4_SIGNER = "AWSS3V4SignerType";
     public static final String S3_HTTPS_FLAG = "usehttps";
     public static final String S3_CONNECTION_TIMEOUT = "connectiontimeout";
+    public static final String S3_CONNECTION_TTL = "connectionttl";
     public static final String S3_MAX_ERROR_RETRY = "maxerrorretry";
     public static final String S3_SOCKET_TIMEOUT = "sockettimeout";
+    public static final String S3_USE_TCP_KEEPALIVE = "usetcpkeepalive";
     public static final String INCL_ZONES = "includezones";
     public static final String EXCL_ZONES = "excludezones";
     public static final String SOURCE = "source";
@@ -557,6 +627,7 @@ public class ApiConstants {
     public static final String VM_SNAPSHOT_DESCRIPTION = "description";
     public static final String VM_SNAPSHOT_DISPLAYNAME = "name";
     public static final String VM_SNAPSHOT_ID = "vmsnapshotid";
+    public static final String VM_SNAPSHOT_IDS = "vmsnapshotids";
     public static final String VM_SNAPSHOT_DISK_IDS = "vmsnapshotdiskids";
     public static final String VM_SNAPSHOT_MEMORY = "snapshotmemory";
     public static final String VM_SNAPSHOT_QUIESCEVM = "quiescevm";
@@ -607,6 +678,7 @@ public class ApiConstants {
     public static final String IAM_ALLOW_DENY = "permission";
     public static final String ENTITY_TYPE = "entitytype";
     public static final String ENTITY_ID = "entityid";
+    public static final String EXTERNAL_ID = "externalid";
     public static final String ACCESS_TYPE = "accesstype";
 
     public static final String RESOURCE_DETAILS = "resourcedetails";
@@ -627,13 +699,18 @@ public class ApiConstants {
     public static final String REMAININGCAPACITY = "remainingcapacity";
     public static final String MAXCAPACITY = "maxcapacity";
     public static final String DISTRIBUTED_VPC_ROUTER = "distributedvpcrouter";
+    public static final String REDUNDANT_VPC_ROUTER = "redundantvpcrouter";
     public static final String READ_ONLY = "readonly";
     public static final String SUPPORTS_REGION_LEVEL_VPC = "supportsregionLevelvpc";
     public static final String SUPPORTS_STRECHED_L2_SUBNET = "supportsstrechedl2subnet";
+    public static final String SUPPORTS_PUBLIC_ACCESS = "supportspublicaccess";
     public static final String REGION_LEVEL_VPC = "regionlevelvpc";
     public static final String STRECHED_L2_SUBNET = "strechedl2subnet";
+    public static final String NETWORK_NAME = "networkname";
     public static final String NETWORK_SPANNED_ZONES = "zonesnetworkspans";
+    public static final String METADATA = "metadata";
     public static final String PHYSICAL_SIZE = "physicalsize";
+
     public static final String GURU_NAME = "guruname";
     public static final String GLOBO_RESOURCE_CONFIG = "globoresourceconfig";
     public static final String L4_PROTOCOL = "l4protocol";
@@ -646,11 +723,37 @@ public class ApiConstants {
     public static final String PRODUCT_ID = "productid";
     public static final String DETAILED_USAGE = "detailedusage";
 
+    public static final String OVM3_POOL = "ovm3pool";
+    public static final String OVM3_CLUSTER = "ovm3cluster";
+    public static final String OVM3_VIP = "ovm3vip";
+    public static final String CLEAN_UP_DETAILS = "cleanupdetails";
+    public static final String VIRTUAL_SIZE = "virtualsize";
+    public static final String NETSCALER_CONTROLCENTER_ID = "netscalercontrolcenterid";
+    public static final String NETSCALER_SERVICEPACKAGE_ID = "netscalerservicepackageid";
+
+    public static final String ZONE_ID_LIST = "zoneids";
+    public static final String DESTINATION_ZONE_ID_LIST = "destzoneids";
+    public static final String ADMIN = "admin";
+    public static final String CHECKSUM_PARAMETER_PREFIX_DESCRIPTION = "The parameter containing the checksum will be considered a MD5sum if it is not prefixed\n"
+            + " and just a plain ascii/utf8 representation of a hexadecimal string. If it is required to\n"
+            + " use another algorithm the hexadecimal string is to be prefixed with a string of the form,\n"
+            + " \"{<algorithm>}\", not including the double quotes. In this <algorithm> is the exact string\n"
+            + " representing the java supported algorithm, i.e. MD5 or SHA-256. Note that java does not\n"
+            + " contain an algorithm called SHA256 or one called sha-256, only SHA-256.";
+
+    public static final String HAS_ANNOTATION = "hasannotation";
+    public static final String LAST_ANNOTATED = "lastannotated";
+    public static final String LDAP_DOMAIN = "ldapdomain";
+
     public enum HostDetails {
         all, capacity, events, stats, min;
     }
 
     public enum VMDetails {
         all, group, nics, stats, secgrp, tmpl, servoff, diskoff, iso, volume, min, affgrp;
+    }
+
+    public enum DomainDetails {
+        all, resource, min;
     }
 }

@@ -17,14 +17,15 @@
 package org.apache.cloudstack.api.command.user.vpn;
 
 import org.apache.log4j.Logger;
-
 import org.apache.cloudstack.api.APICommand;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.ApiErrorCode;
 import org.apache.cloudstack.api.BaseAsyncCmd;
 import org.apache.cloudstack.api.Parameter;
 import org.apache.cloudstack.api.ServerApiException;
+import org.apache.cloudstack.api.BaseCmd.CommandType;
 import org.apache.cloudstack.api.response.DomainResponse;
+import org.apache.cloudstack.api.response.ProjectResponse;
 import org.apache.cloudstack.api.response.Site2SiteCustomerGatewayResponse;
 import org.apache.cloudstack.context.CallContext;
 
@@ -50,7 +51,7 @@ public class CreateVpnCustomerGatewayCmd extends BaseAsyncCmd {
     @Parameter(name = ApiConstants.CIDR_LIST, type = CommandType.STRING, required = true, description = "guest cidr list of the customer gateway")
     private String peerCidrList;
 
-    @Parameter(name = ApiConstants.IPSEC_PSK, type = CommandType.STRING, required = true, description = "IPsec Preshared-Key of the customer gateway")
+    @Parameter(name = ApiConstants.IPSEC_PSK, type = CommandType.STRING, required = true, description = "IPsec Preshared-Key of the customer gateway. Cannot contain newline or double quotes.")
     private String ipsecPsk;
 
     @Parameter(name = ApiConstants.IKE_POLICY, type = CommandType.STRING, required = true, description = "IKE policy of the customer gateway")
@@ -74,6 +75,9 @@ public class CreateVpnCustomerGatewayCmd extends BaseAsyncCmd {
     @Parameter(name = ApiConstants.DPD, type = CommandType.BOOLEAN, required = false, description = "If DPD is enabled for VPN connection")
     private Boolean dpd;
 
+    @Parameter(name = ApiConstants.FORCE_ENCAP, type = CommandType.BOOLEAN, required = false, description = "Force Encapsulation for NAT traversal")
+    private Boolean encap;
+
     @Parameter(name = ApiConstants.ACCOUNT, type = CommandType.STRING, description = "the account associated with the gateway. Must be used with the domainId parameter.")
     private String accountName;
 
@@ -83,6 +87,10 @@ public class CreateVpnCustomerGatewayCmd extends BaseAsyncCmd {
                description = "the domain ID associated with the gateway. If used with the account parameter returns the "
                    + "gateway associated with the account for the specified domain.")
     private Long domainId;
+
+    @Parameter(name = ApiConstants.PROJECT_ID, type = CommandType.UUID, entityType = ProjectResponse.class,
+            description = "create site-to-site VPN customer gateway for the project", since = "4.6")
+    private Long projectId;
 
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
@@ -124,12 +132,18 @@ public class CreateVpnCustomerGatewayCmd extends BaseAsyncCmd {
         return dpd;
     }
 
+    public Boolean getEncap() { return encap; }
+
     public String getAccountName() {
         return accountName;
     }
 
     public Long getDomainId() {
         return domainId;
+    }
+
+    public Long getProjectId() {
+        return projectId;
     }
 
     /////////////////////////////////////////////////////
@@ -143,7 +157,7 @@ public class CreateVpnCustomerGatewayCmd extends BaseAsyncCmd {
 
     @Override
     public long getEntityOwnerId() {
-        Long accountId = _accountService.finalyzeAccountId(accountName, domainId, null, true);
+        Long accountId = _accountService.finalyzeAccountId(accountName, domainId, projectId, true);
         if (accountId == null) {
             accountId = CallContext.current().getCallingAccount().getId();
         }

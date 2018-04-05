@@ -110,6 +110,8 @@ public class ElastistorUtil {
     public static final String REST_PARAM_AUTHNETWORK = "authnetwork";
     public static final String REST_PARAM_MAPUSERSTOROOT = "mapuserstoroot";
     public static final String REST_PARAM_STORAGEID = "storageid";
+    public static final String REST_PARAM_TPCONTROL = "tpcontrol";
+    public static final String REST_PARAM_IOPSCONTROL = "iopscontrol";
 
     /**
      * Constants related to elastistor which are persisted in cloudstack
@@ -162,6 +164,8 @@ public class ElastistorUtil {
     private static final String ES_AUTHNETWORK_VAL = "all";
     private static final String ES_MAPUSERSTOROOT_VAL = "yes";
     private static final String ES_SYNC_VAL = "always";
+    private static final String ES_TPCONTROL_VAL = "false";
+    private static final String ES_IOPSCONTROL_VAL = "true";
 
     /**
      * Private constructor s.t. its never instantiated.
@@ -335,7 +339,8 @@ public class ElastistorUtil {
         String qosgroupid;
         String VolumeName = volumeName;
         String totaliops = String.valueOf(capacityIops);
-        String totalthroughput = String.valueOf(capacityIops * 4);
+        //String totalthroughput = String.valueOf(capacityIops * 4);
+        String totalthroughput = "0";
 
         String quotasize = convertCapacityBytes(capacityBytes);
 
@@ -364,6 +369,10 @@ public class ElastistorUtil {
             addQosGroupCmd.putCommandParameter(ElastistorUtil.REST_PARAM_DATASETID, datasetid);
         if (null != ElastistorUtil.ES_GRACEALLOWED_VAL)
             addQosGroupCmd.putCommandParameter(ElastistorUtil.REST_PARAM_GRACEALLOWED, ElastistorUtil.ES_GRACEALLOWED_VAL);
+        if (null != ElastistorUtil.ES_IOPSCONTROL_VAL)
+            addQosGroupCmd.putCommandParameter(ElastistorUtil.REST_PARAM_IOPSCONTROL, ElastistorUtil.ES_IOPSCONTROL_VAL);
+        if (null != ElastistorUtil.ES_TPCONTROL_VAL)
+            addQosGroupCmd.putCommandParameter(ElastistorUtil.REST_PARAM_TPCONTROL, ElastistorUtil.ES_TPCONTROL_VAL);
 
         AddQosGroupCmdResponse addQosGroupCmdResponse = (AddQosGroupCmdResponse) getElastistorRestClient().executeCommand(addQosGroupCmd);
 
@@ -2420,7 +2429,7 @@ public class ElastistorUtil {
          CreateStorageSnapshotCmdResponse snapshotCmdResponse = (CreateStorageSnapshotCmdResponse) getElastistorRestClient().executeCommand(snapshotCmd);
 
          if(snapshotCmdResponse.getStorageSnapshot().getId() != null){
-             return new Answer(null, true, "snapshot succesfully taken");
+             return new Answer(null, true, snapshotCmdResponse.getStorageSnapshot().getId());
          }else{
              return new Answer(null, false, "snapshot failed");
          }
@@ -2477,12 +2486,12 @@ public class ElastistorUtil {
      // update the TSM storage
      public static UpdateTsmStorageCmdResponse updateElastistorTsmStorage(String capacityBytes,String uuid) throws Throwable{
 
-         Long size = (Long.valueOf(capacityBytes)/(1024 * 1024 * 1024));
+         Long size = (Long.parseLong(capacityBytes)/(1024 * 1024 * 1024));
 
          String quotasize = null;
 
          if(size > 1024){
-            quotasize = (String.valueOf(Long.valueOf(capacityBytes)/(1024)) + "T");
+            quotasize = (String.valueOf(Long.parseLong(capacityBytes)/(1024)) + "T");
          }else{
             quotasize = String.valueOf(quotasize) + "G";
          }
@@ -2555,7 +2564,7 @@ public class ElastistorUtil {
 
          s_logger.info("elastistor tsm IOPS is updating to " + capacityIOPs);
          UpdateTsmCmd updateTsmCmd = new UpdateTsmCmd();
-         String throughput = String.valueOf(Long.valueOf(capacityIOPs)*4);
+         String throughput = String.valueOf(Long.parseLong(capacityIOPs)*4);
 
          updateTsmCmd.putCommandParameter("id", uuid);
          updateTsmCmd.putCommandParameter("iops", capacityIOPs);

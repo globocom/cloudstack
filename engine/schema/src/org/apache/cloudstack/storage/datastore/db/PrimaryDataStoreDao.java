@@ -53,7 +53,7 @@ public interface PrimaryDataStoreDao extends GenericDao<StoragePoolVO, Long> {
      */
     void updateCapacityIops(long id, long capacityIops);
 
-    StoragePoolVO persist(StoragePoolVO pool, Map<String, String> details);
+    StoragePoolVO persist(StoragePoolVO pool, Map<String, String> details, List<String> tags);
 
     /**
      * Find pool by name.
@@ -63,6 +63,8 @@ public interface PrimaryDataStoreDao extends GenericDao<StoragePoolVO, Long> {
      * @return the single StoragePoolVO
      */
     List<StoragePoolVO> findPoolByName(String name);
+
+    List<StoragePoolVO> findPoolsByProvider(String provider);
 
     /**
      * Find pools by the pod that matches the details.
@@ -76,6 +78,8 @@ public interface PrimaryDataStoreDao extends GenericDao<StoragePoolVO, Long> {
     List<StoragePoolVO> findPoolsByDetails(long dcId, long podId, Long clusterId, Map<String, String> details, ScopeType scope);
 
     List<StoragePoolVO> findPoolsByTags(long dcId, long podId, Long clusterId, String[] tags);
+
+    List<StoragePoolVO> findDisabledPoolsByScope(long dcId, Long podId, Long clusterId, ScopeType scope);
 
     /**
      * Find pool by UUID.
@@ -96,7 +100,7 @@ public interface PrimaryDataStoreDao extends GenericDao<StoragePoolVO, Long> {
 
     Map<String, String> getDetails(long poolId);
 
-    List<String> searchForStoragePoolDetails(long poolId, String value);
+    List<String> searchForStoragePoolTags(long poolId);
 
     List<StoragePoolVO> findIfDuplicatePoolsExistByUUID(String uuid);
 
@@ -115,4 +119,15 @@ public interface PrimaryDataStoreDao extends GenericDao<StoragePoolVO, Long> {
     List<StoragePoolVO> findZoneWideStoragePoolsByHypervisor(long dataCenterId, HypervisorType hypervisorType);
 
     List<StoragePoolVO> findLocalStoragePoolsByHostAndTags(long hostId, String[] tags);
+
+    List<StoragePoolVO> listLocalStoragePoolByPath(long datacenterId, String path);
+
+    void deletePoolTags(long poolId);
+
+    /**
+     *  Looks for a storage pool where the original volume of the snapshot was taken.
+     *  Even if the volume has already been deleted, we will return the last storage pool where it was stored.
+     */
+    StoragePoolVO findStoragePoolForSnapshot(long snapshotId);
+
 }

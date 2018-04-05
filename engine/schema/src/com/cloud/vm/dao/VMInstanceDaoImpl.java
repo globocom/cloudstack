@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 
 import javax.annotation.PostConstruct;
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
@@ -63,7 +62,6 @@ import com.cloud.vm.VirtualMachine.State;
 import com.cloud.vm.VirtualMachine.Type;
 
 @Component
-@Local(value = {VMInstanceDao.class})
 public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implements VMInstanceDao {
 
     public static final Logger s_logger = Logger.getLogger(VMInstanceDaoImpl.class);
@@ -74,6 +72,7 @@ public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implem
     protected SearchBuilder<VMInstanceVO> IdStatesSearch;
     protected SearchBuilder<VMInstanceVO> AllFieldsSearch;
     protected SearchBuilder<VMInstanceVO> ZoneTemplateNonExpungedSearch;
+    protected SearchBuilder<VMInstanceVO> TemplateNonExpungedSearch;
     protected SearchBuilder<VMInstanceVO> NameLikeSearch;
     protected SearchBuilder<VMInstanceVO> StateChangeSearch;
     protected SearchBuilder<VMInstanceVO> TransitionSearch;
@@ -89,6 +88,7 @@ public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implem
     protected GenericSearchBuilder<VMInstanceVO, Long> FindIdsOfVirtualRoutersByAccount;
     protected GenericSearchBuilder<VMInstanceVO, Long> CountActiveByHost;
     protected GenericSearchBuilder<VMInstanceVO, Long> CountRunningByAccount;
+    protected GenericSearchBuilder<VMInstanceVO, Long> CountByZoneAndState;
     protected SearchBuilder<VMInstanceVO> NetworkTypeSearch;
     protected GenericSearchBuilder<VMInstanceVO, String> DistinctHostNameSearch;
     protected SearchBuilder<VMInstanceVO> HostAndStateSearch;
@@ -155,6 +155,7 @@ public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implem
         AllFieldsSearch.and("lastHost", AllFieldsSearch.entity().getLastHostId(), Op.EQ);
         AllFieldsSearch.and("state", AllFieldsSearch.entity().getState(), Op.EQ);
         AllFieldsSearch.and("zone", AllFieldsSearch.entity().getDataCenterId(), Op.EQ);
+        AllFieldsSearch.and("pod", AllFieldsSearch.entity().getPodIdToDeployIn(), Op.EQ);
         AllFieldsSearch.and("type", AllFieldsSearch.entity().getType(), Op.EQ);
         AllFieldsSearch.and("account", AllFieldsSearch.entity().getAccountId(), Op.EQ);
         AllFieldsSearch.done();
@@ -164,6 +165,12 @@ public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implem
         ZoneTemplateNonExpungedSearch.and("template", ZoneTemplateNonExpungedSearch.entity().getTemplateId(), Op.EQ);
         ZoneTemplateNonExpungedSearch.and("state", ZoneTemplateNonExpungedSearch.entity().getState(), Op.NEQ);
         ZoneTemplateNonExpungedSearch.done();
+
+
+        TemplateNonExpungedSearch = createSearchBuilder();
+        TemplateNonExpungedSearch.and("template", TemplateNonExpungedSearch.entity().getTemplateId(), Op.EQ);
+        TemplateNonExpungedSearch.and("state", TemplateNonExpungedSearch.entity().getState(), Op.NEQ);
+        TemplateNonExpungedSearch.done();
 
         NameLikeSearch = createSearchBuilder();
         NameLikeSearch.and("name", NameLikeSearch.entity().getHostName(), Op.LIKE);
@@ -242,6 +249,12 @@ public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implem
         CountRunningByAccount.and("account", CountRunningByAccount.entity().getAccountId(), SearchCriteria.Op.EQ);
         CountRunningByAccount.and("state", CountRunningByAccount.entity().getState(), SearchCriteria.Op.EQ);
         CountRunningByAccount.done();
+
+        CountByZoneAndState = createSearchBuilder(Long.class);
+        CountByZoneAndState.select(null, Func.COUNT, null);
+        CountByZoneAndState.and("zone", CountByZoneAndState.entity().getDataCenterId(), SearchCriteria.Op.EQ);
+        CountByZoneAndState.and("state", CountByZoneAndState.entity().getState(), SearchCriteria.Op.EQ);
+        CountByZoneAndState.done();
 
         HostAndStateSearch = createSearchBuilder();
         HostAndStateSearch.and("host", HostAndStateSearch.entity().getHostId(), Op.EQ);
@@ -325,6 +338,15 @@ public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implem
         SearchCriteria<VMInstanceVO> sc = AllFieldsSearch.create();
         sc.setParameters("zone", zoneId);
         sc.setParameters("type", type.toString());
+        return listBy(sc);
+    }
+
+    @Override
+    public List<VMInstanceVO> listNonExpungedByTemplate(long templateId) {
+        SearchCriteria<VMInstanceVO> sc = TemplateNonExpungedSearch.create();
+
+        sc.setParameters("template", templateId);
+        sc.setParameters("state", State.Expunging);
         return listBy(sc);
     }
 
@@ -457,6 +479,9 @@ public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implem
             // state is same, don't need to update
             return true;
         }
+        if(ifStateUnchanged(oldState,newState, oldHostId, newHostId)) {
+            return true;
+        }
 
         // lock the target row at beginning to avoid lock-promotion caused deadlock
         lockRow(vm.getId(), true);
@@ -502,6 +527,14 @@ public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implem
             }
         }
         return result > 0;
+    }
+
+    boolean ifStateUnchanged(State oldState, State newState, Long oldHostId, Long newHostId ) {
+        if (oldState == State.Stopped && newState == State.Stopped && newHostId == null && oldHostId == null) {
+            // No change , no need to update
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -709,6 +742,14 @@ public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implem
     }
 
     @Override
+    public Long countByZoneAndState(long zoneId, State state) {
+        SearchCriteria<Long> sc = CountByZoneAndState.create();
+        sc.setParameters("zone", zoneId);
+        sc.setParameters("state", state);
+        return customSearch(sc, null).get(0);
+    }
+
+    @Override
     public List<VMInstanceVO> listNonRemovedVmsByTypeAndNetwork(long networkId, VirtualMachine.Type... types) {
         if (NetworkTypeSearch == null) {
 
@@ -801,6 +842,15 @@ public class VMInstanceDaoImpl extends GenericDaoBase<VMInstanceVO, Long> implem
                 return needToUpdate;
             }
         });
+    }
+
+    @Override
+    public boolean isPowerStateUpToDate(final long instanceId) {
+        VMInstanceVO instance = findById(instanceId);
+        if(instance == null) {
+            throw new CloudRuntimeException("checking power state update count on non existing instance " + instanceId);
+        }
+        return instance.getPowerStateUpdateCount() < MAX_CONSECUTIVE_SAME_STATE_UPDATE_COUNT;
     }
 
     @Override

@@ -19,18 +19,33 @@
 
 package org.apache.cloudstack.storage.command;
 
-import com.cloud.agent.api.Command;
+import java.util.Map;
+
 import com.cloud.agent.api.to.DiskTO;
 
-public final class AttachCommand extends Command implements StorageSubSystemCommand {
+public final class AttachCommand extends StorageSubSystemCommand {
     private DiskTO disk;
     private String vmName;
     private boolean inSeq = false;
+    private Map<String, String> controllerInfo;
 
-    public AttachCommand(DiskTO disk, String vmName) {
+    public AttachCommand(final DiskTO disk, final String vmName) {
         super();
         this.disk = disk;
         this.vmName = vmName;
+    }
+    public AttachCommand(DiskTO disk, String vmName, Map<String, String> controllerInfo) {
+        super();
+        this.disk = disk;
+        this.vmName = vmName;
+        this.controllerInfo = controllerInfo;
+    }
+
+    public Map<String, String> getControllerInfo() {
+        return controllerInfo;
+    }
+    public void setControllerInfo(Map<String, String> controllerInfo) {
+        this.controllerInfo = controllerInfo;
     }
 
     @Override
@@ -42,7 +57,7 @@ public final class AttachCommand extends Command implements StorageSubSystemComm
         return disk;
     }
 
-    public void setDisk(DiskTO disk) {
+    public void setDisk(final DiskTO disk) {
         this.disk = disk;
     }
 
@@ -50,12 +65,12 @@ public final class AttachCommand extends Command implements StorageSubSystemComm
         return vmName;
     }
 
-    public void setVmName(String vmName) {
+    public void setVmName(final String vmName) {
         this.vmName = vmName;
     }
 
     @Override
-    public void setExecuteInSequence(boolean inSeq) {
+    public void setExecuteInSequence(final boolean inSeq) {
         this.inSeq = inSeq;
     }
 }

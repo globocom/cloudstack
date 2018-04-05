@@ -22,8 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import javax.ejb.Local;
-
 import com.cloud.agent.IAgentControl;
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.CheckNetworkAnswer;
@@ -41,8 +39,8 @@ import com.cloud.network.Networks.RouterPrivateIpStrategy;
 import com.cloud.resource.ServerResource;
 import com.cloud.storage.Storage;
 import com.cloud.storage.Storage.StoragePoolType;
+import com.cloud.utils.StringUtils;
 
-@Local(value = {ServerResource.class})
 public class DummyResource implements ServerResource {
     String _name;
     Host.Type _type;
@@ -135,7 +133,7 @@ public class DummyResource implements ServerResource {
         String hostIp = getConfiguredProperty("private.ip.address", "127.0.0.1");
         String localStoragePath = getConfiguredProperty("local.storage.path", "/mnt");
         String lh = hostIp + localStoragePath;
-        String uuid = UUID.nameUUIDFromBytes(lh.getBytes()).toString();
+        String uuid = UUID.nameUUIDFromBytes(lh.getBytes(StringUtils.getPreferredCharset())).toString();
 
         String capacity = getConfiguredProperty("local.storage.capacity", "1000000000");
         String available = getConfiguredProperty("local.storage.avail", "10000000");

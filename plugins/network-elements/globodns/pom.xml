@@ -24,7 +24,7 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack-plugins</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.0.0</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <dependencies>
@@ -32,16 +32,6 @@
       <groupId>com.globo.globodns</groupId>
       <artifactId>globodns-client</artifactId>
       <version>0.0.23</version>
-    </dependency>
-    <dependency>
-      <groupId>net.kencochrane.raven</groupId>
-      <artifactId>raven</artifactId>
-      <version>4.2</version>
-    </dependency>
-    <dependency>
-      <groupId>net.kencochrane.raven</groupId>
-      <artifactId>raven-log4j</artifactId>
-      <version>4.2</version>
     </dependency>
   </dependencies>
 </project>

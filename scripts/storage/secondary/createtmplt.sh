@@ -22,12 +22,11 @@
 # createtmplt.sh -- install a template
 
 usage() {
-  printf "Usage: %s: -t <template-fs> -n <templatename> -f <root disk file> -c <md5 cksum> -d <descr> -h  [-u] [-v]\n" $(basename $0) >&2
+  printf "Usage: %s: -t <template-fs> -n <templatename> -f <root disk file> -d <descr> -h  [-u] [-v]\n" $(basename $0) >&2
 }
 
 
 #set -x
-ulimit -f 41943040 #40GiB in blocks
 ulimit -c 0
 
 rollback_if_needed() {
@@ -38,16 +37,6 @@ rollback_if_needed() {
     rm -rf $1
     exit 2
 fi
-}
-
-verify_cksum() {
-  echo  "$1  $2" | md5sum  -c --status
-  #printf "$1\t$2" | md5sum  -c --status
-  if [ $? -gt 0 ] 
-  then
-    printf "Checksum failed, not proceeding with install\n"
-    exit 3
-  fi
 }
 
 untar() {
@@ -129,9 +118,8 @@ hflag=
 hvm=false
 cleanup=false
 dflag=
-cflag=
 
-while getopts 'vuht:n:f:s:c:d:S:' OPTION
+while getopts 'vuht:n:f:s:d:S:' OPTION
 do
   case $OPTION in
   t)	tflag=1
@@ -144,9 +132,6 @@ do
 		tmpltimg="$OPTARG"
 		;;
   s)	sflag=1
-		;;
-  c)	cflag=1
-		cksum="$OPTARG"
 		;;
   d)	dflag=1
 		descr="$OPTARG"
@@ -191,10 +176,6 @@ then
   exit 3
 fi
 
-if [ -n "$cksum" ]
-then
-  verify_cksum $cksum $tmpltimg
-fi
 [ -n "$verbose" ] && is_compressed $tmpltimg
 tmpltimg2=$(uncompress $tmpltimg)
 rollback_if_needed $tmpltfs $? "failed to uncompress $tmpltimg\n"
@@ -227,6 +208,8 @@ echo -n "" > /$tmpltfs/template.properties
 today=$(date '+%m_%d_%Y')
 echo "filename=$tmpltname" > /$tmpltfs/template.properties
 echo "description=$descr" >> /$tmpltfs/template.properties
+# we need to rethink this property as it might get changed after download due to decompression
+# option is to recalcutate it here
 echo "checksum=$cksum" >> /$tmpltfs/template.properties
 echo "hvm=$hvm" >> /$tmpltfs/template.properties
 echo "size=$imgsize" >> /$tmpltfs/template.properties

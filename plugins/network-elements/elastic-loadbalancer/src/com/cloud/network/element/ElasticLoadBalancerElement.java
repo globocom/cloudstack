@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -56,7 +55,6 @@ import com.cloud.vm.ReservationContext;
 import com.cloud.vm.VirtualMachineProfile;
 
 @Component
-@Local(value = NetworkElement.class)
 public class ElasticLoadBalancerElement extends AdapterBase implements LoadBalancingServiceProvider, IpDeployer {
     private static final Logger s_logger = Logger.getLogger(ElasticLoadBalancerElement.class);
     private static final Map<Service, Map<Capability, String>> capabilities = setCapabilities();
@@ -221,6 +219,11 @@ public class ElasticLoadBalancerElement extends AdapterBase implements LoadBalan
     @Override
     public List<LoadBalancerTO> updateHealthChecks(Network network, List<LoadBalancingRule> lbrules) {
         return null;
+    }
+
+    @Override
+    public boolean handlesOnlyRulesInTransitionState() {
+        return true;
     }
 
 }

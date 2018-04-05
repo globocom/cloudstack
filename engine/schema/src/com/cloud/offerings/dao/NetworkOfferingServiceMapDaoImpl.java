@@ -18,7 +18,6 @@ package com.cloud.offerings.dao;
 
 import java.util.List;
 
-import javax.ejb.Local;
 
 import org.springframework.stereotype.Component;
 
@@ -33,7 +32,6 @@ import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.SearchCriteria.Func;
 
 @Component
-@Local(value = NetworkOfferingServiceMapDao.class)
 @DB()
 public class NetworkOfferingServiceMapDaoImpl extends GenericDaoBase<NetworkOfferingServiceMapVO, Long> implements NetworkOfferingServiceMapDao {
 
@@ -103,6 +101,15 @@ public class NetworkOfferingServiceMapDaoImpl extends GenericDaoBase<NetworkOffe
         }
 
         return false;
+    }
+
+    @Override
+    public boolean canProviderSupportServiceInNetworkOffering(long networkOfferingId, Service service, Provider provider) {
+        SearchCriteria<NetworkOfferingServiceMapVO> sc = AllFieldsSearch.create();
+        sc.setParameters("networkOfferingId", networkOfferingId);
+        sc.setParameters("service", service.getName());
+        sc.setParameters("provider", provider.getName());
+        return findOneBy(sc) != null;
     }
 
     @Override

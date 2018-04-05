@@ -19,10 +19,14 @@ package org.apache.cloudstack.network.contrail.management;
 
 import java.util.List;
 import java.util.Map;
+import java.net.InetAddress;
 
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
+import org.apache.cloudstack.api.command.admin.user.GetUserKeysCmd;
+import org.apache.cloudstack.api.command.admin.user.MoveUserCmd;
+import org.apache.cloudstack.framework.config.ConfigKey;
 import org.apache.log4j.Logger;
 
 import org.apache.cloudstack.acl.ControlledEntity;
@@ -41,6 +45,8 @@ import com.cloud.domain.Domain;
 import com.cloud.exception.ConcurrentOperationException;
 import com.cloud.exception.PermissionDeniedException;
 import com.cloud.exception.ResourceUnavailableException;
+import com.cloud.offering.DiskOffering;
+import com.cloud.offering.ServiceOffering;
 import com.cloud.projects.Project.ListProjectResourcesCriteria;
 import com.cloud.user.Account;
 import com.cloud.user.AccountManager;
@@ -131,14 +137,14 @@ public class MockAccountManager extends ManagerBase implements AccountManager {
     }
 
     @Override
-    public UserAccount createUserAccount(String arg0, String arg1, String arg2, String arg3, String arg4, String arg5, String arg6, short arg7, Long arg8, String arg9,
+    public UserAccount createUserAccount(String arg0, String arg1, String arg2, String arg3, String arg4, String arg5, String arg6, short arg7, Long roleId, Long arg8, String arg9,
         Map<String, String> arg10, String arg11, String arg12) {
         // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public UserAccount createUserAccount(String userName, String password, String firstName, String lastName, String email, String timezone, String accountName, short accountType,
+    public UserAccount createUserAccount(String userName, String password, String firstName, String lastName, String email, String timezone, String accountName, short accountType, Long roleId,
                                          Long domainId, String networkDomain, Map<String, String> details, String accountUUID, String userUUID, User.Source source) {
         // TODO Auto-generated method stub
         return null;
@@ -250,7 +256,7 @@ public class MockAccountManager extends ManagerBase implements AccountManager {
     }
 
     @Override
-    public UserAccount authenticateUser(String arg0, String arg1, Long arg2, String arg3, Map<String, Object[]> arg4) {
+    public UserAccount authenticateUser(String arg0, String arg1, Long arg2, InetAddress arg3, Map<String, Object[]> arg4) {
         // TODO Auto-generated method stub
         return null;
     }
@@ -308,6 +314,16 @@ public class MockAccountManager extends ManagerBase implements AccountManager {
     @Override
     public boolean deleteUser(DeleteUserCmd arg0) {
         // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public boolean moveUser(MoveUserCmd moveUserCmd) {
+        return false;
+    }
+
+    @Override
+    public boolean moveUser(long id, Long domainId, long accountId) {
         return false;
     }
 
@@ -389,8 +405,8 @@ public class MockAccountManager extends ManagerBase implements AccountManager {
     }
 
     @Override
-    public Account createAccount(String accountName, short accountType, Long domainId, String networkDomain, Map<String, String> details, String uuid) {
-        final AccountVO account = new AccountVO(accountName, domainId, networkDomain, accountType, uuid);
+    public Account createAccount(String accountName, short accountType, Long roleId, Long domainId, String networkDomain, Map<String, String> details, String uuid) {
+        final AccountVO account = new AccountVO(accountName, domainId, networkDomain, accountType, roleId, uuid);
         Transaction.execute(new TransactionCallbackNoReturn() {
             @Override
             public void doInTransactionWithoutResult(TransactionStatus status) {
@@ -417,6 +433,36 @@ public class MockAccountManager extends ManagerBase implements AccountManager {
     @Override
     public Long finalyzeAccountId(String accountName, Long domainId, Long projectId, boolean enabledOnly) {
         // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public void checkAccess(Account account, ServiceOffering so) throws PermissionDeniedException {
+        // TODO Auto-generated method stub
+    }
+
+    @Override
+    public void checkAccess(Account account, DiskOffering dof) throws PermissionDeniedException {
+        // TODO Auto-generated method stub
+    }
+
+    @Override
+    public Map<String, String> getKeys(GetUserKeysCmd cmd){
+        return null;
+    }
+
+    @Override
+    public void checkAccess(User user, ControlledEntity entity)
+            throws PermissionDeniedException {
+
+    }
+    @Override
+    public String getConfigComponentName() {
+        return null;
+    }
+
+    @Override
+    public ConfigKey<?>[] getConfigKeys() {
         return null;
     }
 }

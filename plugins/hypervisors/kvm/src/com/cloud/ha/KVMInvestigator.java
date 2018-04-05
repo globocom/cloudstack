@@ -27,30 +27,44 @@ import com.cloud.host.Status;
 import com.cloud.host.dao.HostDao;
 import com.cloud.hypervisor.Hypervisor;
 import com.cloud.resource.ResourceManager;
+import com.cloud.storage.Storage.StoragePoolType;
 import com.cloud.utils.component.AdapterBase;
+import org.apache.cloudstack.ha.HAManager;
+import org.apache.cloudstack.storage.datastore.db.PrimaryDataStoreDao;
+import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
 import org.apache.log4j.Logger;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import java.util.List;
 
-@Local(value = Investigator.class)
 public class KVMInvestigator extends AdapterBase implements Investigator {
     private final static Logger s_logger = Logger.getLogger(KVMInvestigator.class);
     @Inject
-    HostDao _hostDao;
+    private HostDao _hostDao;
     @Inject
-    AgentManager _agentMgr;
+    private AgentManager _agentMgr;
     @Inject
-    ResourceManager _resourceMgr;
+    private ResourceManager _resourceMgr;
+    @Inject
+    private PrimaryDataStoreDao _storagePoolDao;
+    @Inject
+    private HAManager haManager;
 
     @Override
-    public Boolean isVmAlive(com.cloud.vm.VirtualMachine vm, Host host) {
-        Status status = isAgentAlive(host);
-        if (status == null) {
-            return null;
+    public boolean isVmAlive(com.cloud.vm.VirtualMachine vm, Host host) throws UnknownVM {
+        if (haManager.isHAEligible(host)) {
+            return haManager.isVMAliveOnHost(host);
         }
-        return status == Status.Up ? true : null;
+        Status status = isAgentAlive(host);
+        s_logger.debug("HA: HOST is ineligible legacy state " + status + " for host " + host.getId());
+        if (status == null) {
+            throw new UnknownVM();
+        }
+        if (status == Status.Up) {
+            return true;
+        } else {
+            throw new UnknownVM();
+        }
     }
 
     @Override
@@ -58,6 +72,25 @@ public class KVMInvestigator extends AdapterBase implements Investigator {
         if (agent.getHypervisorType() != Hypervisor.HypervisorType.KVM && agent.getHypervisorType() != Hypervisor.HypervisorType.LXC) {
             return null;
         }
+
+        if (haManager.isHAEligible(agent)) {
+            return haManager.getHostStatus(agent);
+        }
+
+        List<StoragePoolVO> clusterPools = _storagePoolDao.listPoolsByCluster(agent.getClusterId());
+        boolean hasNfs = false;
+        for (StoragePoolVO pool : clusterPools) {
+            if (pool.getPoolType() == StoragePoolType.NetworkFilesystem) {
+                hasNfs = true;
+                break;
+            }
+        }
+        if (!hasNfs) {
+            s_logger.warn(
+                    "Agent investigation was requested on host " + agent + ", but host does not support investigation because it has no NFS storage. Skipping investigation.");
+            return Status.Disconnected;
+        }
+
         Status hostStatus = null;
         Status neighbourStatus = null;
         CheckOnHostCommand cmd = new CheckOnHostCommand(agent);
@@ -76,7 +109,8 @@ public class KVMInvestigator extends AdapterBase implements Investigator {
 
         List<HostVO> neighbors = _resourceMgr.listHostsInClusterByStatus(agent.getClusterId(), Status.Up);
         for (HostVO neighbor : neighbors) {
-            if (neighbor.getId() == agent.getId() || (neighbor.getHypervisorType() != Hypervisor.HypervisorType.KVM && neighbor.getHypervisorType() != Hypervisor.HypervisorType.LXC)) {
+            if (neighbor.getId() == agent.getId()
+                    || (neighbor.getHypervisorType() != Hypervisor.HypervisorType.KVM && neighbor.getHypervisorType() != Hypervisor.HypervisorType.LXC)) {
                 continue;
             }
             s_logger.debug("Investigating host:" + agent.getId() + " via neighbouring host:" + neighbor.getId());
@@ -99,6 +133,7 @@ public class KVMInvestigator extends AdapterBase implements Investigator {
         if (neighbourStatus == Status.Down && (hostStatus == Status.Disconnected || hostStatus == Status.Down)) {
             hostStatus = Status.Down;
         }
+        s_logger.debug("HA: HOST is ineligible legacy state " + hostStatus + " for host " + agent.getId());
         return hostStatus;
     }
 }

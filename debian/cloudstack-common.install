@@ -24,9 +24,10 @@
 /usr/share/cloudstack-common/scripts/vm/systemvm/*
 /usr/share/cloudstack-common/scripts/vm/pingtest.sh
 /usr/share/cloudstack-common/scripts/vm/hypervisor/kvm/*
+/usr/share/cloudstack-common/scripts/vm/hypervisor/update_host_passwd.sh
 /usr/share/cloudstack-common/scripts/vm/hypervisor/versions.sh
 /usr/share/cloudstack-common/scripts/vm/hypervisor/xenserver/*
 /usr/share/cloudstack-common/lib/*
 /usr/bin/cloudstack-set-guest-password
 /usr/bin/cloudstack-set-guest-sshkey
-/usr/lib/python2.?/*-packages/*
+/usr/share/pyshared

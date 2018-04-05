@@ -16,7 +16,7 @@
 // under the License.
 package com.cloud.upgrade.dao;
 
-import java.io.File;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -36,7 +36,6 @@ import com.cloud.utils.crypt.DBEncryptionUtil;
 import com.cloud.utils.crypt.EncryptionSecretKeyChecker;
 import com.cloud.utils.db.TransactionLegacy;
 import com.cloud.utils.exception.CloudRuntimeException;
-import com.cloud.utils.script.Script;
 
 public class Upgrade2214to30 extends Upgrade30xBase implements DbUpgrade {
     final static Logger s_logger = Logger.getLogger(Upgrade2214to30.class);
@@ -57,13 +56,14 @@ public class Upgrade2214to30 extends Upgrade30xBase implements DbUpgrade {
     }
 
     @Override
-    public File[] getPrepareScripts() {
-        String script = Script.findScript("", "db/schema-2214to30.sql");
+    public InputStream[] getPrepareScripts() {
+        final String scriptFile = "META-INF/db/schema-2214to30.sql";
+        final InputStream script = Thread.currentThread().getContextClassLoader().getResourceAsStream(scriptFile);
         if (script == null) {
-            throw new CloudRuntimeException("Unable to find db/schema-2214to30.sql");
+            throw new CloudRuntimeException("Unable to find " + scriptFile);
         }
 
-        return new File[] {new File(script)};
+        return new InputStream[] {script};
     }
 
     @Override
@@ -102,13 +102,14 @@ public class Upgrade2214to30 extends Upgrade30xBase implements DbUpgrade {
     }
 
     @Override
-    public File[] getCleanupScripts() {
-        String script = Script.findScript("", "db/schema-2214to30-cleanup.sql");
+    public InputStream[] getCleanupScripts() {
+        final String scriptFile = "META-INF/db/schema-2214to30-cleanup.sql";
+        final InputStream script = Thread.currentThread().getContextClassLoader().getResourceAsStream(scriptFile);
         if (script == null) {
-            throw new CloudRuntimeException("Unable to find db/schema-2214to30-cleanup.sql");
+            throw new CloudRuntimeException("Unable to find " + scriptFile);
         }
 
-        return new File[] {new File(script)};
+        return new InputStream[] {script};
     }
 
     private void setupPhysicalNetworks(Connection conn) {
@@ -272,7 +273,8 @@ public class Upgrade2214to30 extends Upgrade30xBase implements DbUpgrade {
                         addDefaultSGProvider(conn, physicalNetworkId, zoneId, networkType, false);
                         //for all networks with this tag, add physical_network_id
 
-                        PreparedStatement pstmt3 = conn.prepareStatement("SELECT network_id FROM `cloud`.`network_tags` where tag = '" + guestNetworkTag + "'");
+                        PreparedStatement pstmt3 = conn.prepareStatement("SELECT network_id FROM `cloud`.`network_tags` where tag= ?");
+                        pstmt3.setString(1,guestNetworkTag);
                         ResultSet rsNet = pstmt3.executeQuery();
                         s_logger.debug("Adding PhysicalNetwork to VLAN");
                         s_logger.debug("Adding PhysicalNetwork to user_ip_address");
@@ -410,6 +412,7 @@ public class Upgrade2214to30 extends Upgrade30xBase implements DbUpgrade {
                     pstmt.close();
                 }
             } catch (SQLException e) {
+                s_logger.info("[ignored]",e);
             }
         }
         s_logger.debug("Done encrypting Config values");
@@ -860,6 +863,7 @@ public class Upgrade2214to30 extends Upgrade30xBase implements DbUpgrade {
                 pstmt.executeUpdate();
                 pstmt.close();
             } catch (SQLException e) {
+                s_logger.info("[ignored]",e);
             }
             TransactionLegacy.closePstmts(pstmt2Close);
         }
@@ -999,6 +1003,7 @@ public class Upgrade2214to30 extends Upgrade30xBase implements DbUpgrade {
                 pstmt.executeUpdate();
                 pstmt.close();
             } catch (SQLException e) {
+                s_logger.info("[ignored]",e);
             }
             TransactionLegacy.closePstmts(pstmt2Close);
         }
@@ -1052,6 +1057,7 @@ public class Upgrade2214to30 extends Upgrade30xBase implements DbUpgrade {
                     pstmt.close();
                 }
             } catch (SQLException e) {
+                s_logger.info("[ignored]",e);
             }
         }
     }
@@ -1150,11 +1156,10 @@ public class Upgrade2214to30 extends Upgrade30xBase implements DbUpgrade {
             } catch (SQLException e) {
                 throw new CloudRuntimeException("Unable to switch networks to the new network offering", e);
             } finally {
-                try {
-                    pstmt = conn.prepareStatement("DROP TABLE `cloud`.`network_offerings2`");
-                    pstmt.executeUpdate();
-                    pstmt.close();
+                try (PreparedStatement dropStatement = conn.prepareStatement("DROP TABLE `cloud`.`network_offerings2`");){
+                    dropStatement.executeUpdate();
                 } catch (SQLException e) {
+                    s_logger.info("[ignored]",e);
                 }
                 TransactionLegacy.closePstmts(pstmt2Close);
             }

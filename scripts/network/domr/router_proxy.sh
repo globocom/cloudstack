@@ -16,8 +16,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-
-
 # used as a proxy to call script inside virtual router 
 
 #set -x
@@ -37,22 +35,11 @@ check_gw() {
 
 cert="/root/.ssh/id_rsa.cloud"
 
-script=$1
-shift
-
-domRIp=$1
-shift
+script="$1"
+domRIp="$2"
 
 check_gw "$domRIp"
 
-ssh -p 3922 -q -o StrictHostKeyChecking=no -i $cert root@$domRIp "/opt/cloud/bin/$script $*"
+ssh -p 3922 -q -o StrictHostKeyChecking=no -i $cert root@$domRIp "/opt/cloud/bin/$script ${@:3}"
+
 exit $?
-
-
-
-
-
-
-
-
-

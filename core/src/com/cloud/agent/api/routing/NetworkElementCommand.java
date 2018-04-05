@@ -19,9 +19,10 @@
 
 package com.cloud.agent.api.routing;
 
-import com.cloud.agent.api.Command;
-
 import java.util.HashMap;
+import java.util.Map;
+
+import com.cloud.agent.api.Command;
 
 public abstract class NetworkElementCommand extends Command {
     HashMap<String, String> accessDetails = new HashMap<String, String>(0);
@@ -38,6 +39,7 @@ public abstract class NetworkElementCommand extends Command {
     public static final String VPC_PRIVATE_GATEWAY = "vpc.gateway.private";
     public static final String FIREWALL_EGRESS_DEFAULT = "firewall.egress.default";
     public static final String ROUTER_MONITORING_ENABLE = "router.monitor.enable";
+    public static final String NETWORK_PUB_LAST_IP = "network.public.last.ip";
 
     private String routerAccessIp;
 
@@ -45,11 +47,23 @@ public abstract class NetworkElementCommand extends Command {
         super();
     }
 
-    public void setAccessDetail(String name, String value) {
+    public void setAccessDetail(final Map<String, String> details) {
+        if (details == null) {
+            return;
+        }
+        for (final Map.Entry<String, String> detail : details.entrySet()) {
+            if (detail == null) {
+                continue;
+            }
+            setAccessDetail(detail.getKey(), detail.getValue());
+        }
+    }
+
+    public void setAccessDetail(final String name, final String value) {
         accessDetails.put(name, value);
     }
 
-    public String getAccessDetail(String name) {
+    public String getAccessDetail(final String name) {
         return accessDetails.get(name);
     }
 
@@ -62,7 +76,7 @@ public abstract class NetworkElementCommand extends Command {
         return routerAccessIp;
     }
 
-    public void setRouterAccessIp(String routerAccessIp) {
+    public void setRouterAccessIp(final String routerAccessIp) {
         this.routerAccessIp = routerAccessIp;
     }
 

@@ -16,9 +16,9 @@
 // under the License.
 package com.cloud.network.guru;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
+import com.cloud.network.NetworkModel;
 import org.apache.log4j.Logger;
 
 import com.cloud.dc.Pod;
@@ -44,7 +44,6 @@ import com.cloud.vm.NicProfile;
 import com.cloud.vm.ReservationContext;
 import com.cloud.vm.VirtualMachineProfile;
 
-@Local(value = NetworkGuru.class)
 public class StorageNetworkGuru extends PodBasedNetworkGuru implements NetworkGuru {
     private static final Logger s_logger = Logger.getLogger(StorageNetworkGuru.class);
     @Inject
@@ -90,7 +89,7 @@ public class StorageNetworkGuru extends PodBasedNetworkGuru implements NetworkGu
 
         NetworkVO config =
             new NetworkVO(offering.getTrafficType(), Mode.Static, BroadcastDomainType.Native, offering.getId(), Network.State.Setup, plan.getDataCenterId(),
-                plan.getPhysicalNetworkId());
+                plan.getPhysicalNetworkId(), offering.getRedundantRouter());
         return config;
     }
 
@@ -132,12 +131,12 @@ public class StorageNetworkGuru extends PodBasedNetworkGuru implements NetworkGu
         }
 
         vlan = ip.getVlan();
-        nic.setIp4Address(ip.getIpAddress());
-        nic.setMacAddress(NetUtils.long2Mac(NetUtils.createSequenceBasedMacAddress(ip.getMac())));
+        nic.setIPv4Address(ip.getIpAddress());
+        nic.setMacAddress(NetUtils.long2Mac(NetUtils.createSequenceBasedMacAddress(ip.getMac(), NetworkModel.MACIdentifier.value())));
         nic.setFormat(AddressFormat.Ip4);
-        nic.setNetmask(ip.getNetmask());
+        nic.setIPv4Netmask(ip.getNetmask());
         nic.setBroadcastType(BroadcastDomainType.Storage);
-        nic.setGateway(ip.getGateway());
+        nic.setIPv4Gateway(ip.getGateway());
         if (vlan != null) {
             nic.setBroadcastUri(BroadcastDomainType.Storage.toUri(vlan));
         } else {
@@ -154,8 +153,8 @@ public class StorageNetworkGuru extends PodBasedNetworkGuru implements NetworkGu
             return super.release(nic, vm, reservationId);
         }
 
-        _sNwMgr.releaseIpAddress(nic.getIp4Address());
-        s_logger.debug("Release an storage ip " + nic.getIp4Address());
+        _sNwMgr.releaseIpAddress(nic.getIPv4Address());
+        s_logger.debug("Release an storage ip " + nic.getIPv4Address());
         nic.deallocate();
         return true;
     }

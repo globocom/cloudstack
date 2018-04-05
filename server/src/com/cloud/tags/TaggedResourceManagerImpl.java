@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -37,13 +36,13 @@ import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
-import com.cloud.api.query.dao.ResourceTagJoinDao;
 import com.cloud.dc.DataCenterVO;
 import com.cloud.domain.PartOf;
 import com.cloud.event.ActionEvent;
 import com.cloud.event.EventTypes;
 import com.cloud.exception.InvalidParameterValueException;
 import com.cloud.exception.PermissionDeniedException;
+import com.cloud.offerings.NetworkOfferingVO;
 import com.cloud.network.LBHealthCheckPolicyVO;
 import com.cloud.network.as.AutoScaleVmGroupVO;
 import com.cloud.network.as.AutoScaleVmProfileVO;
@@ -57,11 +56,12 @@ import com.cloud.network.dao.Site2SiteVpnConnectionVO;
 import com.cloud.network.dao.Site2SiteVpnGatewayVO;
 import com.cloud.network.rules.FirewallRuleVO;
 import com.cloud.network.rules.PortForwardingRuleVO;
-import com.cloud.network.security.SecurityGroupVO;
 import com.cloud.network.security.SecurityGroupRuleVO;
+import com.cloud.network.security.SecurityGroupVO;
 import com.cloud.network.vpc.NetworkACLItemVO;
 import com.cloud.network.vpc.NetworkACLVO;
 import com.cloud.network.vpc.StaticRouteVO;
+import com.cloud.network.vpc.VpcOfferingVO;
 import com.cloud.network.vpc.VpcVO;
 import com.cloud.projects.ProjectVO;
 import com.cloud.server.ResourceTag;
@@ -75,6 +75,7 @@ import com.cloud.storage.VolumeVO;
 import com.cloud.tags.dao.ResourceTagDao;
 import com.cloud.user.Account;
 import com.cloud.user.AccountManager;
+import com.cloud.user.AccountVO;
 import com.cloud.user.DomainManager;
 import com.cloud.user.OwnedBy;
 import com.cloud.user.UserVO;
@@ -91,11 +92,15 @@ import com.cloud.vm.NicVO;
 import com.cloud.vm.UserVmVO;
 import com.cloud.vm.snapshot.VMSnapshotVO;
 
-@Local(value = {TaggedResourceService.class})
+import org.apache.commons.collections.MapUtils;
+
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 public class TaggedResourceManagerImpl extends ManagerBase implements TaggedResourceService {
     public static final Logger s_logger = Logger.getLogger(TaggedResourceManagerImpl.class);
 
-    private static final Map<ResourceObjectType, Class<?>> s_typeMap = new HashMap<ResourceObjectType, Class<?>>();
+    private static final Map<ResourceObjectType, Class<?>> s_typeMap = new HashMap<>();
     static {
         s_typeMap.put(ResourceObjectType.UserVm, UserVmVO.class);
         s_typeMap.put(ResourceObjectType.Volume, VolumeVO.class);
@@ -110,6 +115,7 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
         s_typeMap.put(ResourceObjectType.SecurityGroupRule, SecurityGroupRuleVO.class);
         s_typeMap.put(ResourceObjectType.PublicIpAddress, IPAddressVO.class);
         s_typeMap.put(ResourceObjectType.Project, ProjectVO.class);
+        s_typeMap.put(ResourceObjectType.Account, AccountVO.class);
         s_typeMap.put(ResourceObjectType.Vpc, VpcVO.class);
         s_typeMap.put(ResourceObjectType.Nic, NicVO.class);
         s_typeMap.put(ResourceObjectType.NetworkACL, NetworkACLItemVO.class);
@@ -131,7 +137,8 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
         s_typeMap.put(ResourceObjectType.LBStickinessPolicy, LBStickinessPolicyVO.class);
         s_typeMap.put(ResourceObjectType.LBHealthCheckPolicy, LBHealthCheckPolicyVO.class);
         s_typeMap.put(ResourceObjectType.SnapshotPolicy, SnapshotPolicyVO.class);
-
+        s_typeMap.put(ResourceObjectType.NetworkOffering, NetworkOfferingVO.class);
+        s_typeMap.put(ResourceObjectType.VpcOffering, VpcOfferingVO.class);
     }
 
     @Inject
@@ -141,8 +148,6 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
     @Inject
     ResourceTagDao _resourceTagDao;
     @Inject
-    ResourceTagJoinDao _resourceTagJoinDao;
-    @Inject
     DomainManager _domainMgr;
     @Inject
     AccountDao _accountDao;
@@ -150,7 +155,6 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
     UserVmManager _userVmManager;
     @Inject
     AutoScaleManager _autoscaleManager;
-
 
     @Override
     public boolean configure(String name, Map<String, Object> params) throws ConfigurationException {
@@ -200,6 +204,26 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
             domainId = ((SecurityGroupVO)SecurityGroup).getDomainId();
         }
 
+        if (resourceType == ResourceObjectType.Account) {
+            AccountVO account = (AccountVO)entity;
+            accountId = account.getId();
+            domainId = account.getDomainId();
+        }
+
+        // if the resource type is network acl, get the accountId and domainId from VPC following: NetworkACLItem -> NetworkACL -> VPC
+        if (resourceType == ResourceObjectType.NetworkACL) {
+            NetworkACLItemVO aclItem = (NetworkACLItemVO)entity;
+            Object networkACL = _entityMgr.findById(s_typeMap.get(ResourceObjectType.NetworkACLList), aclItem.getAclId());
+            Long vpcId = ((NetworkACLVO)networkACL).getVpcId();
+
+            if (vpcId != null && vpcId != 0) {
+                Object vpc = _entityMgr.findById(s_typeMap.get(ResourceObjectType.Vpc), vpcId);
+
+                accountId = ((VpcVO)vpc).getAccountId();
+                domainId = ((VpcVO)vpc).getDomainId();
+            }
+        }
+
         if (entity instanceof OwnedBy) {
             accountId = ((OwnedBy)entity).getAccountId();
         }
@@ -212,11 +236,26 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
             accountId = Account.ACCOUNT_ID_SYSTEM;
         }
 
-        if ((domainId == null) || ((accountId != null) && (domainId.longValue() == -1)))
-        {
+        if ((domainId == null) || ((accountId != null) && (domainId.longValue() == -1))) {
             domainId = _accountDao.getDomainIdForGivenAccountId(accountId);
         }
-        return new Pair<Long, Long>(accountId, domainId);
+        return new Pair<>(accountId, domainId);
+    }
+
+    private void checkResourceAccessible(Long accountId, Long domainId, String exceptionMessage) {
+        Account caller = CallContext.current().getCallingAccount();
+        if (Objects.equals(domainId, -1))
+        {
+            throw new CloudRuntimeException("Invalid DomainId: -1");
+        }
+        if (accountId != null) {
+            _accountMgr.checkAccess(caller, null, false, _accountMgr.getAccount(accountId));
+        } else if (domainId != null && !_accountMgr.isNormalUser(caller.getId())) {
+            //check permissions;
+            _accountMgr.checkAccess(caller, _domainMgr.getDomain(domainId));
+        } else {
+            throw new PermissionDeniedException(exceptionMessage);
+        }
     }
 
     @Override
@@ -231,12 +270,28 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
     }
 
     @Override
+    public String getUuid(String resourceId, ResourceObjectType resourceType) {
+        if (!StringUtils.isNumeric(resourceId)) {
+            return resourceId;
+        }
+
+        Class<?> clazz = s_typeMap.get(resourceType);
+
+        Object entity = _entityMgr.findById(clazz, resourceId);
+        if (entity != null && entity instanceof Identity) {
+            return ((Identity)entity).getUuid();
+        }
+
+        return resourceId;
+    }
+
+    @Override
     @DB
     @ActionEvent(eventType = EventTypes.EVENT_TAGS_CREATE, eventDescription = "creating resource tags")
     public List<ResourceTag> createTags(final List<String> resourceIds, final ResourceObjectType resourceType, final Map<String, String> tags, final String customer) {
         final Account caller = CallContext.current().getCallingAccount();
 
-        final List<ResourceTag> resourceTags = new ArrayList<ResourceTag>(tags.size());
+        final List<ResourceTag> resourceTags = new ArrayList<>(tags.size());
 
         final Map<Long, Map<String, String>> vmsIdResourceTagToCreate = new HashMap<Long, Map<String, String>>();
 
@@ -245,7 +300,7 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
             public void doInTransactionWithoutResult(TransactionStatus status) {
                 for (String key : tags.keySet()) {
                     for (String resourceId : resourceIds) {
-                        if (!resourceType.resourceTagsSupport())  {
+                        if (!resourceType.resourceTagsSupport()) {
                             throw new InvalidParameterValueException("The resource type " + resourceType + " doesn't support resource tags");
                         }
 
@@ -256,18 +311,8 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
                         Long domainId = accountDomainPair.second();
                         Long accountId = accountDomainPair.first();
 
-                        if ((domainId != null) && (domainId == -1))
-                        {
-                           throw new CloudRuntimeException("Invalid DomainId : -1");
-                        }
-                        if (accountId != null) {
-                            _accountMgr.checkAccess(caller, null, false, _accountMgr.getAccount(accountId));
-                        } else if (domainId != null && !_accountMgr.isNormalUser(caller.getId())) {
-                            //check permissions;
-                            _accountMgr.checkAccess(caller, _domainMgr.getDomain(domainId));
-                        } else {
-                            throw new PermissionDeniedException("Account " + caller + " doesn't have permissions to create tags" + " for resource " + key);
-                        }
+                        checkResourceAccessible(accountId, domainId, "Account '" + caller +
+                                "' doesn't have permissions to create tags" + " for resource '" + id + "(" + key + ")'.");
 
                         String value = tags.get(key);
 
@@ -304,20 +349,16 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
     }
 
 
-    @Override
-    public String getUuid(String resourceId, ResourceObjectType resourceType) {
-        if (!StringUtils.isNumeric(resourceId)) {
-            return resourceId;
-        }
+    private List<? extends ResourceTag> searchResourceTags(List<String> resourceIds, ResourceObjectType resourceType) {
+        List<String> resourceUuids = resourceIds.stream().map(resourceId -> getUuid(resourceId, resourceType)).collect(Collectors.toList());
+        SearchBuilder<ResourceTagVO> sb = _resourceTagDao.createSearchBuilder();
+        sb.and("resourceUuid", sb.entity().getResourceUuid(), SearchCriteria.Op.IN);
+        sb.and("resourceType", sb.entity().getResourceType(), SearchCriteria.Op.EQ);
 
-        Class<?> clazz = s_typeMap.get(resourceType);
-
-        Object entity = _entityMgr.findById(clazz, resourceId);
-        if (entity != null && entity instanceof Identity) {
-            return ((Identity)entity).getUuid();
-        }
-
-        return resourceId;
+        SearchCriteria<ResourceTagVO> sc = sb.create();
+        sc.setParameters("resourceUuid", resourceUuids.toArray());
+        sc.setParameters("resourceType", resourceType);
+        return _resourceTagDao.search(sc, null);
     }
 
     @Override
@@ -325,57 +366,50 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
     @ActionEvent(eventType = EventTypes.EVENT_TAGS_DELETE, eventDescription = "deleting resource tags")
     public boolean deleteTags(List<String> resourceIds, ResourceObjectType resourceType, Map<String, String> tags) {
         Account caller = CallContext.current().getCallingAccount();
-
-        if(resourceType == ResourceObjectType.AutoScaleVmGroup){
-            _autoscaleManager.deleteTagsFromAutoScaleGroupVms(resourceIds, tags);
+        if(s_logger.isDebugEnabled()) {
+            s_logger.debug("ResourceIds to Find " + String.join(", ", resourceIds));
         }
-
-        SearchBuilder<ResourceTagVO> sb = _resourceTagDao.createSearchBuilder();
-        sb.and().op("resourceId", sb.entity().getResourceId(), SearchCriteria.Op.IN);
-        sb.or("resourceUuid", sb.entity().getResourceUuid(), SearchCriteria.Op.IN);
-        sb.cp();
-        sb.and("resourceType", sb.entity().getResourceType(), SearchCriteria.Op.EQ);
-
-        SearchCriteria<ResourceTagVO> sc = sb.create();
-        sc.setParameters("resourceId", resourceIds.toArray());
-        sc.setParameters("resourceUuid", resourceIds.toArray());
-        sc.setParameters("resourceType", resourceType);
-
-        List<? extends ResourceTag> resourceTags = _resourceTagDao.search(sc, null);
-
-        final List<ResourceTag> tagsToRemove = new ArrayList<ResourceTag>();
+        List<? extends ResourceTag> resourceTags = searchResourceTags(resourceIds, resourceType);
+        final List<ResourceTag> tagsToDelete = new ArrayList<>();
 
         // Finalize which tags should be removed
         for (ResourceTag resourceTag : resourceTags) {
             //1) validate the permissions
+            if(s_logger.isDebugEnabled()) {
+                s_logger.debug("Resource Tag Id: " + resourceTag.getResourceId());
+                s_logger.debug("Resource Tag AccountId: " + resourceTag.getAccountId());
+            }
             Account owner = _accountMgr.getAccount(resourceTag.getAccountId());
+            if(s_logger.isDebugEnabled()) {
+                s_logger.debug("Resource Owner: " + owner);
+            }
             _accountMgr.checkAccess(caller, null, false, owner);
             //2) Only remove tag if it matches key value pairs
-            if (tags != null && !tags.isEmpty()) {
+            if (MapUtils.isEmpty(tags)) {
+                tagsToDelete.add(resourceTag);
+            } else {
                 for (String key : tags.keySet()) {
-                    boolean canBeRemoved = false;
+                    boolean deleteTag = false;
                     if (resourceTag.getKey().equalsIgnoreCase(key)) {
                         String value = tags.get(key);
                         if (value != null) {
                             if (resourceTag.getValue().equalsIgnoreCase(value)) {
-                                canBeRemoved = true;
+                                deleteTag = true;
                             }
                         } else {
-                            canBeRemoved = true;
+                            deleteTag = true;
                         }
-                        if (canBeRemoved) {
-                            tagsToRemove.add(resourceTag);
+                        if (deleteTag) {
+                            tagsToDelete.add(resourceTag);
                             break;
                         }
                     }
                 }
-            } else {
-                tagsToRemove.add(resourceTag);
             }
         }
 
-        if (tagsToRemove.isEmpty()) {
-            throw new InvalidParameterValueException("Unable to find tags by parameters specified");
+        if (tagsToDelete.isEmpty()) {
+            throw new InvalidParameterValueException("Unable to find any tags which conform to specified delete parameters.");
         }
 
 
@@ -387,7 +421,7 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
         Transaction.execute(new TransactionCallbackNoReturn() {
             @Override
             public void doInTransactionWithoutResult(TransactionStatus status) {
-                for (ResourceTag tagToRemove : tagsToRemove) {
+                for (ResourceTag tagToRemove : tagsToDelete) {
                     _resourceTagDao.remove(tagToRemove.getId());
                     s_logger.debug("Removed the tag " + tagToRemove);
 
@@ -396,6 +430,9 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
                                         tagToRemove.getKey(),
                                         "",
                                         tagToRemove.getResourceType());
+
+                    s_logger.debug("Removed the tag '" + tagToRemove + "' for resources (" +
+                            String.join(", ", resourceIds) + ")");
                 }
             }
         });
@@ -451,8 +488,8 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
 
 
     @Override
-    public List<? extends ResourceTag> listByResourceTypeAndId(ResourceObjectType type, long resourceId) {
-        return _resourceTagDao.listBy(resourceId, type);
+    public List<? extends ResourceTag> listByResourceTypeAndId(ResourceObjectType resourceType, long resourceId) {
+        return _resourceTagDao.listBy(resourceId, resourceType);
     }
 
 }

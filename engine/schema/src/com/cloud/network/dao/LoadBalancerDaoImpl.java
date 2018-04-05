@@ -16,17 +16,19 @@
 // under the License.
 package com.cloud.network.dao;
 
+import com.cloud.utils.db.TransactionLegacy;
+import com.cloud.utils.exception.CloudRuntimeException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.ejb.Local;
+import org.apache.log4j.Logger;
+
 import javax.inject.Inject;
 
-import com.cloud.utils.db.TransactionLegacy;
-import com.cloud.utils.exception.CloudRuntimeException;
-import org.apache.log4j.Logger;
+import com.cloud.network.rules.FirewallRule;
+import com.cloud.utils.db.JoinBuilder;
 import org.springframework.stereotype.Component;
 
 import com.cloud.network.rules.FirewallRule.State;
@@ -37,7 +39,6 @@ import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.SearchCriteria.Op;
 
 @Component
-@Local(value = {LoadBalancerDao.class})
 public class LoadBalancerDaoImpl extends GenericDaoBase<LoadBalancerVO, Long> implements LoadBalancerDao {
     public static final Logger s_logger = Logger.getLogger(LoadBalancerDaoImpl.class);
 
@@ -46,6 +47,8 @@ public class LoadBalancerDaoImpl extends GenericDaoBase<LoadBalancerVO, Long> im
 
     @Inject
     protected FirewallRulesCidrsDao _portForwardingRulesCidrsDao;
+    @Inject
+    LoadBalancerVMMapDao _loadBalancerVMMapDao;
 
     protected LoadBalancerDaoImpl() {
         ListByIp = createSearchBuilder();
@@ -85,6 +88,39 @@ public class LoadBalancerDaoImpl extends GenericDaoBase<LoadBalancerVO, Long> im
         return listBy(sc);
     }
 
+    @Override
+    public boolean isLoadBalancerRulesMappedToVmGuestIp(long instanceId, String instanceIp, long networkId)
+    {
+        SearchBuilder<LoadBalancerVMMapVO> lbVmMapSearch = _loadBalancerVMMapDao.createSearchBuilder();
+        lbVmMapSearch.and("instanceIp", lbVmMapSearch.entity().getInstanceIp(),SearchCriteria.Op.EQ);
+        lbVmMapSearch.and("instanceId", lbVmMapSearch.entity().getInstanceId(), SearchCriteria.Op.EQ);
+
+        SearchBuilder<LoadBalancerVO> firewallRuleIdSearch = createSearchBuilder();
+        firewallRuleIdSearch.selectFields(firewallRuleIdSearch.entity().getId());
+        firewallRuleIdSearch.and("networkId",firewallRuleIdSearch.entity().getNetworkId(),Op.EQ);
+        firewallRuleIdSearch.and("purpose",firewallRuleIdSearch.entity().getPurpose(),Op.EQ);
+        firewallRuleIdSearch.and("state",firewallRuleIdSearch.entity().getState(),Op.NEQ);
+        firewallRuleIdSearch.join("LoadBalancerRuleList", lbVmMapSearch, lbVmMapSearch.entity().getLoadBalancerId(), firewallRuleIdSearch.entity().getId(), JoinBuilder.JoinType.INNER);
+
+        firewallRuleIdSearch.done();
+        lbVmMapSearch.done();
+
+        SearchCriteria<LoadBalancerVO> sc = firewallRuleIdSearch.create();
+        sc.setParameters("state", State.Revoke);
+        sc.setParameters("networkId", networkId);
+        sc.setParameters("purpose", FirewallRule.Purpose.LoadBalancing);
+
+        sc.setJoinParameters("LoadBalancerRuleList", "instanceIp", instanceIp);
+        sc.setJoinParameters("LoadBalancerRuleList", "instanceId", instanceId);
+
+        List<LoadBalancerVO> lbRuleList = customSearch(sc, null);
+
+        if(lbRuleList == null || lbRuleList.size() > 0) {
+            return true;
+        }
+
+        return false;
+    }
 
     @Override
     public List<LoadBalancerVO> listLinkables(String uuid, long networkEnvId, long accountId) {

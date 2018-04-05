@@ -16,13 +16,18 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloud-engine</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.0.0</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <dependencies>
     <dependency>
       <groupId>org.apache.cloudstack</groupId>
       <artifactId>cloud-engine-storage</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.cloudstack</groupId>
+      <artifactId>cloud-engine-storage-image</artifactId>
       <version>${project.version}</version>
     </dependency>
   </dependencies>

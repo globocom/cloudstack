@@ -27,7 +27,6 @@ usage() {
 
 
 #set -x
-ulimit -f 41943040 #40GiB in blocks
 ulimit -c 0
 
 rollback_if_needed() {
@@ -41,8 +40,19 @@ fi
 }
 
 verify_cksum() {
-  echo  "$1  $2" | md5sum  -c --status
-  #printf "$1\t$2" | md5sum  -c --status
+  digestalgo=""
+# NOTE this will only work with 0-padded checksums
+  case ${#1} in
+        32) digestalgo="md5sum" ;;
+        40) digestalgo="sha1sum" ;;
+        56) digestalgo="sha224sum" ;;
+        64) digestalgo="sha256sum" ;;
+        96) digestalgo="sha384sum" ;;
+        128) digestalgo="sha512sum" ;;
+        *) echo "Please provide valid cheksum" ; exit 3 ;;
+  esac
+  echo  "$1  $2" | $digestalgo  -c --status
+  #printf "$1\t$2" | $digestalgo  -c --status
   if [ $? -gt 0 ] 
   then
     printf "Checksum failed, not proceeding with install\n"

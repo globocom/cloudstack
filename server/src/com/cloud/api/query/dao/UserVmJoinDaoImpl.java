@@ -30,42 +30,43 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
-
-import org.apache.log4j.Logger;
-import org.springframework.stereotype.Component;
 
 import org.apache.cloudstack.affinity.AffinityGroupResponse;
 import org.apache.cloudstack.api.ApiConstants.VMDetails;
 import org.apache.cloudstack.api.ResponseObject.ResponseView;
+import org.apache.cloudstack.api.response.NicExtraDhcpOptionResponse;
 import org.apache.cloudstack.api.response.NicResponse;
+import org.apache.cloudstack.api.response.NicSecondaryIpResponse;
 import org.apache.cloudstack.api.response.SecurityGroupResponse;
 import org.apache.cloudstack.api.response.UserVmResponse;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
+import org.apache.log4j.Logger;
+import org.springframework.stereotype.Component;
 
 import com.cloud.api.ApiDBUtils;
-import com.cloud.api.query.vo.ResourceTagJoinVO;
 import com.cloud.api.query.vo.UserVmJoinVO;
 import com.cloud.gpu.GPU;
-import com.cloud.hypervisor.Hypervisor.HypervisorType;
 import com.cloud.service.ServiceOfferingDetailsVO;
 import com.cloud.user.Account;
 import com.cloud.user.AccountManager;
+import com.cloud.user.User;
+import com.cloud.user.dao.UserDao;
 import com.cloud.uservm.UserVm;
-import com.cloud.utils.db.GenericDaoBase;
 import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
+import com.cloud.utils.net.Dhcp;
 import com.cloud.vm.UserVmDetailVO;
 import com.cloud.vm.VirtualMachine.State;
-import com.cloud.vm.VmDetailConstants;
 import com.cloud.vm.VmStats;
+import com.cloud.vm.dao.NicExtraDhcpOptionDao;
+import com.cloud.vm.dao.NicSecondaryIpVO;
 import com.cloud.vm.dao.UserVmDetailsDao;
 
 @Component
-@Local(value = {UserVmJoinDao.class})
-public class UserVmJoinDaoImpl extends GenericDaoBase<UserVmJoinVO, Long> implements UserVmJoinDao {
+public class UserVmJoinDaoImpl extends GenericDaoBaseWithTagInformation<UserVmJoinVO, UserVmResponse> implements UserVmJoinDao {
     public static final Logger s_logger = Logger.getLogger(UserVmJoinDaoImpl.class);
 
     @Inject
@@ -74,6 +75,10 @@ public class UserVmJoinDaoImpl extends GenericDaoBase<UserVmJoinVO, Long> implem
     public AccountManager _accountMgr;
     @Inject
     private UserVmDetailsDao _userVmDetailsDao;
+    @Inject
+    private UserDao _userDao;
+    @Inject
+    private NicExtraDhcpOptionDao _nicExtraDhcpOptionDao;
 
     private final SearchBuilder<UserVmJoinVO> VmDetailSearch;
     private final SearchBuilder<UserVmJoinVO> activeVmByIsoSearch;
@@ -126,6 +131,11 @@ public class UserVmJoinDaoImpl extends GenericDaoBase<UserVmJoinVO, Long> implem
             userVmResponse.setAccountName(userVm.getAccountName());
         }
 
+        User user = _userDao.getUser(userVm.getUserId());
+        if (user != null) {
+            userVmResponse.setUserId(user.getUuid());
+            userVmResponse.setUserName(user.getUsername());
+        }
         userVmResponse.setDomainId(userVm.getDomainUuid());
         userVmResponse.setDomainName(userVm.getDomainName());
 
@@ -200,20 +210,16 @@ public class UserVmJoinDaoImpl extends GenericDaoBase<UserVmJoinVO, Long> implem
             VmStats vmStats = ApiDBUtils.getVmStatistics(userVm.getId());
             if (vmStats != null) {
                 userVmResponse.setCpuUsed(new DecimalFormat("#.##").format(vmStats.getCPUUtilization()) + "%");
-
                 userVmResponse.setNetworkKbsRead((long)vmStats.getNetworkReadKBs());
-
                 userVmResponse.setNetworkKbsWrite((long)vmStats.getNetworkWriteKBs());
+                userVmResponse.setDiskKbsRead((long)vmStats.getDiskReadKBs());
+                userVmResponse.setDiskKbsWrite((long)vmStats.getDiskWriteKBs());
+                userVmResponse.setDiskIORead((long)vmStats.getDiskReadIOs());
+                userVmResponse.setDiskIOWrite((long)vmStats.getDiskWriteIOs());
+                userVmResponse.setMemoryKBs((long)vmStats.getMemoryKBs());
+                userVmResponse.setMemoryIntFreeKBs((long)vmStats.getIntFreeMemoryKBs());
+                userVmResponse.setMemoryTargetKBs((long)vmStats.getTargetMemoryKBs());
 
-                if ((userVm.getHypervisorType() != null) && (userVm.getHypervisorType().equals(HypervisorType.KVM) || userVm.getHypervisorType().equals(HypervisorType.XenServer))) { // support KVM and XenServer only util 2013.06.25
-                    userVmResponse.setDiskKbsRead((long)vmStats.getDiskReadKBs());
-
-                    userVmResponse.setDiskKbsWrite((long)vmStats.getDiskWriteKBs());
-
-                    userVmResponse.setDiskIORead((long)vmStats.getDiskReadIOs());
-
-                    userVmResponse.setDiskIOWrite((long)vmStats.getDiskWriteIOs());
-                }
             }
         }
 
@@ -262,7 +268,25 @@ public class UserVmJoinDaoImpl extends GenericDaoBase<UserVmJoinVO, Long> implem
                     nicResponse.setType(userVm.getGuestType().toString());
                 }
                 nicResponse.setIsDefault(userVm.isDefaultNic());
+                List<NicSecondaryIpVO> secondaryIps = ApiDBUtils.findNicSecondaryIps(userVm.getNicId());
+                if (secondaryIps != null) {
+                    List<NicSecondaryIpResponse> ipList = new ArrayList<NicSecondaryIpResponse>();
+                    for (NicSecondaryIpVO ip : secondaryIps) {
+                        NicSecondaryIpResponse ipRes = new NicSecondaryIpResponse();
+                        ipRes.setId(ip.getUuid());
+                        ipRes.setIpAddr(ip.getIp4Address());
+                        ipList.add(ipRes);
+                    }
+                    nicResponse.setSecondaryIps(ipList);
+                }
                 nicResponse.setObjectName("nic");
+
+                List<NicExtraDhcpOptionResponse> nicExtraDhcpOptionResponses = _nicExtraDhcpOptionDao.listByNicId(nic_id)
+                        .stream()
+                        .map(vo -> new NicExtraDhcpOptionResponse(Dhcp.DhcpOptionCode.valueOfInt(vo.getCode()).getName(), vo.getCode(), vo.getValue()))
+                        .collect(Collectors.toList());
+                nicResponse.setExtraDhcpOptions(nicExtraDhcpOptionResponses);
+
                 userVmResponse.addNic(nicResponse);
             }
         }
@@ -270,10 +294,7 @@ public class UserVmJoinDaoImpl extends GenericDaoBase<UserVmJoinVO, Long> implem
         // update tag information
         long tag_id = userVm.getTagId();
         if (tag_id > 0 && !userVmResponse.containTag(tag_id)) {
-            ResourceTagJoinVO vtag = ApiDBUtils.findResourceTagViewById(tag_id);
-            if (vtag != null) {
-                userVmResponse.addTag(ApiDBUtils.newResourceTagResponse(vtag, false));
-            }
+            addTagInformation(userVm, userVmResponse);
         }
 
         if (details.contains(VMDetails.all) || details.contains(VMDetails.affgrp)) {
@@ -290,11 +311,13 @@ public class UserVmJoinDaoImpl extends GenericDaoBase<UserVmJoinVO, Long> implem
         }
 
         // set resource details map
-        // only hypervisortoolsversion can be returned to the end user
-        UserVmDetailVO hypervisorToolsVersion = _userVmDetailsDao.findDetail(userVm.getId(), VmDetailConstants.HYPERVISOR_TOOLS_VERSION);
-        if (hypervisorToolsVersion != null) {
+        // Allow passing details to end user
+        List<UserVmDetailVO> vmDetails = _userVmDetailsDao.listDetails(userVm.getId());
+        if (vmDetails != null) {
             Map<String, String> resourceDetails = new HashMap<String, String>();
-            resourceDetails.put(hypervisorToolsVersion.getName(), hypervisorToolsVersion.getValue());
+            for (UserVmDetailVO userVmDetailVO : vmDetails) {
+                resourceDetails.put(userVmDetailVO.getName(), userVmDetailVO.getValue());
+            }
             userVmResponse.setDetails(resourceDetails);
         }
 
@@ -308,6 +331,10 @@ public class UserVmJoinDaoImpl extends GenericDaoBase<UserVmJoinVO, Long> implem
         return userVmResponse;
     }
 
+    /**
+     * The resulting Response attempts to be in line with what is returned from
+     * @see com.cloud.api.ApiResponseHelper#createNicResponse(Nic)
+     */
     @Override
     public UserVmResponse setUserVmResponse(ResponseView view, UserVmResponse userVmData, UserVmJoinVO uvo) {
         Long securityGroupId = uvo.getSecurityGroupId();
@@ -329,39 +356,76 @@ public class UserVmJoinDaoImpl extends GenericDaoBase<UserVmJoinVO, Long> implem
         long nic_id = uvo.getNicId();
         if (nic_id > 0) {
             NicResponse nicResponse = new NicResponse();
+            // The numbered comments are to keep track of the data returned from here and ApiResponseHelper.createNicResponse()
+            // the data can't be identical but some tidying up/unifying might be possible
+            /*1: nicUuid*/
             nicResponse.setId(uvo.getNicUuid());
-            nicResponse.setIpaddress(uvo.getIpAddress());
-            nicResponse.setGateway(uvo.getGateway());
-            nicResponse.setNetmask(uvo.getNetmask());
+            /*2: networkUuid*/
             nicResponse.setNetworkid(uvo.getNetworkUuid());
-            nicResponse.setNetworkName(uvo.getNetworkName());
-            nicResponse.setMacAddress(uvo.getMacAddress());
-            nicResponse.setIp6Address(uvo.getIp6Address());
-            nicResponse.setIp6Gateway(uvo.getIp6Gateway());
-            nicResponse.setIp6Cidr(uvo.getIp6Cidr());
-            if (uvo.getBroadcastUri() != null) {
-                nicResponse.setBroadcastUri(uvo.getBroadcastUri().toString());
-            }
-            if (uvo.getIsolationUri() != null) {
-                nicResponse.setIsolationUri(uvo.getIsolationUri().toString());
-            }
+            /*3: vmId makes no sense on a nested nic object so it is ommited here */
+
             if (uvo.getTrafficType() != null) {
+            /*4: trafficType*/
                 nicResponse.setTrafficType(uvo.getTrafficType().toString());
             }
             if (uvo.getGuestType() != null) {
+                /*5: guestType*/
                 nicResponse.setType(uvo.getGuestType().toString());
             }
+            /*6: ipAddress*/
+            nicResponse.setIpaddress(uvo.getIpAddress());
+            /*7: gateway*/
+            nicResponse.setGateway(uvo.getGateway());
+            /*8: netmask*/
+            nicResponse.setNetmask(uvo.getNetmask());
+            /*9: networkName*/
+            nicResponse.setNetworkName(uvo.getNetworkName());
+            /*10: macAddress*/
+            nicResponse.setMacAddress(uvo.getMacAddress());
+            /*11: IPv6Address*/
+            nicResponse.setIp6Address(uvo.getIp6Address());
+            /*12: IPv6Gateway*/
+            nicResponse.setIp6Gateway(uvo.getIp6Gateway());
+            /*13: IPv6Cidr*/
+            nicResponse.setIp6Cidr(uvo.getIp6Cidr());
+            /*14: deviceId*/
+// where do we find           nicResponse.setDeviceId(
+// this is probably not String.valueOf(uvo.getNicId())); as this is a db-id
+            /*15: broadcastURI*/
+            if (uvo.getBroadcastUri() != null) {
+                nicResponse.setBroadcastUri(uvo.getBroadcastUri().toString());
+            }
+            /*16: isolationURI*/
+            if (uvo.getIsolationUri() != null) {
+                nicResponse.setIsolationUri(uvo.getIsolationUri().toString());
+            }
+            /*17: default*/
             nicResponse.setIsDefault(uvo.isDefaultNic());
+            List<NicSecondaryIpVO> secondaryIps = ApiDBUtils.findNicSecondaryIps(uvo.getNicId());
+            if (secondaryIps != null) {
+                List<NicSecondaryIpResponse> ipList = new ArrayList<NicSecondaryIpResponse>();
+                for (NicSecondaryIpVO ip : secondaryIps) {
+                    NicSecondaryIpResponse ipRes = new NicSecondaryIpResponse();
+                    ipRes.setId(ip.getUuid());
+                    ipRes.setIpAddr(ip.getIp4Address());
+                    ipList.add(ipRes);
+                }
+                nicResponse.setSecondaryIps(ipList);
+            }
+
+            /* 18: extra dhcp options */
             nicResponse.setObjectName("nic");
+            List<NicExtraDhcpOptionResponse> nicExtraDhcpOptionResponses = _nicExtraDhcpOptionDao.listByNicId(nic_id)
+                    .stream()
+                    .map(vo -> new NicExtraDhcpOptionResponse(Dhcp.DhcpOptionCode.valueOfInt(vo.getCode()).getName(), vo.getCode(), vo.getValue()))
+                    .collect(Collectors.toList());
+            nicResponse.setExtraDhcpOptions(nicExtraDhcpOptionResponses);
             userVmData.addNic(nicResponse);
         }
 
         long tag_id = uvo.getTagId();
         if (tag_id > 0 && !userVmData.containTag(tag_id)) {
-            ResourceTagJoinVO vtag = ApiDBUtils.findResourceTagViewById(tag_id);
-            if (vtag != null) {
-                userVmData.addTag(ApiDBUtils.newResourceTagResponse(vtag, false));
-            }
+            addTagInformation(uvo, userVmData);
         }
 
         Long affinityGroupId = uvo.getAffinityGroupId();

@@ -21,11 +21,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.persistence.EntityExistsException;
 
-import com.cloud.storage.Storage;
 import com.cloud.vm.VirtualMachine;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -33,6 +31,7 @@ import org.springframework.stereotype.Component;
 import com.cloud.event.UsageEventVO;
 import com.cloud.service.ServiceOfferingDetailsVO;
 import com.cloud.service.ServiceOfferingVO;
+import com.cloud.storage.Storage.ProvisioningType;
 import com.cloud.utils.db.DB;
 import com.cloud.utils.db.GenericDaoBase;
 import com.cloud.utils.db.SearchBuilder;
@@ -41,7 +40,6 @@ import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.vm.dao.UserVmDetailsDao;
 
 @Component
-@Local(value = {ServiceOfferingDao.class})
 @DB()
 public class ServiceOfferingDaoImpl extends GenericDaoBase<ServiceOfferingVO, Long> implements ServiceOfferingDao {
     protected static final Logger s_logger = Logger.getLogger(ServiceOfferingDaoImpl.class);
@@ -250,8 +248,8 @@ public class ServiceOfferingDaoImpl extends GenericDaoBase<ServiceOfferingVO, Lo
 
     @Override
     public List<ServiceOfferingVO> createSystemServiceOfferings(String name, String uniqueName, int cpuCount, int ramSize, int cpuSpeed,
-                                                                Integer rateMbps, Integer multicastRateMbps, boolean offerHA, String displayText, Storage.ProvisioningType provisioningType,
-                                                                boolean recreatable, String tags, boolean systemUse, VirtualMachine.Type vmType, boolean defaultUse) {
+            Integer rateMbps, Integer multicastRateMbps, boolean offerHA, String displayText, ProvisioningType provisioningType,
+            boolean recreatable, String tags, boolean systemUse, VirtualMachine.Type vmType, boolean defaultUse) {
         List<ServiceOfferingVO> list = new ArrayList<ServiceOfferingVO>();
         ServiceOfferingVO offering = new ServiceOfferingVO(name, cpuCount, ramSize, cpuSpeed, rateMbps, multicastRateMbps, offerHA, displayText,
                 provisioningType, false, recreatable, tags, systemUse, vmType, defaultUse);

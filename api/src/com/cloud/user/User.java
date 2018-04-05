@@ -22,11 +22,13 @@ import org.apache.cloudstack.api.InternalIdentity;
 
 public interface User extends OwnedBy, InternalIdentity {
 
+    // UNKNOWN and NATIVE can be used interchangeably
     public enum Source {
-        LDAP, SAML2, SAML2DISABLED, UNKNOWN
+        LDAP, SAML2, SAML2DISABLED, UNKNOWN, NATIVE
     }
 
     public static final long UID_SYSTEM = 1;
+    public static final long UID_ADMIN = 2;
 
     @Override
     public long getId();

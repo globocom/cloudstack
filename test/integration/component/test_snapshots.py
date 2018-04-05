@@ -167,6 +167,12 @@ class TestSnapshots(cloudstackTestCase):
         cls.domain = get_domain(cls.api_client)
         cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
         cls.services['mode'] = cls.zone.networktype
+        cls._cleanup = []
+        cls.unsupportedHypervisor = False
+        cls.hypervisor = str(get_hypervisor_type(cls.api_client)).lower()
+        if cls.hypervisor.lower() in ['hyperv', 'lxc']:
+            cls.unsupportedHypervisor = True
+            return
         cls.disk_offering = DiskOffering.create(
             cls.api_client,
             cls.services["disk_offering"]
@@ -193,9 +199,6 @@ class TestSnapshots(cloudstackTestCase):
             cls.services["service_offering"]
         )
 
-        # Get Hypervisor Type
-        cls.hypervisor = (get_hypervisor_type(cls.api_client)).lower()
-
         cls._cleanup = [
             cls.service_offering,
             cls.disk_offering
@@ -213,8 +216,13 @@ class TestSnapshots(cloudstackTestCase):
 
     def setUp(self):
         self.apiclient = self.testClient.getApiClient()
-        self.hypervisor = str(self.testClient.getHypervisorInfo()).lower()
         self.dbclient = self.testClient.getDbConnection()
+        self.cleanup = []
+
+        if self.unsupportedHypervisor:
+            self.skipTest("Skipping test because unsupported hypervisor: %s" %
+                    self.hypervisor)
+
 
         # Create VMs, NAT Rules etc
         self.account = Account.create(
@@ -222,6 +230,7 @@ class TestSnapshots(cloudstackTestCase):
             self.services["account"],
             domainid=self.domain.id
         )
+        self.cleanup.append(self.account)
 
         self.virtual_machine = self.virtual_machine_with_disk = \
             VirtualMachine.create(
@@ -233,7 +242,6 @@ class TestSnapshots(cloudstackTestCase):
                 serviceofferingid=self.service_offering.id,
                 mode=self.services["mode"]
             )
-        self.cleanup = [self.account, ]
         return
 
     def tearDown(self):
@@ -963,12 +971,17 @@ class TestCreateVMSnapshotTemplate(cloudstackTestCase):
             TestCreateVMSnapshotTemplate,
             cls).getClsTestClient()
         cls.api_client = cls.testClient.getApiClient()
-        cls.hypervisor = cls.testClient.getHypervisorInfo()
+        cls._cleanup = []
         cls.services = Services().services
         # Get Zone, Domain and templates
         cls.domain = get_domain(cls.api_client)
         cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
         cls.services['mode'] = cls.zone.networktype
+        cls.unsupportedHypervisor = False
+        cls.hypervisor = get_hypervisor_type(cls.api_client)
+        if cls.hypervisor.lower() in ['hyperv', 'lxc']:
+            cls.unsupportedHypervisor = True
+            return
 
         cls.template = get_template(
             cls.api_client,
@@ -1006,9 +1019,11 @@ class TestCreateVMSnapshotTemplate(cloudstackTestCase):
 
     def setUp(self):
         self.apiclient = self.testClient.getApiClient()
-        self.hypervisor = str(self.testClient.getHypervisorInfo()).lower()
         self.dbclient = self.testClient.getDbConnection()
         self.cleanup = []
+
+        if self.unsupportedHypervisor:
+            self.skipTest("snapshots are not supported on %s" % self.hypervisor.lower())
         return
 
     def tearDown(self):
@@ -1177,12 +1192,17 @@ class TestSnapshotEvents(cloudstackTestCase):
     def setUpClass(cls):
         cls.testClient = super(TestSnapshotEvents, cls).getClsTestClient()
         cls.api_client = cls.testClient.getApiClient()
-        cls.hypervisor = cls.testClient.getHypervisorInfo()
         cls.services = Services().services
+        cls._cleanup = []
         # Get Zone, Domain and templates
         cls.domain = get_domain(cls.api_client)
         cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
         cls.services['mode'] = cls.zone.networktype
+        cls.unsupportedHypervisor = False
+        cls.hypervisor = get_hypervisor_type(cls.api_client)
+        if cls.hypervisor.lower() in ['hyperv', 'lxc']:
+            cls.unsupportedHypervisor = True
+            return
 
         template = get_template(
             cls.api_client,
@@ -1232,9 +1252,11 @@ class TestSnapshotEvents(cloudstackTestCase):
 
     def setUp(self):
         self.apiclient = self.testClient.getApiClient()
-        self.hypervisor = str(self.testClient.getHypervisorInfo()).lower()
         self.dbclient = self.testClient.getDbConnection()
         self.cleanup = []
+
+        if self.unsupportedHypervisor:
+            self.skipTest("snapshots are not supported on %s" % self.hypervisor)
         return
 
     def tearDown(self):

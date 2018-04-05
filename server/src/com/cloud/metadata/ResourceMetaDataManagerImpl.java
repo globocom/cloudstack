@@ -20,10 +20,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
+import com.cloud.offerings.dao.NetworkOfferingDetailsDao;
 import org.apache.cloudstack.api.ResourceDetail;
 import org.apache.cloudstack.resourcedetail.ResourceDetailsDao;
 import org.apache.cloudstack.resourcedetail.dao.AutoScaleVmGroupDetailsDao;
@@ -43,6 +43,7 @@ import org.apache.cloudstack.resourcedetail.dao.VpcDetailsDao;
 import org.apache.cloudstack.resourcedetail.dao.VpcGatewayDetailsDao;
 import org.apache.cloudstack.resourcedetail.dao.LBStickinessPolicyDetailsDao;
 import org.apache.cloudstack.resourcedetail.dao.LBHealthCheckPolicyDetailsDao;
+import org.apache.cloudstack.resourcedetail.dao.GuestOsDetailsDao;
 import org.apache.cloudstack.storage.datastore.db.StoragePoolDetailsDao;
 
 import org.apache.log4j.Logger;
@@ -68,7 +69,6 @@ import com.cloud.vm.dao.NicDetailsDao;
 import com.cloud.vm.dao.UserVmDetailsDao;
 
 @Component
-@Local(value = {ResourceMetaDataService.class, ResourceMetaDataManager.class})
 public class ResourceMetaDataManagerImpl extends ManagerBase implements ResourceMetaDataService, ResourceMetaDataManager {
     public static final Logger s_logger = Logger.getLogger(ResourceMetaDataManagerImpl.class);
     @Inject
@@ -123,6 +123,10 @@ public class ResourceMetaDataManagerImpl extends ManagerBase implements Resource
     LBHealthCheckPolicyDetailsDao _healthcheckPolicyDetailsDao;
     @Inject
     SnapshotPolicyDetailsDao _snapshotPolicyDetailsDao;
+    @Inject
+    GuestOsDetailsDao _guestOsDetailsDao;
+    @Inject
+    NetworkOfferingDetailsDao _networkOfferingDetailsDao;
 
     private static Map<ResourceObjectType, ResourceDetailsDao<? extends ResourceDetail>> s_daoMap = new HashMap<ResourceObjectType, ResourceDetailsDao<? extends ResourceDetail>>();
 
@@ -155,7 +159,8 @@ public class ResourceMetaDataManagerImpl extends ManagerBase implements Resource
         s_daoMap.put(ResourceObjectType.LBStickinessPolicy, _stickinessPolicyDetailsDao);
         s_daoMap.put(ResourceObjectType.LBHealthCheckPolicy, _healthcheckPolicyDetailsDao);
         s_daoMap.put(ResourceObjectType.SnapshotPolicy, _snapshotPolicyDetailsDao);
-
+        s_daoMap.put(ResourceObjectType.GuestOs, _guestOsDetailsDao);
+        s_daoMap.put(ResourceObjectType.NetworkOffering, _networkOfferingDetailsDao);
         return true;
     }
 
@@ -199,7 +204,11 @@ public class ResourceMetaDataManagerImpl extends ManagerBase implements Resource
         long id = _taggedResourceMgr.getResourceId(resourceId, resourceType);
 
         DetailDaoHelper newDetailDaoHelper = new DetailDaoHelper(resourceType);
-        newDetailDaoHelper.removeDetail(id, key);
+        if (key != null) {
+            newDetailDaoHelper.removeDetail(id, key);
+        } else {
+            newDetailDaoHelper.removeDetails(id);
+        }
 
         return true;
     }
@@ -222,6 +231,10 @@ public class ResourceMetaDataManagerImpl extends ManagerBase implements Resource
 
         private void removeDetail(long resourceId, String key) {
             dao.removeDetail(resourceId, key);
+        }
+
+        private void removeDetails(long resourceId) {
+            dao.removeDetails(resourceId);
         }
 
         private ResourceDetail getDetail(long resourceId, String key) {

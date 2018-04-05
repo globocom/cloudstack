@@ -301,7 +301,7 @@
 
                     'select-iso': function($step, formData) {
                         $step.find('.section.custom-size').hide();
-                        
+
                         var originalValues = function(formData) {
                             var $inputs = $step.find('.wizard-step-conditional:visible')
                                 .find('input[type=radio]');
@@ -323,7 +323,7 @@
 
                         return {
                             response: {
-                                success: function(args) {                                    
+                                success: function(args) {
                                     if (formData['select-template']) {
                                         $step.find('.wizard-step-conditional').filter(function() {
                                             return $(this).hasClass(formData['select-template']);
@@ -372,7 +372,7 @@
 
                                                 $select.addClass('selected').append(
                                                     $('<div>').addClass('hypervisor')
-                                                    .append($('<label>').html('Hypervisor:'))
+                                                    .append($('<label>').html(_l('label.hypervisor') + ':'))
                                                     .append($('<select>').attr({
                                                         name: 'hypervisorid'
                                                     }))
@@ -407,7 +407,7 @@
                                             ['featuredisos', 'instance-wizard-featured-isos'],
                                             ['communityisos', 'instance-wizard-community-isos'],
                                             ['myisos', 'instance-wizard-my-isos'],
-                                            ['sharedisos', 'instance-wizard-shared-isos'],
+                                            ['sharedisos', 'instance-wizard-shared-isos']
                                             //['isos', 'instance-wizard-all-isos']
                                         ]
                                     ).each(function() {
@@ -419,8 +419,6 @@
                                         });
                                     });
 
-                                    originalValues(formData);
-
                                     var custom = args.customHidden({
                                         context: context,
                                         data: args.data
@@ -428,13 +426,52 @@
 
                                     $step.find('.custom-size-label').remove();
 
-                                    if (!custom) {
-                                        $step.find('.section.custom-size').show();
-                                        $step.addClass('custom-disk-size');
-                                    } else {
+                                    if (custom) {
                                         $step.find('.section.custom-size').hide();
                                         $step.removeClass('custom-disk-size');
                                     }
+
+                                    $step.find('input[type=radio]').bind('change', function() {
+                                        var $target = $(this);
+                                        var val = $target.val();
+                                        var item = null;
+                                        if (item == null && args.data.templates.featuredtemplates != undefined) {
+                                            item = $.grep(args.data.templates.featuredtemplates, function(elem) {
+                                                return elem.id == val;
+                                            })[0];
+                                        }
+                                        if (item == null && args.data.templates.communitytemplates != undefined) {
+                                            item = $.grep(args.data.templates.communitytemplates, function(elem) {
+                                                return elem.id == val;
+                                            })[0];
+                                        }
+                                        if (item == null && args.data.templates.mytemplates!=undefined) {
+                                            item = $.grep(args.data.templates.mytemplates, function(elem) {
+                                                return elem.id == val;
+                                            })[0];
+                                        }
+                                        if (item == null && args.data.templates.sharedtemplates!=undefined) {
+                                            item = $.grep(args.data.templates.sharedtemplates, function(elem) {
+                                                return elem.id == val;
+                                            })[0];
+                                        }
+
+                                        if (!item) return true;
+
+                                        var hypervisor = item['hypervisor'];
+                                        if (hypervisor == 'KVM' || hypervisor == 'XenServer' || hypervisor == 'VMware') {
+                                            $step.find('.section.custom-size').show();
+                                            $step.addClass('custom-disk-size');
+                                        } else {
+                                            $step.find('.section.custom-size').hide();
+                                            $step.removeClass('custom-disk-size');
+                                        }
+
+                                        return true;
+                                    });
+
+                                    originalValues(formData);
+
                                 }
                             }
                         };
@@ -462,7 +499,7 @@
                                         }, {
                                             'wizard-field': 'service-offering'
                                         })
-                                    );                                    
+                                    );
 
                                     $step.find('input[type=radio]').bind('change', function() {
                                         var $target = $(this);
@@ -518,21 +555,43 @@
 
                                     $step.find('.multi-disk-select-container').remove();
                                     $step.removeClass('custom-disk-size');
+                                    $step.find('.main-desc, p.no-datadisk').remove();
 
-                                    if (args.required) {
+                                    if (!multiDisk){
+                                            if (args.required) {
+                                            $step.find('.section.no-thanks')
+                                                    .hide();
+                                            $step.addClass('required');
+                                        } else {
+                                            $step.find('.section.no-thanks')
+                                                    .show();
+                                            $step.removeClass('required');
+                                        }
+                                    } else {
                                         $step.find('.section.no-thanks').hide();
                                         $step.addClass('required');
-                                    } else {
-                                        $step.find('.section.no-thanks').show();
-                                        $step.removeClass('required');
                                     }
 
                                     var $selectContainer = $step.find('.content .select-container:not(.multi-disk)');
 
                                     if (multiDisk) { // Render as multiple groups for each disk
+                                        if (multiDisk[0].id == "none"){
+                                            $step.find('.select-container').append(
+                                                $('<p>').addClass('no-datadisk').html(_l('message.no.datadisk'))
+                                            );
+                                            return;
+                                        }
                                         var $multiDiskSelect = $('<div>').addClass('multi-disk-select-container');
 
                                         $(multiDisk).map(function(index, disk) {
+                                            var array_do = [];
+                                            $.each(args.data.diskOfferings, function( key, value ) {
+                                              if (value){
+                                                      if (value.disksize >= disk.size && value.name != "Custom"){
+                                                          array_do.push(value);
+                                                     }
+                                                 }
+                                            })
                                             var $group = $('<div>').addClass('disk-select-group');
                                             var $header = $('<div>').addClass('disk-select-header').append(
                                                 $('<div>').addClass('title').html(disk.label)
@@ -544,7 +603,7 @@
                                             })
                                             .prependTo($header);
                                             var $multiSelectContainer = $selectContainer.clone().append(
-                                                makeSelects('diskofferingid.' + disk.id, args.data.diskOfferings, {
+                                                makeSelects('diskofferingid.' + disk.id, array_do, {
                                                     id: 'id',
                                                     name: 'name',
                                                     desc: 'displaytext'
@@ -576,7 +635,7 @@
                                         $selectContainer.hide();
 
                                         // Fix issue with containers always showing after reload
-                                        $multiDiskSelect.find('.select-container').attr('style', null); 
+                                        $multiDiskSelect.find('.select-container').attr('style', null);
                                     } else {
                                         $selectContainer.show();
                                         $step.find('.content .select-container').append(
@@ -618,7 +677,7 @@
                                                 // handle removal of custom IOPS controls
                                                 $step.removeClass('custom-iops-do');
                                             }
-                                            
+
                                             return true;
                                         }
 
@@ -713,6 +772,51 @@
                                     } else {
                                         $step.find('.select-container').append(
                                             $('<p>').addClass('no-affinity-groups').html(_l('message.no.affinity.groups'))
+                                        );
+                                    }
+                                }
+                            }
+                        };
+                    },
+
+                    'sshkeyPairs': function($step, formData) {
+                        var originalValues = function(formData) {
+                            if (formData.sshkeypair) {
+                                $step.find('input[type=radio]').filter(function() {
+                                    return $(this).val() == formData.sshkeypair;
+                                }).click();
+                            } else {
+                                $step.find('input[type=radio]:first').click();
+                            }
+                        };
+                        return {
+                            response: {
+                                success: function(args) {
+                                    $step.find('.main-desc, p.no-sshkey-pairs').remove();
+
+                                    if (args.data.sshkeyPairs && args.data.sshkeyPairs.length) {
+                                        $step.prepend(
+                                            $('<div>').addClass('main-desc').append(
+                                                $('<p>').html(_l('message.please.select.ssh.key.pair.use.with.this.vm'))
+                                            )
+                                        );
+                                        $step.find('.section.no-thanks').show();
+                                        $step.find('.select-container').append(
+                                            makeSelects(
+                                                'sshkeypair',
+                                                args.data.sshkeyPairs, {
+                                                    name: 'name',
+                                                    id: 'name'
+                                                }, {
+                                                    'wizard-field': 'sshkey-pairs'
+                                                }
+                                            )
+                                        );
+                                        originalValues(formData); // if we can select only one.
+                                    } else {
+                                        $step.find('.section.no-thanks').hide();
+                                        $step.find('.select-container').append(
+                                            $('<p>').addClass('no-sshkey-pairs').html(_l('You do not have any ssh key pairs. Please continue to the next step.'))
                                         );
                                     }
                                 }
@@ -1009,6 +1113,10 @@
                     }
                 };
 
+                $wizard.bind('cloudStack.instanceWizard.showStep', function(e, args) {
+                    showStep(args.index, { refresh: true });
+                });
+
                 // Go to specified step in wizard,
                 // updating nav items and diagram
                 var showStep = function(index, options) {
@@ -1024,6 +1132,10 @@
                     var $targetStep = $($steps.hide()[targetIndex]).show();
                     var stepID = $targetStep.attr('wizard-step-id');
                     var formData = cloudStack.serializeForm($form);
+
+                    if (options.refresh) {
+                        $targetStep.removeClass('loaded');
+                    }
 
                     if (!$targetStep.hasClass('loaded')) {
                         // Remove previous content
@@ -1083,15 +1195,21 @@
 
                     // Next button
                     if ($target.closest('div.button.next').size()) {
-                        // Make sure ISO or template is selected
-                        if ($activeStep.hasClass('select-iso') && !$activeStep.find('.content:visible input:checked').size()) {
-                            cloudStack.dialog.notice({
-                                message: 'message.step.1.continue'
+                        //step 2 - select template/ISO
+                        if($activeStep.hasClass('select-iso')) {
+                            if ($activeStep.find('.content:visible input:checked').size() == 0) {
+                                cloudStack.dialog.notice({
+                                    message: 'message.step.1.continue'
+                                });
+                                return false;
+                            }
+                            $(window).trigger("cloudStack.module.instanceWizard.clickNextButton", {
+                                $form: $form,
+                                currentStep: 2
                             });
-                            return false;
                         }
 
-                        //step 5 - select network
+                        //step 6 - select network
                         if ($activeStep.find('.wizard-step-conditional.select-network:visible').size() > 0) {
                             var data = $activeStep.data('my-networks');
 
@@ -1212,13 +1330,13 @@
                     args.maxDiskOfferingSize() : 100;
 
                 // Setup tabs and slider
-                $wizard.find('.section.custom-size .size.min span').html(minCustomDiskSize);
-                $wizard.find('.section.custom-size input[type=text]').val(minCustomDiskSize);
-                $wizard.find('.section.custom-size .size.max span').html(maxCustomDiskSize);
+                $wizard.find('.section.custom-size.custom-disk-size .size.min span').html(minCustomDiskSize);
+                $wizard.find('.section.custom-size.custom-disk-size input[type=text]').val(minCustomDiskSize);
+                $wizard.find('.section.custom-size.custom-disk-size .size.max span').html(maxCustomDiskSize);
                 $wizard.find('.tab-view').tabs();
                 $wizard.find('.slider').each(function() {
                    var $slider = $(this);
-                   
+
                     $slider.slider({
                         min: minCustomDiskSize,
                         max: maxCustomDiskSize,
@@ -1244,7 +1362,7 @@
 
                 return $wizard.dialog({
                     title: _l('label.vm.add'),
-                    width: 800,
+                    width: 896,
                     height: 570,
                     closeOnEscape: false,
                     zIndex: 5000

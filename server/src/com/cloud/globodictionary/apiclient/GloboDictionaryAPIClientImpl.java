@@ -31,7 +31,6 @@ import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
-import javax.ejb.Local;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +38,6 @@ import java.util.Collections;
 
 
 @Component
-@Local(value = GloboDictionaryAPIClient.class)
 public class GloboDictionaryAPIClientImpl implements GloboDictionaryAPIClient, Configurable {
 
     public static final Logger s_logger = Logger.getLogger(GloboDictionaryAPIClientImpl.class);

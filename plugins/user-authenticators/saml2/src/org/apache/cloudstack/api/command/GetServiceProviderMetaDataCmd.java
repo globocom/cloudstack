@@ -89,6 +89,7 @@ import java.io.StringWriter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.net.InetAddress;
 
 @APICommand(name = "getSPMetadata", description = "Returns SAML2 CloudStack Service Provider MetaData", responseObject = SAMLMetaDataResponse.class, entityType = {})
 public class GetServiceProviderMetaDataCmd extends BaseCmd implements APIAuthenticator {
@@ -120,7 +121,7 @@ public class GetServiceProviderMetaDataCmd extends BaseCmd implements APIAuthent
     }
 
     @Override
-    public String authenticate(String command, Map<String, Object[]> params, HttpSession session, String remoteAddress, String responseType, StringBuilder auditTrailSb, final HttpServletRequest req, final HttpServletResponse resp) throws ServerApiException {
+    public String authenticate(String command, Map<String, Object[]> params, HttpSession session, InetAddress remoteAddress, String responseType, StringBuilder auditTrailSb, final HttpServletRequest req, final HttpServletResponse resp) throws ServerApiException {
         SAMLMetaDataResponse response = new SAMLMetaDataResponse();
         response.setResponseName(getCommandName());
 

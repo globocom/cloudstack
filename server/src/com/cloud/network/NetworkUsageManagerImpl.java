@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -93,7 +92,6 @@ import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.net.MacAddress;
 
 @Component
-@Local(value = {NetworkUsageManager.class})
 public class NetworkUsageManagerImpl extends ManagerBase implements NetworkUsageService, NetworkUsageManager, ResourceStateAdapter {
     public enum NetworkUsageResourceName {
         TrafficSentinel;
@@ -310,7 +308,7 @@ public class NetworkUsageManagerImpl extends ManagerBase implements NetworkUsage
                 s_logger.warn("Last collection time not available. Skipping direct usage collection for Traffic Monitor: " + host.getId());
                 return false;
             }
-            Date lastCollection = new Date(new Long(lastCollectDetail.getValue()));
+            Date lastCollection = new Date(Long.parseLong(lastCollectDetail.getValue()));
 
             //Get list of IPs currently allocated
             List<IPAddressVO> allocatedIps = listAllocatedDirectIps(zoneId);
@@ -486,6 +484,10 @@ public class NetworkUsageManagerImpl extends ManagerBase implements NetworkUsage
         }
 
         @Override
+        public void processHostAdded(long hostId) {
+        }
+
+        @Override
         public void processConnect(Host agent, StartupCommand cmd, boolean forRebalance) {
             if (cmd instanceof StartupTrafficMonitorCommand) {
                 long agentId = agent.getId();
@@ -498,6 +500,14 @@ public class NetworkUsageManagerImpl extends ManagerBase implements NetworkUsage
                 }
             }
             return;
+        }
+
+        @Override
+        public void processHostAboutToBeRemoved(long hostId) {
+        }
+
+        @Override
+        public void processHostRemoved(long hostId, long clusterId) {
         }
 
         @Override

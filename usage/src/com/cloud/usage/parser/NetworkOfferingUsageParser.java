@@ -100,6 +100,7 @@ public class NetworkOfferingUsageParser {
             }
 
             if (noCreateDate.after(endDate)) {
+                //Ignore records created after endDate
                 continue;
             }
 

@@ -18,16 +18,18 @@ package com.cloud.api.query.dao;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
 import org.apache.cloudstack.api.ResponseObject.ResponseView;
+import org.apache.cloudstack.api.response.ChildTemplateResponse;
 import org.apache.cloudstack.api.response.TemplateResponse;
 import org.apache.cloudstack.context.CallContext;
 import org.apache.cloudstack.engine.subsystem.api.storage.ObjectInDataStoreStateMachine;
@@ -38,23 +40,24 @@ import com.cloud.api.ApiDBUtils;
 import com.cloud.api.ApiResponseHelper;
 import com.cloud.api.query.vo.ResourceTagJoinVO;
 import com.cloud.api.query.vo.TemplateJoinVO;
+import com.cloud.hypervisor.Hypervisor.HypervisorType;
 import com.cloud.storage.Storage;
 import com.cloud.storage.Storage.TemplateType;
 import com.cloud.storage.VMTemplateHostVO;
 import com.cloud.storage.VMTemplateStorageResourceAssoc.Status;
+import com.cloud.storage.VMTemplateVO;
+import com.cloud.storage.dao.VMTemplateDao;
 import com.cloud.template.VirtualMachineTemplate;
 import com.cloud.user.Account;
 import com.cloud.user.AccountService;
 import com.cloud.utils.Pair;
 import com.cloud.utils.db.Filter;
-import com.cloud.utils.db.GenericDaoBase;
 import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
 
 
 @Component
-@Local(value = {TemplateJoinDao.class})
-public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> implements TemplateJoinDao {
+public class TemplateJoinDaoImpl extends GenericDaoBaseWithTagInformation<TemplateJoinVO, TemplateResponse> implements TemplateJoinDao {
 
     public static final Logger s_logger = Logger.getLogger(TemplateJoinDaoImpl.class);
 
@@ -62,6 +65,8 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
     private ConfigurationDao  _configDao;
     @Inject
     private AccountService _accountService;
+    @Inject
+    private VMTemplateDao _vmTemplateDao;
 
     private final SearchBuilder<TemplateJoinVO> tmpltIdPairSearch;
 
@@ -74,7 +79,7 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
     protected TemplateJoinDaoImpl() {
 
         tmpltIdPairSearch = createSearchBuilder();
-        tmpltIdPairSearch.and("templateState", tmpltIdPairSearch.entity().getTemplateState(), SearchCriteria.Op.EQ);
+        tmpltIdPairSearch.and("templateState", tmpltIdPairSearch.entity().getTemplateState(), SearchCriteria.Op.IN);
         tmpltIdPairSearch.and("tempZonePairIN", tmpltIdPairSearch.entity().getTempZonePair(), SearchCriteria.Op.IN);
         tmpltIdPairSearch.done();
 
@@ -108,7 +113,11 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
                 } else {
                     templateStatus = template.getDownloadPercent() + "% Downloaded";
                 }
-            } else {
+            } else if (template.getDownloadState() == Status.BYPASSED) {
+                templateStatus = "Bypassed Secondary Storage";
+            }else if (template.getErrorString()==null){
+                templateStatus = template.getTemplateState().toString();
+            }else {
                 templateStatus = template.getErrorString();
             }
         } else if (template.getDownloadState() == VMTemplateHostVO.Status.DOWNLOADED) {
@@ -174,15 +183,24 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
             templateResponse.setSize(templateSize);
         }
 
+        Long templatePhysicalSize = template.getPhysicalSize();
+        if (templatePhysicalSize > 0) {
+            templateResponse.setPhysicalSize(templatePhysicalSize);
+        }
+
         templateResponse.setChecksum(template.getChecksum());
         if (template.getSourceTemplateId() != null) {
             templateResponse.setSourceTemplateId(template.getSourceTemplateUuid());
         }
         templateResponse.setTemplateTag(template.getTemplateTag());
 
+        if (template.getParentTemplateId() != null) {
+            templateResponse.setParentTemplateId(template.getParentTemplateUuid());
+        }
+
         // set details map
         if (template.getDetailName() != null) {
-            Map<String, String> details = new HashMap<String, String>();
+            Map<String, String> details = new HashMap<>();
             details.put(template.getDetailName(), template.getDetailValue());
             templateResponse.setDetails(details);
         }
@@ -190,10 +208,25 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
         // update tag information
         long tag_id = template.getTagId();
         if (tag_id > 0) {
-            ResourceTagJoinVO vtag = ApiDBUtils.findResourceTagViewById(tag_id);
-            if (vtag != null) {
-                templateResponse.addTag(ApiDBUtils.newResourceTagResponse(vtag, false));
+            addTagInformation(template, templateResponse);
+        }
+
+        templateResponse.setDirectDownload(template.isDirectDownload());
+
+        //set template children disks
+        Set<ChildTemplateResponse> childTemplatesSet = new HashSet<ChildTemplateResponse>();
+        if (template.getHypervisorType() == HypervisorType.VMware) {
+            List<VMTemplateVO> childTemplates = _vmTemplateDao.listByParentTemplatetId(template.getId());
+            for (VMTemplateVO tmpl : childTemplates) {
+                if (tmpl.getTemplateType() != TemplateType.ISODISK) {
+                    ChildTemplateResponse childTempl = new ChildTemplateResponse();
+                    childTempl.setId(tmpl.getUuid());
+                    childTempl.setName(tmpl.getName());
+                    childTempl.setSize(Math.round(tmpl.getSize() / (1024 * 1024 * 1024)));
+                    childTemplatesSet.add(childTempl);
+                }
             }
+            templateResponse.setChildTemplates(childTemplatesSet);
         }
 
         templateResponse.setObjectName("template");
@@ -215,6 +248,7 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
         response.setOsTypeName(result.getGuestOSName());
         response.setBootable(result.isBootable());
         response.setHypervisor(result.getHypervisorType().toString());
+        response.setDynamicallyScalable(result.isDynamicallyScalable());
 
         // populate owner.
         ApiResponseHelper.populateOwner(response, result);
@@ -225,7 +259,7 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
 
         // set details map
         if (result.getDetailName() != null) {
-            Map<String, String> details = new HashMap<String, String>();
+            Map<String, String> details = new HashMap<>();
             details.put(result.getDetailName(), result.getDetailValue());
             response.setDetails(details);
         }
@@ -250,7 +284,7 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
         if (template.getDetailName() != null) {
             Map<String, String> details = templateResponse.getDetails();
             if (details == null) {
-                details = new HashMap<String, String>();
+                details = new HashMap<>();
             }
             details.put(template.getDetailName(), template.getDetailValue());
             templateResponse.setDetails(details);
@@ -259,10 +293,7 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
         // update tag information
         long tag_id = template.getTagId();
         if (tag_id > 0) {
-            ResourceTagJoinVO vtag = ApiDBUtils.findResourceTagViewById(tag_id);
-            if (vtag != null) {
-                templateResponse.addTag(ApiDBUtils.newResourceTagResponse(vtag, false));
-            }
+            addTagInformation(template, templateResponse);
         }
 
         return templateResponse;
@@ -293,6 +324,7 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
 
         isoResponse.setOsTypeId(iso.getGuestOSUuid());
         isoResponse.setOsTypeName(iso.getGuestOSName());
+        isoResponse.setBits(iso.getBits());
 
         // populate owner.
         ApiResponseHelper.populateOwner(isoResponse, iso);
@@ -320,6 +352,8 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
                     } else {
                         isoStatus = iso.getDownloadPercent() + "% Downloaded";
                     }
+                } else if (iso.getDownloadState() == Status.BYPASSED) {
+                    isoStatus = "Bypassed Secondary Storage";
                 } else {
                     isoStatus = iso.getErrorString();
                 }
@@ -347,6 +381,8 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
                 isoResponse.addTag(ApiDBUtils.newResourceTagResponse(vtag, false));
             }
         }
+
+        isoResponse.setDirectDownload(iso.isDirectDownload());
 
         isoResponse.setObjectName("iso");
         return isoResponse;
@@ -383,6 +419,7 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
         Boolean isAscending = Boolean.parseBoolean(_configDao.getValue("sortkey.algorithm"));
         isAscending = (isAscending == null ? Boolean.TRUE : isAscending);
         Filter searchFilter = new Filter(TemplateJoinVO.class, "sortKey", isAscending, null, null);
+        searchFilter.addOrderBy(TemplateJoinVO.class, "tempZonePair", isAscending);
         List<TemplateJoinVO> uvList = new ArrayList<TemplateJoinVO>();
         // query details by batches
         int curr_index = 0;
@@ -412,7 +449,7 @@ public class TemplateJoinDaoImpl extends GenericDaoBase<TemplateJoinVO, Long> im
             }
             SearchCriteria<TemplateJoinVO> sc = tmpltIdPairSearch.create();
             if (!showRemoved) {
-                sc.setParameters("templateState", VirtualMachineTemplate.State.Active);
+                sc.setParameters("templateState", VirtualMachineTemplate.State.Active, VirtualMachineTemplate.State.UploadAbandoned, VirtualMachineTemplate.State.UploadError ,VirtualMachineTemplate.State.NotUploaded, VirtualMachineTemplate.State.UploadInProgress);
             }
             sc.setParameters("tempZonePairIN", labels);
             List<TemplateJoinVO> vms = searchIncludingRemoved(sc, searchFilter, null, false);

@@ -27,21 +27,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
-
 import org.apache.cloudstack.storage.command.DeleteCommand;
 import org.apache.cloudstack.storage.command.DownloadCommand;
 import org.apache.cloudstack.storage.command.DownloadProgressCommand;
+import org.apache.cloudstack.storage.command.UploadStatusAnswer;
+import org.apache.cloudstack.storage.command.UploadStatusAnswer.UploadStatus;
+import org.apache.cloudstack.storage.command.UploadStatusCommand;
 
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.AttachIsoCommand;
-import com.cloud.agent.api.AttachVolumeAnswer;
-import com.cloud.agent.api.AttachVolumeCommand;
 import com.cloud.agent.api.BackupSnapshotAnswer;
 import com.cloud.agent.api.BackupSnapshotCommand;
 import com.cloud.agent.api.ComputeChecksumCommand;
@@ -102,7 +101,6 @@ import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.vm.DiskProfile;
 
 @Component
-@Local(value = {MockStorageManager.class})
 public class MockStorageManagerImpl extends ManagerBase implements MockStorageManager {
     private static final Logger s_logger = Logger.getLogger(MockStorageManagerImpl.class);
     @Inject
@@ -241,36 +239,6 @@ public class MockStorageManagerImpl extends ManagerBase implements MockStorageMa
                 volume.getSize(), null);
 
         return new CreateAnswer(cmd, volumeTo);
-    }
-
-    @Override
-    public AttachVolumeAnswer AttachVolume(AttachVolumeCommand cmd) {
-        TransactionLegacy txn = TransactionLegacy.open(TransactionLegacy.SIMULATOR_DB);
-        try {
-            txn.start();
-            String poolid = cmd.getPoolUuid();
-            String volumeName = cmd.getVolumeName();
-            MockVolumeVO volume = _mockVolumeDao.findByStoragePathAndType(cmd.getVolumePath());
-            if (volume == null) {
-                return new AttachVolumeAnswer(cmd, "Can't find volume:" + volumeName + "on pool:" + poolid);
-            }
-
-            String vmName = cmd.getVmName();
-            MockVMVO vm = _mockVMDao.findByVmName(vmName);
-            if (vm == null) {
-                return new AttachVolumeAnswer(cmd, "can't vm :" + vmName);
-            }
-            txn.commit();
-
-            return new AttachVolumeAnswer(cmd, cmd.getDeviceId(), cmd.getVolumePath());
-        } catch (Exception ex) {
-            txn.rollback();
-            throw new CloudRuntimeException("Error when attaching volume " + cmd.getVolumeName() + " to VM " + cmd.getVmName(), ex);
-        } finally {
-            txn.close();
-            txn = TransactionLegacy.open(TransactionLegacy.CLOUD_DB);
-            txn.close();
-        }
     }
 
     @Override
@@ -1254,5 +1222,10 @@ public class MockStorageManagerImpl extends ManagerBase implements MockStorageMa
             }
             return new CopyVolumeAnswer(cmd, true, null, primaryStorage.getMountPoint(), vol.getPath());
         }
+    }
+
+    @Override
+    public UploadStatusAnswer getUploadStatus(UploadStatusCommand cmd) {
+        return new UploadStatusAnswer(cmd, UploadStatus.COMPLETED);
     }
 }

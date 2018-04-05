@@ -19,43 +19,31 @@
 # This should be used to create the build.
 #
 
-
-export TEST_JOB_NUMBER=`echo $TRAVIS_JOB_NUMBER | cut -d. -f1`
 export TEST_SEQUENCE_NUMBER=`echo $TRAVIS_JOB_NUMBER | cut -d. -f2`
+export MAVEN_OPTS="-Xmx4096m -XX:MaxPermSize=800m -Djava.security.egd=file:/dev/./urandom"
 
-#run regression test only on $REGRESSION_CYCLE
-MOD=$(( $TEST_JOB_NUMBER % $REGRESSION_CYCLE ))
-
-if [ $MOD -ne 0 ]; then
- if [ $TEST_SEQUENCE_NUMBER -ge $REGRESSION_INDEX ]; then
-   #skip test
-   echo "Skipping tests ... SUCCESS !"
-   exit 0
- fi
-fi
-
-export CATALINA_BASE=/opt/tomcat
-export CATALINA_HOME=/opt/tomcat
-export MAVEN_OPTS="-Xmx1024m -XX:MaxPermSize=500m"
+set -e
 
 if [ $TEST_SEQUENCE_NUMBER -eq 1 ]; then
-   mvn -q -Pimpatient -Dsimulator clean install
+   # Pylint/pep8 systemvm python codebase
+   cd systemvm/test && bash -x runtests.sh && cd ../..
+   # Build noredist
+   git clone https://github.com/rhtyd/cloudstack-nonoss.git nonoss
+   cd nonoss && bash -x install-non-oss.sh && cd ..
+   git clean -fdx .
+   # Perform rat checks
+   mvn -P developer,systemvm -Dsimulator -Dnoredist --projects='org.apache.cloudstack:cloudstack' org.apache.rat:apache-rat-plugin:0.12:check
+   mvn -q -B -P developer,systemvm -Dsimulator -Dnoredist clean install
 else
-   mvn -q -Pimpatient -Dsimulator clean install -DskipTests=true
+   mvn -Pdeveloper -Dsimulator clean install -DskipTests -T4 | egrep "Building|Tests|SUCCESS|FAILURE"
 fi
 
-# Compile API Docs
-cd tools/apidoc
-mvn -q clean install
-cd ../../
+# Install mysql-connector-python
+pip install --user --upgrade http://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-2.0.4.zip#md5=3df394d89300db95163f17c843ef49df 2>&1 > /dev/null
 
-# Compile marvin
-cd tools/marvin
-mvn -q clean install
-sudo python setup.py install 2>&1 > /dev/null
-cd ../../
+# Install marvin
+pip install --user --upgrade tools/marvin/dist/Marvin-*.tar.gz
 
 # Deploy the database
 mvn -q -Pdeveloper -pl developer -Ddeploydb
 mvn -q -Pdeveloper -pl developer -Ddeploydb-simulator
-

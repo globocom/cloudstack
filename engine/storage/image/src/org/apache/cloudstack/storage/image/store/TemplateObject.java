@@ -28,14 +28,13 @@ import org.apache.log4j.Logger;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataObjectInStore;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataStore;
 import org.apache.cloudstack.engine.subsystem.api.storage.ObjectInDataStoreStateMachine;
-import org.apache.cloudstack.engine.subsystem.api.storage.ObjectInDataStoreStateMachine.Event;
-import org.apache.cloudstack.engine.subsystem.api.storage.PrimaryDataStore;
 import org.apache.cloudstack.engine.subsystem.api.storage.TemplateInfo;
 import org.apache.cloudstack.storage.command.CopyCmdAnswer;
 import org.apache.cloudstack.storage.datastore.ObjectInDataStoreManager;
 import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreDao;
 import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreVO;
 import org.apache.cloudstack.storage.to.TemplateObjectTO;
+import com.cloud.agent.api.storage.CreateDatadiskTemplateAnswer;
 
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.to.DataObjectType;
@@ -55,6 +54,9 @@ import com.cloud.utils.component.ComponentContext;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.fsm.NoTransitionException;
 
+import com.google.common.base.Strings;
+
+@SuppressWarnings("serial")
 public class TemplateObject implements TemplateInfo {
     private static final Logger s_logger = Logger.getLogger(TemplateObject.class);
     private VMTemplateVO imageVO;
@@ -166,7 +168,7 @@ public class TemplateObject implements TemplateInfo {
     }
 
     @Override
-    public void processEvent(Event event) {
+    public void processEvent(ObjectInDataStoreStateMachine.Event event) {
         try {
             objectInStoreMgr.update(this, event);
         } catch (NoTransitionException e) {
@@ -190,12 +192,15 @@ public class TemplateObject implements TemplateInfo {
                     TemplateObjectTO newTemplate = (TemplateObjectTO)cpyAnswer.getNewData();
                     VMTemplateStoragePoolVO templatePoolRef = templatePoolDao.findByPoolTemplate(getDataStore().getId(), getId());
                     templatePoolRef.setDownloadPercent(100);
-                    if (newTemplate.getSize() != null) {
-                        templatePoolRef.setTemplateSize(newTemplate.getSize());
-                    }
+
+                    setTemplateSizeIfNeeded(newTemplate, templatePoolRef);
+
                     templatePoolRef.setDownloadState(Status.DOWNLOADED);
-                    templatePoolRef.setLocalDownloadPath(newTemplate.getPath());
-                    templatePoolRef.setInstallPath(newTemplate.getPath());
+
+                    setDownloadPathIfNeeded(newTemplate, templatePoolRef);
+
+                    setInstallPathIfNeeded(newTemplate, templatePoolRef);
+
                     templatePoolDao.update(templatePoolRef.getId(), templatePoolRef);
                 }
             } else if (getDataStore().getRole() == DataStoreRole.Image || getDataStore().getRole() == DataStoreRole.ImageCache) {
@@ -220,9 +225,22 @@ public class TemplateObject implements TemplateInfo {
                             // For template created from snapshot, template name is determine by resource code.
                             templateVO.setUniqueName(newTemplate.getName());
                         }
+                        if (newTemplate.getHypervisorType() != null) {
+                            templateVO.setHypervisorType(newTemplate.getHypervisorType());
+                        }
                         templateVO.setSize(newTemplate.getSize());
                         imageDao.update(templateVO.getId(), templateVO);
                     }
+                } else if (answer instanceof CreateDatadiskTemplateAnswer) {
+                    CreateDatadiskTemplateAnswer createAnswer = (CreateDatadiskTemplateAnswer)answer;
+                    TemplateObjectTO dataDiskTemplate = createAnswer.getDataDiskTemplate();
+                    TemplateDataStoreVO templateStoreRef = templateStoreDao.findByStoreTemplate(getDataStore().getId(), dataDiskTemplate.getId());
+                    templateStoreRef.setInstallPath(dataDiskTemplate.getPath());
+                    templateStoreRef.setDownloadPercent(100);
+                    templateStoreRef.setDownloadState(Status.DOWNLOADED);
+                    templateStoreRef.setSize(dataDiskTemplate.getSize());
+                    templateStoreRef.setPhysicalSize(dataDiskTemplate.getPhysicalSize());
+                    templateStoreDao.update(templateStoreRef.getId(), templateStoreRef);
                 }
             }
             objectInStoreMgr.update(this, event);
@@ -238,6 +256,33 @@ public class TemplateObject implements TemplateInfo {
             if (event == ObjectInDataStoreStateMachine.Event.OperationFailed) {
                 objectInStoreMgr.deleteIfNotReady(this);
             }
+        }
+    }
+
+    /**
+     * In the case of managed storage, the install path may already be specified (by the storage plug-in), so do not overwrite it.
+     */
+    private void setInstallPathIfNeeded(TemplateObjectTO template, VMTemplateStoragePoolVO templatePoolRef) {
+        if (Strings.isNullOrEmpty(templatePoolRef.getInstallPath())) {
+            templatePoolRef.setInstallPath(template.getPath());
+        }
+    }
+
+    /**
+     * In the case of managed storage, the local download path may already be specified (by the storage plug-in), so do not overwrite it.
+     */
+    private void setDownloadPathIfNeeded(TemplateObjectTO template, VMTemplateStoragePoolVO templatePoolRef) {
+        if (Strings.isNullOrEmpty(templatePoolRef.getLocalDownloadPath())) {
+            templatePoolRef.setLocalDownloadPath(template.getPath());
+        }
+    }
+
+    /**
+     *  In the case of managed storage, the template size may already be specified (by the storage plug-in), so do not overwrite it.
+     */
+    private void setTemplateSizeIfNeeded(TemplateObjectTO template, VMTemplateStoragePoolVO templatePoolRef) {
+        if (templatePoolRef.getTemplateSize() == 0 && template.getSize() != null) {
+            templatePoolRef.setTemplateSize(template.getSize());
         }
     }
 
@@ -297,28 +342,25 @@ public class TemplateObject implements TemplateInfo {
 
     @Override
     public String getInstallPath() {
-        if (installPath != null)
+        if (installPath != null) {
             return installPath;
+        }
 
         if (dataStore == null) {
             return null;
         }
 
-        // managed primary data stores should not have an install path
-        if (dataStore instanceof PrimaryDataStore) {
-            PrimaryDataStore primaryDataStore = (PrimaryDataStore)dataStore;
-
-            Map<String, String> details = primaryDataStore.getDetails();
-
-            boolean managed = details != null && Boolean.parseBoolean(details.get(PrimaryDataStore.MANAGED));
-
-            if (managed) {
-                return null;
-            }
-        }
-
         DataObjectInStore obj = objectInStoreMgr.findObject(this, dataStore);
-        return obj.getInstallPath();
+
+        return obj != null ? obj.getInstallPath() : null;
+    }
+
+    @Override
+    public boolean isDirectDownload() {
+        if (this.imageVO == null) {
+            return false;
+        }
+        return this.imageVO.isDirectDownload();
     }
 
     public void setInstallPath(String installPath) {
@@ -428,12 +470,17 @@ public class TemplateObject implements TemplateInfo {
     }
 
     @Override
+    public Long getParentTemplateId() {
+        return imageVO.getParentTemplateId();
+    }
+
+    @Override
     public String getTemplateTag() {
         return imageVO.getTemplateTag();
     }
 
     @Override
-    public Map getDetails() {
+    public Map<String, String> getDetails() {
         return imageVO.getDetails();
     }
 
@@ -458,5 +505,22 @@ public class TemplateObject implements TemplateInfo {
     @Override
     public Class<?> getEntityType() {
         return VirtualMachineTemplate.class;
+    }
+
+    @Override
+    public long getUpdatedCount() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public void incrUpdatedCount() {
+        // TODO Auto-generated method stub
+    }
+
+    @Override
+    public Date getUpdated() {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

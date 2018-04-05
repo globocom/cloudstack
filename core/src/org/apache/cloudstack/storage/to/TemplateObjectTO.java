@@ -44,6 +44,8 @@ public class TemplateObjectTO implements DataTO {
     private Long size;
     private Long physicalSize;
     private Hypervisor.HypervisorType hypervisorType;
+    private boolean bootable;
+    private String uniqueName;
 
     public TemplateObjectTO() {
 
@@ -73,6 +75,8 @@ public class TemplateObjectTO implements DataTO {
         this.accountId = template.getAccountId();
         this.name = template.getUniqueName();
         this.format = template.getFormat();
+        this.uniqueName = template.getUniqueName();
+        this.size = template.getSize();
         if (template.getDataStore() != null) {
             this.imageDataStore = template.getDataStore().getTO();
         }
@@ -133,6 +137,10 @@ public class TemplateObjectTO implements DataTO {
     @Override
     public DataStoreTO getDataStore() {
         return this.imageDataStore;
+    }
+
+    public void setHypervisorType(Hypervisor.HypervisorType hypervisorType) {
+        this.hypervisorType = hypervisorType;
     }
 
     @Override
@@ -209,6 +217,22 @@ public class TemplateObjectTO implements DataTO {
 
     public void setPhysicalSize(Long physicalSize) {
         this.physicalSize = physicalSize;
+    }
+
+    public void setIsBootable(boolean bootable) {
+        this.bootable = bootable;
+    }
+
+    public boolean isBootable() {
+        return bootable;
+    }
+
+    public String getUniqueName() {
+        return this.uniqueName;
+    }
+
+    public void setUniqueName(String uniqueName) {
+        this.uniqueName = uniqueName;
     }
 
     @Override

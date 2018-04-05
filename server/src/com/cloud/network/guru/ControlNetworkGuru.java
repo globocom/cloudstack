@@ -18,13 +18,11 @@ package com.cloud.network.guru;
 
 import java.util.Map;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
-import org.apache.log4j.Logger;
-
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
+import org.apache.log4j.Logger;
 
 import com.cloud.configuration.Config;
 import com.cloud.dc.DataCenter;
@@ -54,7 +52,6 @@ import com.cloud.vm.ReservationContext;
 import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachineProfile;
 
-@Local(value = {NetworkGuru.class})
 public class ControlNetworkGuru extends PodBasedNetworkGuru implements NetworkGuru {
     private static final Logger s_logger = Logger.getLogger(ControlNetworkGuru.class);
     @Inject
@@ -100,7 +97,7 @@ public class ControlNetworkGuru extends PodBasedNetworkGuru implements NetworkGu
 
         NetworkVO config =
             new NetworkVO(offering.getTrafficType(), Mode.Static, BroadcastDomainType.LinkLocal, offering.getId(), Network.State.Setup, plan.getDataCenterId(),
-                plan.getPhysicalNetworkId());
+                plan.getPhysicalNetworkId(), offering.getRedundantRouter());
         config.setCidr(_cidr);
         config.setGateway(_gateway);
 
@@ -139,7 +136,7 @@ public class ControlNetworkGuru extends PodBasedNetworkGuru implements NetworkGu
         assert nic.getTrafficType() == TrafficType.Control;
 
         // we have to get management/private ip for the control nic for vmware/hyperv due ssh issues.
-        HypervisorType hType = dest.getHost().getHypervisorType();
+        HypervisorType hType = vm.getHypervisorType();
         if (((hType == HypervisorType.VMware) || (hType == HypervisorType.Hyperv)) && isRouterVm(vm)) {
             if (dest.getDataCenter().getNetworkType() != NetworkType.Basic) {
                 super.reserve(nic, config, vm, dest, context);
@@ -151,10 +148,10 @@ public class ControlNetworkGuru extends PodBasedNetworkGuru implements NetworkGu
                 // in basic mode and in VMware case, control network will be shared with guest network
                 String mac = _networkMgr.getNextAvailableMacAddressInNetwork(config.getId());
                 nic.setMacAddress(mac);
-                nic.setIp4Address("0.0.0.0");
-                nic.setNetmask("0.0.0.0");
+                nic.setIPv4Address("0.0.0.0");
+                nic.setIPv4Netmask("0.0.0.0");
                 nic.setFormat(AddressFormat.Ip4);
-                nic.setGateway("0.0.0.0");
+                nic.setIPv4Gateway("0.0.0.0");
                 return;
             }
         }
@@ -163,11 +160,11 @@ public class ControlNetworkGuru extends PodBasedNetworkGuru implements NetworkGu
         if (ip == null) {
             throw new InsufficientAddressCapacityException("Insufficient link local address capacity", DataCenter.class, dest.getDataCenter().getId());
         }
-        nic.setIp4Address(ip);
+        nic.setIPv4Address(ip);
         nic.setMacAddress(NetUtils.long2Mac(NetUtils.ip2Long(ip) | (14l << 40)));
-        nic.setNetmask("255.255.0.0");
+        nic.setIPv4Netmask("255.255.0.0");
         nic.setFormat(AddressFormat.Ip4);
-        nic.setGateway(NetUtils.getLinkLocalGateway());
+        nic.setIPv4Gateway(NetUtils.getLinkLocalGateway());
     }
 
     @Override

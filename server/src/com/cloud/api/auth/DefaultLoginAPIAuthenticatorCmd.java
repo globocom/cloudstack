@@ -16,6 +16,9 @@
 // under the License.
 package com.cloud.api.auth;
 
+import com.cloud.domain.Domain;
+import com.cloud.user.User;
+import com.cloud.user.UserAccount;
 import org.apache.cloudstack.api.ApiServerService;
 import com.cloud.api.response.ApiResponseSerializer;
 import com.cloud.exception.CloudAuthenticationException;
@@ -38,6 +41,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.util.List;
 import java.util.Map;
+import java.net.InetAddress;
 
 @APICommand(name = "login", description = "Logs a user into the CloudStack. A successful login attempt will generate a JSESSIONID cookie value that can be passed in subsequent Query command calls until the \"logout\" command has been issued or the session has expired.", requestHasSensitiveInfo = true, responseObject = LoginCmdResponse.class, entityType = {})
 public class DefaultLoginAPIAuthenticatorCmd extends BaseCmd implements APIAuthenticator {
@@ -104,7 +108,7 @@ public class DefaultLoginAPIAuthenticatorCmd extends BaseCmd implements APIAuthe
     }
 
     @Override
-    public String authenticate(String command, Map<String, Object[]> params, HttpSession session, String remoteAddress, String responseType, StringBuilder auditTrailSb, final HttpServletRequest req, final HttpServletResponse resp) throws ServerApiException {
+    public String authenticate(String command, Map<String, Object[]> params, HttpSession session, InetAddress remoteAddress, String responseType, StringBuilder auditTrailSb, final HttpServletRequest req, final HttpServletResponse resp) throws ServerApiException {
         // Disallow non POST requests
         if (HTTPMethod.valueOf(req.getMethod()) != HTTPMethod.POST) {
             throw new ServerApiException(ApiErrorCode.METHOD_NOT_ALLOWED, "Please use HTTP POST to authenticate using this API");
@@ -155,6 +159,16 @@ public class DefaultLoginAPIAuthenticatorCmd extends BaseCmd implements APIAuthe
         if (username != null) {
             final String pwd = ((password == null) ? null : password[0]);
             try {
+                final Domain userDomain = _domainService.findDomainByIdOrPath(domainId, domain);
+                if (userDomain != null) {
+                    domainId = userDomain.getId();
+                } else {
+                    throw new CloudAuthenticationException("Unable to find the domain from the path " + domain);
+                }
+                final UserAccount userAccount = _accountService.getActiveUserAccount(username[0], domainId);
+                if (userAccount != null && User.Source.SAML2 == userAccount.getSource()) {
+                    throw new CloudAuthenticationException("User is not allowed CloudStack login");
+                }
                 return ApiResponseSerializer.toSerializedString(_apiServer.loginUser(session, username[0], pwd, domainId, domain, remoteAddress, params),
                         responseType);
             } catch (final CloudAuthenticationException ex) {

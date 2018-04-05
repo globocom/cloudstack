@@ -21,6 +21,7 @@ package org.apache.cloudstack.engine.orchestration.service;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.cloudstack.engine.subsystem.api.storage.DataObject;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataStore;
 import org.apache.cloudstack.engine.subsystem.api.storage.VolumeInfo;
 import org.apache.cloudstack.framework.config.ConfigKey;
@@ -56,20 +57,22 @@ import com.cloud.vm.VirtualMachineProfile;
  */
 public interface VolumeOrchestrationService {
 
-    static final ConfigKey<Long> CustomDiskOfferingMinSize = new ConfigKey<Long>("Advanced",
+    ConfigKey<Long> CustomDiskOfferingMinSize = new ConfigKey<Long>("Advanced",
         Long.class,
         "custom.diskoffering.size.min",
         "1",
         "Minimum size in GB for custom disk offering.",
         true
     );
-    static final ConfigKey<Long> CustomDiskOfferingMaxSize = new ConfigKey<Long>("Advanced",
+
+    ConfigKey<Long> CustomDiskOfferingMaxSize = new ConfigKey<Long>("Advanced",
         Long.class,
         "custom.diskoffering.size.max",
         "1024",
         "Maximum size in GB for custom disk offering.",
         true
     );
+
     VolumeInfo moveVolume(VolumeInfo volume, long destPoolDcId, Long destPoolPodId, Long destPoolClusterId, HypervisorType dataDiskHyperType)
         throws ConcurrentOperationException, StorageUnavailableException;
 
@@ -89,7 +92,8 @@ public interface VolumeOrchestrationService {
 
     void destroyVolume(Volume volume);
 
-    DiskProfile allocateRawVolume(Type type, String name, DiskOffering offering, Long size, Long minIops, Long maxIops, VirtualMachine vm, VirtualMachineTemplate template, Account owner);
+    DiskProfile allocateRawVolume(Type type, String name, DiskOffering offering, Long size, Long minIops, Long maxIops, VirtualMachine vm, VirtualMachineTemplate template,
+            Account owner, Long deviceId);
 
     VolumeInfo createVolumeOnPrimaryStorage(VirtualMachine vm, VolumeInfo volume, HypervisorType rootDiskHyperType, StoragePool storagePool) throws NoTransitionException;
 
@@ -97,9 +101,9 @@ public interface VolumeOrchestrationService {
 
     void cleanupVolumes(long vmId) throws ConcurrentOperationException;
 
-    void disconnectVolumeFromHost(VolumeInfo volumeInfo, Host host, DataStore dataStore);
+    void revokeAccess(DataObject dataObject, Host host, DataStore dataStore);
 
-    void disconnectVolumesFromHost(long vmId, long hostId);
+    void revokeAccess(long vmId, long hostId);
 
     void migrateVolumes(VirtualMachine vm, VirtualMachineTO vmTo, Host srcHost, Host destHost, Map<Volume, StoragePool> volumeToPool);
 
@@ -123,5 +127,4 @@ public interface VolumeOrchestrationService {
     StoragePool findStoragePool(DiskProfile dskCh, DataCenter dc, Pod pod, Long clusterId, Long hostId, VirtualMachine vm, Set<StoragePool> avoid);
 
     void updateVolumeDiskChain(long volumeId, String path, String chainInfo);
-
 }

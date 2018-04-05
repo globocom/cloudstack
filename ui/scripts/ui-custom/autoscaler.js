@@ -431,8 +431,8 @@
 
             var $loading = $('<div>').addClass('loading-overlay').appendTo($autoscalerDialog);
             $autoscalerDialog.dialog({
-                title: 'AutoScale Configuration Wizard',
-                width: 800,
+                title: _l('label.autoscale.configuration.wizard'),
+                width: 825,
                 height: 600,
                 draggable: true,
                 closeonEscape: false,

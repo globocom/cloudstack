@@ -81,9 +81,19 @@ public class ListHostsCmd extends BaseListCmd {
                description = "lists hosts in the same cluster as this VM and flag hosts with enough CPU/RAm to host this VM")
     private Long virtualMachineId;
 
+    @Parameter(name = ApiConstants.OUTOFBANDMANAGEMENT_ENABLED,
+            type = CommandType.BOOLEAN,
+            description = "list hosts for which out-of-band management is enabled")
+    private Boolean outOfBandManagementEnabled;
+
+    @Parameter(name = ApiConstants.OUTOFBANDMANAGEMENT_POWERSTATE,
+            type = CommandType.STRING,
+            description = "list hosts by its out-of-band management interface's power state. Its value can be one of [On, Off, Unknown]")
+    private String outOfBandManagementPowerState;
+
     @Parameter(name = ApiConstants.RESOURCE_STATE,
                type = CommandType.STRING,
-               description = "list hosts by resource state. Resource state represents current state determined by admin of host, valule can be one of [Enabled, Disabled, Unmanaged, PrepareForMaintenance, ErrorInMaintenance, Maintenance, Error]")
+               description = "list hosts by resource state. Resource state represents current state determined by admin of host, value can be one of [Enabled, Disabled, Unmanaged, PrepareForMaintenance, ErrorInMaintenance, Maintenance, Error]")
     private String resourceState;
 
     @Parameter(name = ApiConstants.DETAILS,
@@ -120,6 +130,10 @@ public class ListHostsCmd extends BaseListCmd {
 
     public String getState() {
         return state;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 
     public String getType() {
@@ -165,6 +179,15 @@ public class ListHostsCmd extends BaseListCmd {
         return resourceState;
     }
 
+
+    public Boolean isOutOfBandManagementEnabled() {
+        return outOfBandManagementEnabled;
+    }
+
+    public String getHostOutOfBandManagementPowerState() {
+        return outOfBandManagementPowerState;
+    }
+
     /////////////////////////////////////////////////////
     /////////////// API Implementation///////////////////
     /////////////////////////////////////////////////////
@@ -179,19 +202,16 @@ public class ListHostsCmd extends BaseListCmd {
         return ApiCommandJobType.Host;
     }
 
-    @Override
-    public void execute() {
-        ListResponse<HostResponse> response = null;
+    protected ListResponse<HostResponse> getHostResponses() {
+        ListResponse<HostResponse> response = new ListResponse<>();
         if (getVirtualMachineId() == null) {
             response = _queryService.searchForServers(this);
         } else {
             Pair<List<? extends Host>, Integer> result;
             Ternary<Pair<List<? extends Host>, Integer>, List<? extends Host>, Map<Host, Boolean>> hostsForMigration =
-                _mgr.listHostsForMigrationOfVM(getVirtualMachineId(), this.getStartIndex(), this.getPageSizeVal());
+                _mgr.listHostsForMigrationOfVM(getVirtualMachineId(), this.getStartIndex(), this.getPageSizeVal(), null);
             result = hostsForMigration.first();
             List<? extends Host> hostsWithCapacity = hostsForMigration.second();
-
-            response = new ListResponse<HostResponse>();
             List<HostResponse> hostResponses = new ArrayList<HostResponse>();
             for (Host host : result.first()) {
                 HostResponse hostResponse = _responseGenerator.createHostResponse(host, getDetails());
@@ -203,9 +223,14 @@ public class ListHostsCmd extends BaseListCmd {
                 hostResponse.setObjectName("host");
                 hostResponses.add(hostResponse);
             }
-
             response.setResponses(hostResponses, result.second());
         }
+        return response;
+    }
+
+    @Override
+    public void execute() {
+        ListResponse<HostResponse> response = getHostResponses();
         response.setResponseName(getCommandName());
         this.setResponseObject(response);
     }

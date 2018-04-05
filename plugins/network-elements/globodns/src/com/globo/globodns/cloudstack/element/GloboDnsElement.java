@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -87,7 +86,6 @@ import com.globo.globodns.cloudstack.commands.ValidateLbRecordCommand;
 import com.globo.globodns.cloudstack.resource.GloboDnsResource;
 
 @Component
-@Local(NetworkElement.class)
 public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter, NetworkElement, GloboDnsElementService, Configurable {
 
     private static final Logger s_logger = Logger.getLogger(GloboDnsElement.class);
@@ -208,9 +206,12 @@ public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter
             throw new CloudRuntimeException("Could not find zone associated to this network");
         }
 
+
         boolean isIpv6 = nic.getIp6Address() != null;
         String ipAddress = isIpv6 ? nic.getIp6Address() : nic.getIp4Address();
-        RemoveRecordCommand cmd = new RemoveRecordCommand(vm.getHostName().toLowerCase(), ipAddress, network.getNetworkDomain(), isIpv6);
+
+        RemoveRecordCommand cmd = new RemoveRecordCommand(hostNameOfVirtualMachine(vm), nic.getIPv4Address(), network.getNetworkDomain(), GloboDNSOverride.value());
+
         callCommand(cmd, zoneId);
 
         List<GloboResourceConfigurationVO> configurationList = _globoResourceConfigDao.getConfiguration(GloboResourceType.VM_NIC, nic.getUuid(), GloboResourceKey.isDNSRegistered);

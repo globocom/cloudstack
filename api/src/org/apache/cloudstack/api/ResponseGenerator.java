@@ -20,6 +20,7 @@ import java.text.DecimalFormat;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.http.HttpSession;
 
@@ -87,6 +88,7 @@ import org.apache.cloudstack.api.response.RemoteAccessVpnResponse;
 import org.apache.cloudstack.api.response.ResourceCountResponse;
 import org.apache.cloudstack.api.response.ResourceLimitResponse;
 import org.apache.cloudstack.api.response.ResourceTagResponse;
+import org.apache.cloudstack.api.response.SSHKeyPairResponse;
 import org.apache.cloudstack.api.response.SecurityGroupResponse;
 import org.apache.cloudstack.api.response.ServiceOfferingResponse;
 import org.apache.cloudstack.api.response.ServiceResponse;
@@ -189,6 +191,7 @@ import com.cloud.storage.snapshot.SnapshotPolicy;
 import com.cloud.storage.snapshot.SnapshotSchedule;
 import com.cloud.template.VirtualMachineTemplate;
 import com.cloud.user.Account;
+import com.cloud.user.SSHKeyPair;
 import com.cloud.user.User;
 import com.cloud.user.UserAccount;
 import com.cloud.uservm.UserVm;
@@ -238,6 +241,8 @@ public interface ResponseGenerator {
 
     VlanIpRangeResponse createVlanIpRangeResponse(Vlan vlan);
 
+    VlanIpRangeResponse createVlanIpRangeResponse(Class<? extends VlanIpRangeResponse> subClass, Vlan vlan);
+
     IPAddressResponse createIPAddressResponse(ResponseView view, IpAddress ipAddress);
 
     GuestVlanRangeResponse createDedicatedGuestVlanRangeResponse(GuestVlan result);
@@ -284,6 +289,8 @@ public interface ResponseGenerator {
 
     Host findHostById(Long hostId);
 
+    DiskOffering findDiskOfferingById(Long diskOfferingId);
+
     VpnUsersResponse createVpnUserResponse(VpnUser user);
 
     RemoteAccessVpnResponse createRemoteAccessVpnResponse(RemoteAccessVpn vpn);
@@ -306,7 +313,11 @@ public interface ResponseGenerator {
 
     TemplateResponse createTemplateUpdateResponse(ResponseView view, VirtualMachineTemplate result);
 
-    List<TemplateResponse> createTemplateResponses(ResponseView view, VirtualMachineTemplate result, Long zoneId, boolean readyOnly);
+    List<TemplateResponse> createTemplateResponses(ResponseView view, VirtualMachineTemplate result,
+                                                   Long zoneId, boolean readyOnly);
+
+    List<TemplateResponse> createTemplateResponses(ResponseView view, VirtualMachineTemplate result,
+                                                   List<Long> zoneIds, boolean readyOnly);
 
     List<CapacityResponse> createCapacityResponse(List<? extends Capacity> result, DecimalFormat format);
 
@@ -425,6 +436,10 @@ public interface ResponseGenerator {
 
     UsageRecordResponse createUsageResponse(Usage usageRecord);
 
+    UsageRecordResponse createUsageResponse(Usage usageRecord, Map<String, Set<ResourceTagResponse>> resourceTagResponseMap);
+
+    public Map<String, Set<ResourceTagResponse>> getUsageResourceTags();
+
     TrafficMonitorResponse createTrafficMonitorResponse(Host trafficMonitor);
 
     VMSnapshotResponse createVMSnapshotResponse(VMSnapshot vmSnapshot);
@@ -451,4 +466,5 @@ public interface ResponseGenerator {
 
     LoginCmdResponse createLoginResponse(HttpSession session);
 
+    SSHKeyPairResponse createSSHKeyPairResponse(SSHKeyPair sshkeyPair, boolean privatekey);
 }

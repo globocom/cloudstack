@@ -40,8 +40,6 @@ import org.apache.cloudstack.storage.to.VolumeObjectTO;
 import com.cloud.agent.IAgentControl;
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.AttachIsoCommand;
-import com.cloud.agent.api.AttachVolumeAnswer;
-import com.cloud.agent.api.AttachVolumeCommand;
 import com.cloud.agent.api.CheckNetworkAnswer;
 import com.cloud.agent.api.CheckNetworkCommand;
 import com.cloud.agent.api.CheckVirtualMachineAnswer;
@@ -810,10 +808,6 @@ public class OvmResourceBase implements ServerResource, HypervisorResource {
         return new GetVmStatsAnswer(cmd, vmStatsNameMap);
     }
 
-    protected AttachVolumeAnswer execute(AttachVolumeCommand cmd) {
-        return new AttachVolumeAnswer(cmd, "You must stop " + cmd.getVmName() + " first, OVM doesn't support hotplug datadisk");
-    }
-
     public Answer execute(DestroyCommand cmd) {
         try {
             OvmVolume.destroy(_conn, cmd.getVolume().getPoolUuid(), cmd.getVolume().getPath());
@@ -946,8 +940,8 @@ public class OvmResourceBase implements ServerResource, HypervisorResource {
             s_logger.warn("Failed to program network rules for vm " + cmd.getVmName());
             return new SecurityGroupRuleAnswer(cmd, false, "programming network rules failed");
         } else {
-            s_logger.info("Programmed network rules for vm " + cmd.getVmName() + " guestIp=" + cmd.getGuestIp() + ":ingress num rules=" + cmd.getIngressRuleSet().length +
-                ":egress num rules=" + cmd.getEgressRuleSet().length);
+            s_logger.info("Programmed network rules for vm " + cmd.getVmName() + " guestIp=" + cmd.getGuestIp() + ":ingress num rules=" + cmd.getIngressRuleSet().size() +
+                ":egress num rules=" + cmd.getEgressRuleSet().size());
             return new SecurityGroupRuleAnswer(cmd);
         }
     }
@@ -1072,7 +1066,7 @@ public class OvmResourceBase implements ServerResource, HypervisorResource {
             String secondaryStorageMountPath = uri.getHost() + ":" + uri.getPath();
             String installPath = "template/tmpl/" + accountId + "/" + templateId;
             Map<String, String> res = OvmStoragePool.createTemplateFromVolume(_conn, secondaryStorageMountPath, installPath, volumePath, wait);
-            return new CreatePrivateTemplateAnswer(cmd, true, null, res.get("installPath"), Long.valueOf(res.get("virtualSize")), Long.valueOf(res.get("physicalSize")),
+            return new CreatePrivateTemplateAnswer(cmd, true, null, res.get("installPath"), Long.parseLong(res.get("virtualSize")), Long.parseLong(res.get("physicalSize")),
                 res.get("templateFileName"), ImageFormat.RAW);
         } catch (Exception e) {
             s_logger.debug("Create template failed", e);
@@ -1183,8 +1177,6 @@ public class OvmResourceBase implements ServerResource, HypervisorResource {
             return execute((GetStorageStatsCommand)cmd);
         } else if (clazz == GetVmStatsCommand.class) {
             return execute((GetVmStatsCommand)cmd);
-        } else if (clazz == AttachVolumeCommand.class) {
-            return execute((AttachVolumeCommand)cmd);
         } else if (clazz == DestroyCommand.class) {
             return execute((DestroyCommand)cmd);
         } else if (clazz == PrepareForMigrationCommand.class) {

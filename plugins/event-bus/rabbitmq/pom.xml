@@ -24,14 +24,14 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack-plugins</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.0.0</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <dependencies>
     <dependency>
     <groupId>com.rabbitmq</groupId>
       <artifactId>amqp-client</artifactId>
-        <version>3.4.3</version>
+        <version>5.1.1</version>
     </dependency>
     <dependency>
     <groupId>org.apache.cloudstack</groupId>

@@ -28,7 +28,7 @@
 from marvin.codes import (PASS,
                           RECURRING)
 from nose.plugins.attrib import attr
-from marvin.cloudstackTestCase import cloudstackTestCase
+from marvin.cloudstackTestCase import cloudstackTestCase, unittest
 
 from marvin.lib.base import (ServiceOffering,
                                          Account,
@@ -97,7 +97,7 @@ class Services:
                        "displaytext": "Public Template - Xen",
                         "name": "Public template - Xen",
                         "ostype": "CentOS 5.3 (64-bit)",
-                        "url": "http://download.cloud.com/releases/2.0.0/UbuntuServer-10-04-64bit.vhd.bz2",
+                        "url": "http://download.cloudstack.org/releases/2.0.0/UbuntuServer-10-04-64bit.vhd.bz2",
                         "hypervisor": "xenserver",
                         "format": "VHD",
                         "isfeatured": True,
@@ -108,7 +108,7 @@ class Services:
                         "displaytext": "Public Template - KVM",
                         "name": "Public template -KVM",
                         "ostype": "CentOS 5.3 (64-bit)",
-                        "url": "http://download.cloud.com/releases/2.0.0/UbuntuServer-10-04-64bit.qcow2.bz2",
+                        "url": "http://download.cloudstack.org/releases/2.0.0/UbuntuServer-10-04-64bit.qcow2.bz2",
                         "hypervisor": "kvm",
                         "format": "qcow2",
                         "isfeatured": True,
@@ -120,7 +120,7 @@ class Services:
                         "displaytext": "Public Template - VMware",
                         "name": "Public template -VMware",
                         "ostype": "CentOS 5.3 (64-bit)",
-                        "url": "http://download.cloud.com/releases/2.2.0/CentOS5.3-x86_64.ova",
+                        "url": "http://download.cloudstack.org/releases/2.2.0/CentOS5.3-x86_64.ova",
                         "hypervisor": "vmware",
                         "format": "ova",
                         "isfeatured": True,
@@ -528,6 +528,9 @@ class TestBaseImageUpdate(cloudstackTestCase):
         1) New root disk should be formed
         2) The recurring snapshot rule should be deleted
         """
+        self.hypervisor = self.testClient.getHypervisorInfo()
+        if self.hypervisor.lower() in ['lxc']:
+            self.skipTest("snapshot creation is not supported in LXC")
         vms = VirtualMachine.list(
                                   self.apiclient,
                                   id=self.vm_with_reset.id,

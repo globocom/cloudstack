@@ -25,6 +25,7 @@ from marvin.lib.base import *
 from marvin.lib.common import *
 from nose.plugins.attrib import attr
 
+
 _multiprocess_shared_ = True
 
 class TestCreateDiskOffering(cloudstackTestCase):
@@ -45,7 +46,7 @@ class TestCreateDiskOffering(cloudstackTestCase):
             raise Exception("Warning: Exception during cleanup : %s" % e)
         return
 
-    @attr(tags = ["advanced", "basic", "eip", "sg", "advancedns", "smoke"], required_hardware="false")
+    @attr(tags=["advanced", "basic", "eip", "sg", "advancedns", "smoke"], required_hardware="false")
     def test_01_create_disk_offering(self):
         """Test to create disk offering
 

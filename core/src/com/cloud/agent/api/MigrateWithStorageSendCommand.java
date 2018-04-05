@@ -19,24 +19,21 @@
 
 package com.cloud.agent.api;
 
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
-import com.cloud.agent.api.to.VirtualNetworkTO;
-import com.cloud.agent.api.to.SrTO;
 import com.cloud.agent.api.to.NicTO;
 import com.cloud.agent.api.to.VirtualMachineTO;
 import com.cloud.agent.api.to.VolumeTO;
 import com.cloud.utils.Pair;
 
 public class MigrateWithStorageSendCommand extends Command {
-
     VirtualMachineTO vm;
-    List<Pair<VolumeTO, SrTO>> volumeToSr;
-    List<Pair<NicTO, VirtualNetworkTO>> nicToNetwork;
+    List<Pair<VolumeTO, Object>> volumeToSr;
+    List<Pair<NicTO, Object>> nicToNetwork;
     Map<String, String> token;
 
-    public MigrateWithStorageSendCommand(VirtualMachineTO vm, List<Pair<VolumeTO, SrTO>> volumeToSr, List<Pair<NicTO, VirtualNetworkTO>> nicToNetwork, Map<String, String> token) {
+    public MigrateWithStorageSendCommand(VirtualMachineTO vm, List<Pair<VolumeTO, Object>> volumeToSr, List<Pair<NicTO, Object>> nicToNetwork, Map<String, String> token) {
         this.vm = vm;
         this.volumeToSr = volumeToSr;
         this.nicToNetwork = nicToNetwork;
@@ -47,11 +44,11 @@ public class MigrateWithStorageSendCommand extends Command {
         return vm;
     }
 
-    public List<Pair<VolumeTO, SrTO>> getVolumeToSr() {
+    public List<Pair<VolumeTO, Object>> getVolumeToSr() {
         return volumeToSr;
     }
 
-    public List<Pair<NicTO, VirtualNetworkTO>> getNicToNetwork() {
+    public List<Pair<NicTO, Object>> getNicToNetwork() {
         return nicToNetwork;
     }
 

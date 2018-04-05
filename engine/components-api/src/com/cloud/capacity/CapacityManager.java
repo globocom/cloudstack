@@ -35,6 +35,7 @@ public interface CapacityManager {
     static final String StorageCapacityDisableThresholdCK = "pool.storage.capacity.disablethreshold";
     static final String StorageOverprovisioningFactorCK = "storage.overprovisioning.factor";
     static final String StorageAllocatedCapacityDisableThresholdCK = "pool.storage.allocated.capacity.disablethreshold";
+    static final String VmwareCreateCloneFullCK = "vmware.create.full.clone";
 
     static final ConfigKey<Float> CpuOverprovisioningFactor = new ConfigKey<Float>(Float.class, CpuOverprovisioningFactorCK, "Advanced", "1.0",
         "Used for CPU overprovisioning calculation; available CPU will be (actualCpuCapacity * cpu.overprovisioning.factor)", true, ConfigKey.Scope.Cluster, null);
@@ -53,6 +54,35 @@ public interface CapacityManager {
             "0.85",
             "Percentage (as a value between 0 and 1) of allocated storage utilization above which allocators will disable using the pool for low allocated storage available.",
             true, ConfigKey.Scope.Zone);
+    static final ConfigKey<Boolean> StorageOperationsExcludeCluster =
+            new ConfigKey<Boolean>(
+                    Boolean.class,
+                    "cluster.storage.operations.exclude",
+                    "Advanced",
+                    "false",
+                    "Exclude cluster from storage operations",
+                    true,
+                    ConfigKey.Scope.Cluster,
+                    null);
+    static final ConfigKey<Boolean> VmwareCreateCloneFull =
+            new ConfigKey<Boolean>(
+                    "Storage",
+                    Boolean.class,
+                    VmwareCreateCloneFullCK,
+                    "false",
+                    "If set to true, creates VMs as full clones on ESX hypervisor",
+                    true,
+                    ConfigKey.Scope.StoragePool);
+    static final ConfigKey<Integer> ImageStoreNFSVersion =
+            new ConfigKey<Integer>(
+                    Integer.class,
+                    "secstorage.nfs.version",
+                    "Advanced",
+                    null,
+                    "Enforces specific NFS version when mounting Secondary Storage. If NULL default selection is performed",
+                    true,
+                    ConfigKey.Scope.ImageStore,
+                    null);
 
     public boolean releaseVmCapacity(VirtualMachine vm, boolean moveFromReserved, boolean moveToReservered, Long hostId);
 

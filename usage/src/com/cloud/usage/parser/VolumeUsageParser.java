@@ -104,6 +104,7 @@ public class VolumeUsageParser {
             }
 
             if (volCreateDate.after(endDate)) {
+                //Ignore records created after endDate
                 continue;
             }
 

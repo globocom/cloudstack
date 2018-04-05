@@ -34,39 +34,39 @@
         physicalNetworkID = zoneType == 'Advanced' ? physicalNetworkID : 0;
         var physicalNetwork = data.physicalNetworks ? data.physicalNetworks[physicalNetworkID] : null;
         var trafficConfig = physicalNetwork ? physicalNetwork.trafficTypeConfiguration[trafficTypeID] : null;
-                
-        var trafficLabel;       
+
+        var trafficLabel;
         if (trafficConfig != null) {
-        	if ('label' in trafficConfig) {
-        		trafficLabel = trafficConfig.label;
-        	}
-        	else {
-        		trafficLabel = '';
-        		
-        		if ('vSwitchName' in trafficConfig) {
-        			trafficLabel += trafficConfig.vSwitchName;
-        		}
-        		if ('vlanId' in trafficConfig) {
-        			if (trafficLabel.length > 0)
-        				trafficLabel += ',';
-        			trafficLabel += trafficConfig.vlanId;
-        		}
-        		if ('vSwitchType' in trafficConfig) {
-        			if (trafficLabel.length > 0)
-        				trafficLabel += ',';
-        			trafficLabel += trafficConfig.vSwitchType;
-        		}
-        		
-        		if (trafficLabel.length == 0) { //trafficLabel == ''
-        			trafficLabel = null;
-        		} else if (trafficLabel.length >= 1) {            		
-            		if (trafficLabel.charAt(trafficLabel.length-1) == ',') { //if last character is comma  
-            			trafficLabel = trafficLabel.substring(0, trafficLabel.length - 1); //remove the last character (which is comma)  
-            		}
-        		}        		
-        	}
+            if ('label' in trafficConfig) {
+                trafficLabel = trafficConfig.label;
+            }
+            else {
+                trafficLabel = '';
+
+                if ('vSwitchName' in trafficConfig) {
+                    trafficLabel += trafficConfig.vSwitchName;
+                }
+                if ('vlanId' in trafficConfig) {
+                    if (trafficLabel.length > 0)
+                        trafficLabel += ',';
+                    trafficLabel += trafficConfig.vlanId;
+                }
+                if ('vSwitchType' in trafficConfig) {
+                    if (trafficLabel.length > 0)
+                        trafficLabel += ',';
+                    trafficLabel += trafficConfig.vSwitchType;
+                }
+
+                if (trafficLabel.length == 0) { //trafficLabel == ''
+                    trafficLabel = null;
+                } else if (trafficLabel.length >= 1) {
+                    if (trafficLabel.charAt(trafficLabel.length-1) == ',') { //if last character is comma
+                        trafficLabel = trafficLabel.substring(0, trafficLabel.length - 1); //remove the last character (which is comma)
+                    }
+                }
+            }
         }
-        
+
         var hypervisorAttr, trafficLabelStr;
 
         switch (hypervisor) {
@@ -90,6 +90,9 @@
                 break;
             case 'LXC':
                 hypervisorAttr = 'lxcnetworklabel';
+                break;
+            case 'Ovm3':
+                hypervisorAttr = 'ovm3networklabel';
                 break;
         }
 
@@ -177,11 +180,17 @@
                         },
                         'startip': {
                             edit: true,
-                            label: 'label.start.IP'
+                            label: 'label.start.IP',
+                            validation: {
+                                ipv4: true
+                            }
                         },
                         'endip': {
                             edit: true,
-                            label: 'label.end.IP'
+                            label: 'label.end.IP',
+                            validation: {
+                                ipv4: true
+                            }
                         },
                         'add-rule': {
                             label: 'label.add',
@@ -339,7 +348,7 @@
                     $('.setup-guest-traffic').addClass('basic');
                     $('.setup-guest-traffic').removeClass('advanced');
                     skipGuestTrafficStep = false; //set value
-                } else { //args.data['network-model'] == 'Advanced' && args.data["zone-advanced-sg-enabled"] !=	"on"
+                } else { //args.data['network-model'] == 'Advanced' && args.data["zone-advanced-sg-enabled"] !=    "on"
                     $('.setup-guest-traffic').removeClass('basic');
                     $('.setup-guest-traffic').addClass('advanced');
 
@@ -424,34 +433,48 @@
                     ip4dns1: {
                         label: 'label.ipv4.dns1',
                         validation: {
-                            required: true
+                            required: true,
+                            ipv4: true
                         },
                         desc: 'message.tooltip.dns.1'
                     },
                     ip4dns2: {
                         label: 'label.ipv4.dns2',
-                        desc: 'message.tooltip.dns.2'
+                        desc: 'message.tooltip.dns.2',
+                        validation: {
+                            ipv4: true
+                        }
                     },
 
                     ip6dns1: {
                         label: 'label.ipv6.dns1',
-                        desc: 'message.tooltip.dns.1'
+                        desc: 'message.tooltip.dns.1',
+                        validation: {
+                            ipv6: true
+                        }
                     },
                     ip6dns2: {
                         label: 'label.ipv6.dns2',
-                        desc: 'message.tooltip.dns.2'
-                    },
+                        desc: 'message.tooltip.dns.2',
+                        validation: {
+                            ipv6: true
+                        }
+                   },
 
                     internaldns1: {
                         label: 'label.internal.dns.1',
                         validation: {
-                            required: true
+                            required: true,
+                            ipv4: true
                         },
                         desc: 'message.tooltip.internal.dns.1'
                     },
                     internaldns2: {
                         label: 'label.internal.dns.2',
-                        desc: 'message.tooltip.internal.dns.2'
+                        desc: 'message.tooltip.internal.dns.2',
+                        validation: {
+                            ipv4: true
+                        }
                     },
                     hypervisor: {
                         label: 'label.hypervisor',
@@ -477,12 +500,13 @@
                                         nonSupportedHypervisors["BareMetal"] = 1;
                                         nonSupportedHypervisors["Hyperv"] = 1;
                                         nonSupportedHypervisors["Ovm"] = 1;
+                                        nonSupportedHypervisors["Ovm3"] = 1;
                                     }
 
-                                    if (args.context.zones[0]['network-model'] == "Advanced") { //CLOUDSTACK-7681: UI > zone wizard > Advanced zone > hypervisor => do not support BareMetal                                    
-                                        nonSupportedHypervisors["BareMetal"] = 1;                                        
+                                    if (args.context.zones[0]['network-model'] == "Advanced") { //CLOUDSTACK-7681: UI > zone wizard > Advanced zone > hypervisor => do not support BareMetal
+                                        nonSupportedHypervisors["BareMetal"] = 1;
                                     }
-                                    
+
                                     if (items != null) {
                                         for (var i = 0; i < items.length; i++) {
                                             if (items[i].name in nonSupportedHypervisors)
@@ -621,10 +645,10 @@
                             required: false
                         }
                     },
-                    isdedicated: {                        
+                    isdedicated: {
                         isBoolean: true,
                         label: 'label.dedicated',
-                        isChecked: false 
+                        isChecked: false
                     },
                     domain: {
                         label: 'label.domain',
@@ -668,6 +692,7 @@
                         label: 'label.local.storage.enabled',
                         isBoolean: true,
                         onChange: function(args) {
+
                         }
                     },
 
@@ -675,6 +700,7 @@
                         label: 'label.local.storage.enabled.system.vms',
                         isBoolean: true,
                         onChange: function(args) {
+
                         }
                     }
                 }
@@ -706,13 +732,15 @@
                     reservedSystemStartIp: {
                         label: 'label.start.reserved.system.IP',
                         validation: {
-                            required: true
+                            required: true,
+                            ipv4: true
                         }
                     },
                     reservedSystemEndIp: {
                         label: 'label.end.reserved.system.IP',
                         validation: {
-                            required: false
+                            required: false,
+                            ipv4: true
                         }
                     }
                 }
@@ -801,7 +829,7 @@
                     if ((args.data['network-model'] == 'Basic') || (args.data['network-model'] == 'Advanced' && args.data["zone-advanced-sg-enabled"] == "on")) {
                         $guestTrafficDesc.find('#for_basic_zone').css('display', 'inline');
                         $guestTrafficDesc.find('#for_advanced_zone').hide();
-                    } else { //args.data['network-model'] == 'Advanced' && args.data["zone-advanced-sg-enabled"] !=	"on"
+                    } else { //args.data['network-model'] == 'Advanced' && args.data["zone-advanced-sg-enabled"] !=    "on"
                         $guestTrafficDesc.find('#for_advanced_zone').css('display', 'inline');
                         $guestTrafficDesc.find('#for_basic_zone').hide();
                     }
@@ -933,37 +961,15 @@
                                 });
 
                                 if ($(this).val() == "VMware") {
-                                    //$('li[input_sub_group="external"]', $dialogAddCluster).show();
                                     if (dvSwitchEnabled) {
-                                        /*   
-										$fields.filter('[rel=vSwitchPublicType]').css('display', 'inline-block');
-										$form.find('.form-item[rel=vSwitchGuestType]').css('display', 'inline-block');
-
-										$form.find('.form-item[rel=vSwitchPublicName]').css('display','inline-block');
-										$form.find('.form-item[rel=vSwitchGuestName]').css('display','inline-block');
-
-										$form.find('.form-item[rel=overridepublictraffic]').find('input[type=checkbox]').css('display','inline-block');
-										$form.find('.form-item[rel=overrideguesttraffic]').find('input[type=checkbox]').css('display','inline-block');
-						                */
-
                                         $form.find('.form-item[rel=overridepublictraffic]').css('display', 'inline-block');
                                         $form.find('.form-item[rel=overridepublictraffic]').find('input[type=checkbox]').removeAttr('checked');
 
                                         $form.find('.form-item[rel=overrideguesttraffic]').css('display', 'inline-block');
                                         $form.find('.form-item[rel=overrideguesttraffic]').find('input[type=checkbox]').removeAttr('checked');
-
-
-
                                     } else {
-                                        /*    
-										$form.find('.form-item[rel=vSwitchPublicType]').css('display', 'none');
-									    $form.find('.form-item[rel=vSwitchGuestType]').css('display', 'none');
-									    $form.find('.form-item[rel=vSwitchPublicName]').css('display','none');
-									    $form.find('.form-item[rel=vSwitchGuestName]').css('display','none');
-						                */
                                         $form.find('.form-item[rel=overridepublictraffic]').css('display', 'none');
                                         $form.find('.form-item[rel=overrideguesttraffic]').css('display', 'none');
-
                                     }
 
                                     $form.find('[rel=vCenterHost]').css('display', 'block');
@@ -976,24 +982,21 @@
                                     } else {
                                         $vsmFields.css('display', 'none');
                                     }
-                                    //$("#cluster_name_label", $dialogAddCluster).text("vCenter Cluster:");
-                                } else {
-                                    //$('li[input_group="vmware"]', $dialogAddCluster).hide();
+                                } else if ($(this).val() == "Ovm3") {
+                                    $form.find('.form-item[rel=ovm3pool]').css('display', 'inline-block');
+                                    $form.find('.form-item[rel=ovm3pool]').find('input[type=checkbox]').removeAttr('checked');
 
+                                    $form.find('.form-item[rel=ovm3cluster]').css('display', 'inline-block');
+                                    $form.find('.form-item[rel=ovm3cluster]').find('input[type=checkbox]').removeAttr('checked');
+                                    $form.find('[rel=ovm3vip]').css('display', 'block');
+                                } else {
                                     $form.find('.form-item[rel=overridepublictraffic]').css('display', 'none');
                                     $form.find('.form-item[rel=overrideguesttraffic]').css('display', 'none');
-                                    //$form.find('.form-item[rel=vSwitchPublicType]').css('display', 'none');
-                                    //$form.find('.form-item[rel=vSwitchGuestType]').css('display', 'none');
-                                    //$form.find('.form-item[rel=vSwitchPublicName]').css('display', 'none');
-                                    //$form.find('.form-item[rel=vSwitchGuestName]').css('display', 'none');
-
 
                                     $form.find('[rel=vCenterHost]').css('display', 'none');
                                     $form.find('[rel=vCenterUsername]').css('display', 'none');
                                     $form.find('[rel=vCenterPassword]').css('display', 'none');
                                     $form.find('[rel=vCenterDatacenter]').css('display', 'none');
-
-                                    //$("#cluster_name_label", $dialogAddCluster).text("Cluster:");
                                 }
                             });
                         }
@@ -1040,160 +1043,12 @@
 
                     },
 
-                    /*
-                    vSwitchPublicType: {
-                        label: 'Public Traffic vSwitch Type',
-                        select: function(args) {
-                            var items = []
-                            var vSwitchEnabled = false;
-                            $.ajax({
-                                url: createURL('listConfigurations'),
-                                data: {
-                                    name: 'vmware.use.nexus.vswitch'
-                                },
-                                async: false,
-                                success: function(json) {
-                                    if (json.listconfigurationsresponse.configuration[0].value == 'true') {
-                                        vSwitchEnabled = true;
-                                    }
-                                }
-                            });
-
-                            if (vSwitchEnabled) {
-
-                                items.push({
-                                    id: "nexusdvs",
-                                    description: "Cisco Nexus 1000v Distributed Virtual Switch"
-                                });
-
-                                items.push({
-                                    id: "vmwaresvs",
-                                    description: "VMware vNetwork Standard Virtual Switch"
-                                });
-                                items.push({
-                                    id: "vmwaredvs",
-                                    description: "VMware vNetwork Distributed Virtual Switch"
-                                });
-
-
-
-
-                            }
-
-                            //  items.push({id: " ", description: " "});
-                            else {
-                                items.push({
-                                    id: "vmwaredvs",
-                                    description: "VMware vNetwork Distributed Virtual Switch"
-                                });
-                                items.push({
-                                    id: "vmwaresvs",
-                                    description: "VMware vNetwork Standard Virtual Switch"
-                                });
-                                items.push({
-                                    id: "nexusdvs",
-                                    description: "Cisco Nexus 1000v Distributed Virtual Switch"
-                                });
-
-                            }
-                            args.response.success({
-                                data: items
-                            });
-                        },
-                        isHidden: true,
-                        dependsOn: 'overridepublictraffic'
-                    },
-                    */
-					
-					/*
-                    vSwitchPublicName: {
-                        label: 'Public Traffic vSwitch Name',
-                        dependsOn: 'overridepublictraffic',
-                        isHidden: true
-                    },
-                    */
-					
                     overrideguesttraffic: {
                         label: 'label.override.guest.traffic',
                         isBoolean: true,
                         isHidden: true
 
                     },
-
-                    /*
-                    vSwitchGuestType: {
-                        label: 'Guest Traffic vSwitch Type',
-                        select: function(args) {
-                            var items = []
-                            //items.push({ id:" ", description:" "});
-
-                            var vSwitchEnabled = false;
-                            var items = []
-                            $.ajax({
-                                url: createURL('listConfigurations'),
-                                data: {
-                                    name: 'vmware.use.nexus.vswitch'
-                                },
-                                async: false,
-                                success: function(json) {
-                                    if (json.listconfigurationsresponse.configuration[0].value == 'true') {
-                                        vSwitchEnabled = true;
-                                    }
-                                }
-                            });
-
-                            if (vSwitchEnabled) {
-
-                                items.push({
-                                    id: "nexusdvs",
-                                    description: "Cisco Nexus 1000v Distributed Virtual Switch"
-                                });
-                                items.push({
-                                    id: "vmwaresvs",
-                                    description: "VMware vNetwork Standard Virtual Switch"
-                                });
-                                items.push({
-                                    id: "vmwaredvs",
-                                    description: "VMware vNetwork Distributed Virtual Switch"
-                                });
-
-
-
-
-                            } else {
-
-                                items.push({
-                                    id: "vmwaredvs",
-                                    description: "VMware vNetwork Distributed Virtual Switch"
-                                });
-                                items.push({
-                                    id: "vmwaresvs",
-                                    description: "VMware vNetwork Standard Virtual Switch"
-                                });
-                                items.push({
-                                    id: "nexusdvs",
-                                    description: "Cisco Nexus 1000v Distributed Virtual Switch"
-                                });
-
-                            }
-                            args.response.success({
-                                data: items
-                            });
-
-                        },
-                        isHidden: true,
-                        dependsOn: 'overrideguesttraffic'
-
-                    },
-                    */
-					
-					/*
-                    vSwitchGuestName: {
-                        label: 'Guest Traffic vSwitch Name',
-                        dependsOn: 'overrideguesttraffic',
-                        isHidden: true
-                    },
-					*/
 
                     //Cisco Nexus Vswitch
                     vsmipaddress: {
@@ -1230,78 +1085,106 @@
                     var $form = args.$form;
 
                     if (selectedClusterObj.hypervisortype == "VMware") {
-                        //$('li[input_group="general"]', $dialogAddHost).hide();
                         $form.find('[rel=hostname]').hide();
                         $form.find('[rel=username]').hide();
                         $form.find('[rel=password]').hide();
 
-                        //$('li[input_group="vmware"]', $dialogAddHost).show();
                         $form.find('[rel=vcenterHost]').css('display', 'block');
 
-                        //$('li[input_group="baremetal"]', $dialogAddHost).hide();
                         $form.find('[rel=baremetalCpuCores]').hide();
                         $form.find('[rel=baremetalCpu]').hide();
                         $form.find('[rel=baremetalMemory]').hide();
                         $form.find('[rel=baremetalMAC]').hide();
 
-                        //$('li[input_group="Ovm"]', $dialogAddHost).hide();
                         $form.find('[rel=agentUsername]').hide();
                         $form.find('[rel=agentPassword]').hide();
+
+                        $form.find('.form-item[rel=agentUsername]').hide();
+                        $form.find('.form-item[rel=agentPassword]').hide();
+                        $form.find('.form-item[rel=agentPort]').hide();
+                        $form.find('.form-item[rel=ovm3vip]').hide();
+                        $form.find('.form-item[rel=ovm3pool]').hide();
+                        $form.find('.form-item[rel=ovm3cluster]').hide();
                     } else if (selectedClusterObj.hypervisortype == "BareMetal") {
-                        //$('li[input_group="general"]', $dialogAddHost).show();
                         $form.find('[rel=hostname]').css('display', 'block');
                         $form.find('[rel=username]').css('display', 'block');
                         $form.find('[rel=password]').css('display', 'block');
 
-                        //$('li[input_group="baremetal"]', $dialogAddHost).show();
                         $form.find('[rel=baremetalCpuCores]').css('display', 'block');
                         $form.find('[rel=baremetalCpu]').css('display', 'block');
                         $form.find('[rel=baremetalMemory]').css('display', 'block');
                         $form.find('[rel=baremetalMAC]').css('display', 'block');
 
-                        //$('li[input_group="vmware"]', $dialogAddHost).hide();
                         $form.find('[rel=vcenterHost]').hide();
 
-                        //$('li[input_group="Ovm"]', $dialogAddHost).hide();
                         $form.find('[rel=agentUsername]').hide();
                         $form.find('[rel=agentPassword]').hide();
+
+                        $form.find('.form-item[rel=agentUsername]').hide();
+                        $form.find('.form-item[rel=agentPassword]').hide();
+                        $form.find('.form-item[rel=agentPort]').hide();
+                        $form.find('.form-item[rel=ovm3vip]').hide();
+                        $form.find('.form-item[rel=ovm3pool]').hide();
+                        $form.find('.form-item[rel=ovm3cluster]').hide();
                     } else if (selectedClusterObj.hypervisortype == "Ovm") {
-                        //$('li[input_group="general"]', $dialogAddHost).show();
                         $form.find('[rel=hostname]').css('display', 'block');
                         $form.find('[rel=username]').css('display', 'block');
                         $form.find('[rel=password]').css('display', 'block');
 
-                        //$('li[input_group="vmware"]', $dialogAddHost).hide();
                         $form.find('[rel=vcenterHost]').hide();
 
-                        //$('li[input_group="baremetal"]', $dialogAddHost).hide();
                         $form.find('[rel=baremetalCpuCores]').hide();
                         $form.find('[rel=baremetalCpu]').hide();
                         $form.find('[rel=baremetalMemory]').hide();
                         $form.find('[rel=baremetalMAC]').hide();
 
-                        //$('li[input_group="Ovm"]', $dialogAddHost).show();
                         $form.find('[rel=agentUsername]').css('display', 'block');
                         $form.find('[rel=agentUsername]').find('input').val("oracle");
                         $form.find('[rel=agentPassword]').css('display', 'block');
+
+                        $form.find('.form-item[rel=agentPort]').hide();
+                        $form.find('.form-item[rel=ovm3vip]').hide();
+                        $form.find('.form-item[rel=ovm3pool]').hide();
+                        $form.find('.form-item[rel=ovm3cluster]').hide();
+                   } else if (selectedClusterObj.hypervisortype == "Ovm3") {
+                        $form.find('.form-item[rel=hostname]').css('display', 'inline-block');
+                        $form.find('.form-item[rel=username]').css('display', 'inline-block');
+                        $form.find('.form-item[rel=password]').css('display', 'inline-block');
+
+                        $form.find('.form-item[rel=vcenterHost]').hide();
+
+                        $form.find('.form-item[rel=baremetalCpuCores]').hide();
+                        $form.find('.form-item[rel=baremetalCpu]').hide();
+                        $form.find('.form-item[rel=baremetalMemory]').hide();
+                        $form.find('.form-item[rel=baremetalMAC]').hide();
+
+                        $form.find('.form-item[rel=agentUsername]').css('display', 'inline-block');
+                        $form.find('.form-item[rel=agentUsername]').find('input').val("oracle");
+                        $form.find('.form-item[rel=agentPassword]').css('display', 'inline-block');
+                        $form.find('.form-item[rel=agentPort]').css('display', 'inline-block');
+                        $form.find('.form-item[rel=agentPort]').find('input').val("8899");
+                        $form.find('.form-item[rel=ovm3vip]').css('display', 'inline-block');
+                        $form.find('.form-item[rel=ovm3pool]').css('display', 'inline-block');
+                        $form.find('.form-item[rel=ovm3cluster]').css('display', 'inline-block');
                     } else {
-                        //$('li[input_group="general"]', $dialogAddHost).show();
                         $form.find('[rel=hostname]').css('display', 'block');
                         $form.find('[rel=username]').css('display', 'block');
                         $form.find('[rel=password]').css('display', 'block');
 
-                        //$('li[input_group="vmware"]', $dialogAddHost).hide();
                         $form.find('[rel=vcenterHost]').hide();
 
-                        //$('li[input_group="baremetal"]', $dialogAddHost).hide();
                         $form.find('[rel=baremetalCpuCores]').hide();
                         $form.find('[rel=baremetalCpu]').hide();
                         $form.find('[rel=baremetalMemory]').hide();
                         $form.find('[rel=baremetalMAC]').hide();
 
-                        //$('li[input_group="Ovm"]', $dialogAddHost).hide();
                         $form.find('[rel=agentUsername]').hide();
                         $form.find('[rel=agentPassword]').hide();
+
+                        $form.find('.form-item[rel=agentPort]').hide();
+                        $form.find('.form-item[rel=ovm3vip]').hide();
+                        $form.find('.form-item[rel=ovm3pool]').hide();
+                        $form.find('.form-item[rel=ovm3cluster]').hide();
                     }
                 },
                 fields: {
@@ -1390,6 +1273,16 @@
                     },
                     //input_group="OVM" ends here
 
+                    //input_group="OVM3" starts here
+                    agentPort: {
+                        label: 'label.agent.port',
+                        validation: {
+                            required: false
+                        },
+                        isHidden: true
+                    },
+                    //input_group="OVM3" ends here
+
                     //always appear (begin)
                     hosttags: {
                         label: 'label.host.tags',
@@ -1473,10 +1366,14 @@
                                 items.push({
                                     id: "nfs",
                                     description: "nfs"
-                                });                               
+                                });
                                 items.push({
                                     id: "SharedMountPoint",
                                     description: "SharedMountPoint"
+                                });
+                                items.push({
+                                    id: "rbd",
+                                    description: "RBD"
                                 });
                                 items.push({
                                     id: "clvm",
@@ -1494,7 +1391,7 @@
                                 items.push({
                                     id: "nfs",
                                     description: "nfs"
-                                });                               
+                                });
                                 items.push({
                                     id: "PreSetup",
                                     description: "PreSetup"
@@ -1511,7 +1408,7 @@
                                 items.push({
                                     id: "nfs",
                                     description: "nfs"
-                                });                                
+                                });
                                 items.push({
                                     id: "vmfs",
                                     description: "vmfs"
@@ -1519,13 +1416,13 @@
                                 args.response.success({
                                     data: items
                                 });
-                            } else if (selectedClusterObj.hypervisortype == "Hyperv") {    
-                            	var items = []; 
-                            	items.push({
+                            } else if (selectedClusterObj.hypervisortype == "Hyperv") {
+                                var items = [];
+                                items.push({
                                     id: "SMB",
                                     description: "SMB/CIFS"
                                 });
-                            	args.response.success({
+                                args.response.success({
                                     data: items
                                 });
                             } else if (selectedClusterObj.hypervisortype == "Ovm") {
@@ -1533,7 +1430,7 @@
                                 items.push({
                                     id: "nfs",
                                     description: "nfs"
-                                });                                
+                                });
                                 items.push({
                                     id: "ocfs2",
                                     description: "ocfs2"
@@ -1546,10 +1443,23 @@
                                 items.push({
                                     id: "nfs",
                                     description: "nfs"
-                                });                               
+                                });
                                 items.push({
                                     id: "SharedMountPoint",
                                     description: "SharedMountPoint"
+                                });
+                                items.push({
+                                    id: "rbd",
+                                    description: "RBD"
+                                });
+                                args.response.success({
+                                    data: items
+                                });
+                            } else if (selectedClusterObj.hypervisortype == "Ovm3") {
+                                var items = [];
+                                items.push({
+                                    id: "nfs",
+                                    description: "nfs"
                                 });
                                 args.response.success({
                                     data: items
@@ -1570,156 +1480,197 @@
                                 if (protocol == null)
                                     return;
 
-                                if (protocol == "nfs") {                                    
-                                    $form.find('[rel=server]').css('display', 'block');                                    
+                                if (protocol == "nfs") {
+                                    $form.find('[rel=server]').css('display', 'block');
                                     $form.find('[rel=server]').find(".value").find("input").val("");
-                                    
-                                    $form.find('[rel=path]').css('display', 'block');                                   
-                                    
-                                    $form.find('[rel=smbUsername]').hide();
-                                    $form.find('[rel=smbPassword]').hide();
-                                    $form.find('[rel=smbDomain]').hide();
-                                    
-                                    $form.find('[rel=iqn]').hide();
-                                    $form.find('[rel=lun]').hide();
-                                   
-                                    $form.find('[rel=volumegroup]').hide();
-                                    
-                                    $form.find('[rel=vCenterDataCenter]').hide();
-                                    $form.find('[rel=vCenterDataStore]').hide();
-                                    $form.find('[rel=glustervolume]').hide();
-                                } else if (protocol == "SMB") { //"SMB" show almost the same fields as "nfs" does, except 3 more SMB-specific fields.                                                  
-                               	    $form.find('[rel=server]').css('display', 'block');                                    
-                                    $form.find('[rel=server]').find(".value").find("input").val("");
-                                    
-                                    $form.find('[rel=path]').css('display', 'block');                                   
-                                    
-                                    $form.find('[rel=smbUsername]').css('display', 'block');  
-                                    $form.find('[rel=smbPassword]').css('display', 'block');  
-                                    $form.find('[rel=smbDomain]').css('display', 'block');  
-                                    
-                                    $form.find('[rel=iqn]').hide();
-                                    $form.find('[rel=lun]').hide();
-                                   
-                                    $form.find('[rel=volumegroup]').hide();
-                                    
-                                    $form.find('[rel=vCenterDataCenter]').hide();
-                                    $form.find('[rel=vCenterDataStore]').hide();
 
-                                    $form.find('[rel=glustervolume]').hide();
-                                } else if (protocol == "ocfs2") { //ocfs2 is the same as nfs, except no server field.                                    
-                                    $form.find('[rel=server]').hide();                                    
-                                    $form.find('[rel=server]').find(".value").find("input").val("");
-                                    
                                     $form.find('[rel=path]').css('display', 'block');
-                                                                        
+
                                     $form.find('[rel=smbUsername]').hide();
                                     $form.find('[rel=smbPassword]').hide();
                                     $form.find('[rel=smbDomain]').hide();
-                                    
+
                                     $form.find('[rel=iqn]').hide();
                                     $form.find('[rel=lun]').hide();
-                                    
+
                                     $form.find('[rel=volumegroup]').hide();
-                                   
+
                                     $form.find('[rel=vCenterDataCenter]').hide();
                                     $form.find('[rel=vCenterDataStore]').hide();
 
-                                    $form.find('[rel=glustervolume]').hide();
-                                } else if (protocol == "PreSetup") {                                   
-                                    $form.find('[rel=server]').hide();                                   
-                                    $form.find('[rel=server]').find(".value").find("input").val("localhost");
-                                   
-                                    $form.find('[rel=path]').css('display', 'block');                                    
-                                    $form.find('[rel=path]').find(".name").find("label").html('<span class=\"field-required\">*</span>'+_l('label.SR.name')+':');
-                                   
-                                    $form.find('[rel=smbUsername]').hide();
-                                    $form.find('[rel=smbPassword]').hide();
-                                    $form.find('[rel=smbDomain]').hide();
-                                    
-                                    $form.find('[rel=iqn]').hide();
-                                    $form.find('[rel=lun]').hide();
-                                   
-                                    $form.find('[rel=volumegroup]').hide();
-                                    
-                                    $form.find('[rel=vCenterDataCenter]').hide();
-                                    $form.find('[rel=vCenterDataStore]').hide();
+                                    $form.find('[rel=rbdmonitor]').hide();
+                                    $form.find('[rel=rbdpool]').hide();
+                                    $form.find('[rel=rbdid]').hide();
+                                    $form.find('[rel=rbdsecret]').hide();
 
                                     $form.find('[rel=glustervolume]').hide();
-                                } else if (protocol == "iscsi") {                                    
-                                    $form.find('[rel=server]').css('display', 'block');                                   
+                                } else if (protocol == "SMB") { //"SMB" show almost the same fields as "nfs" does, except 3 more SMB-specific fields.
+                                    $form.find('[rel=server]').css('display', 'block');
                                     $form.find('[rel=server]').find(".value").find("input").val("");
-                                   
-                                    $form.find('[rel=path]').hide();
-                                    
+
+                                    $form.find('[rel=path]').css('display', 'block');
+
+                                    $form.find('[rel=smbUsername]').css('display', 'block');
+                                    $form.find('[rel=smbPassword]').css('display', 'block');
+                                    $form.find('[rel=smbDomain]').css('display', 'block');
+
+                                    $form.find('[rel=iqn]').hide();
+                                    $form.find('[rel=lun]').hide();
+
+                                    $form.find('[rel=volumegroup]').hide();
+
+                                    $form.find('[rel=vCenterDataCenter]').hide();
+                                    $form.find('[rel=vCenterDataStore]').hide();
+
+                                    $form.find('[rel=rbdmonitor]').hide();
+                                    $form.find('[rel=rbdpool]').hide();
+                                    $form.find('[rel=rbdid]').hide();
+                                    $form.find('[rel=rbdsecret]').hide();
+
+                                    $form.find('[rel=glustervolume]').hide();
+                                } else if (protocol == "ocfs2") { //ocfs2 is the same as nfs, except no server field.
+                                    $form.find('[rel=server]').hide();
+                                    $form.find('[rel=server]').find(".value").find("input").val("");
+
+                                    $form.find('[rel=path]').css('display', 'block');
+
                                     $form.find('[rel=smbUsername]').hide();
                                     $form.find('[rel=smbPassword]').hide();
                                     $form.find('[rel=smbDomain]').hide();
-                                    
+
+                                    $form.find('[rel=iqn]').hide();
+                                    $form.find('[rel=lun]').hide();
+
+                                    $form.find('[rel=volumegroup]').hide();
+
+                                    $form.find('[rel=vCenterDataCenter]').hide();
+                                    $form.find('[rel=vCenterDataStore]').hide();
+
+                                    $form.find('[rel=rbdmonitor]').hide();
+                                    $form.find('[rel=rbdpool]').hide();
+                                    $form.find('[rel=rbdid]').hide();
+                                    $form.find('[rel=rbdsecret]').hide();
+
+                                    $form.find('[rel=glustervolume]').hide();
+                                } else if (protocol == "PreSetup") {
+                                    $form.find('[rel=server]').hide();
+                                    $form.find('[rel=server]').find(".value").find("input").val("localhost");
+
+                                    $form.find('[rel=path]').css('display', 'block');
+                                    $form.find('[rel=path]').find(".name").find("label").html('<span class=\"field-required\">*</span>'+_l('label.SR.name')+':');
+
+                                    $form.find('[rel=smbUsername]').hide();
+                                    $form.find('[rel=smbPassword]').hide();
+                                    $form.find('[rel=smbDomain]').hide();
+
+                                    $form.find('[rel=iqn]').hide();
+                                    $form.find('[rel=lun]').hide();
+
+                                    $form.find('[rel=volumegroup]').hide();
+
+                                    $form.find('[rel=vCenterDataCenter]').hide();
+                                    $form.find('[rel=vCenterDataStore]').hide();
+
+                                    $form.find('[rel=rbdmonitor]').hide();
+                                    $form.find('[rel=rbdpool]').hide();
+                                    $form.find('[rel=rbdid]').hide();
+                                    $form.find('[rel=rbdsecret]').hide();
+
+                                    $form.find('[rel=glustervolume]').hide();
+                                } else if (protocol == "iscsi") {
+                                    $form.find('[rel=server]').css('display', 'block');
+                                    $form.find('[rel=server]').find(".value").find("input").val("");
+
+                                    $form.find('[rel=path]').hide();
+
+                                    $form.find('[rel=smbUsername]').hide();
+                                    $form.find('[rel=smbPassword]').hide();
+                                    $form.find('[rel=smbDomain]').hide();
+
                                     $form.find('[rel=iqn]').css('display', 'block');
                                     $form.find('[rel=lun]').css('display', 'block');
-                                    
+
                                     $form.find('[rel=volumegroup]').hide();
-                                    
+
                                     $form.find('[rel=vCenterDataCenter]').hide();
                                     $form.find('[rel=vCenterDataStore]').hide();
 
+                                    $form.find('[rel=rbdmonitor]').hide();
+                                    $form.find('[rel=rbdpool]').hide();
+                                    $form.find('[rel=rbdid]').hide();
+                                    $form.find('[rel=rbdsecret]').hide();
+
                                     $form.find('[rel=glustervolume]').hide();
-                                } else if ($(this).val() == "clvm") {                                    
-                                    $form.find('[rel=server]').hide();                                    
+                                } else if ($(this).val() == "clvm") {
+                                    $form.find('[rel=server]').hide();
                                     $form.find('[rel=server]').find(".value").find("input").val("localhost");
-                                    
+
                                     $form.find('[rel=path]').hide();
-                                    
+
                                     $form.find('[rel=smbUsername]').hide();
                                     $form.find('[rel=smbPassword]').hide();
                                     $form.find('[rel=smbDomain]').hide();
-                                    
+
                                     $form.find('[rel=iqn]').hide();
                                     $form.find('[rel=lun]').hide();
-                                   
+
                                     $form.find('[rel=volumegroup]').css('display', 'inline-block');
-                                   
+
                                     $form.find('[rel=vCenterDataCenter]').hide();
                                     $form.find('[rel=vCenterDataStore]').hide();
 
+                                    $form.find('[rel=rbdmonitor]').hide();
+                                    $form.find('[rel=rbdpool]').hide();
+                                    $form.find('[rel=rbdid]').hide();
+                                    $form.find('[rel=rbdsecret]').hide();
+
                                     $form.find('[rel=glustervolume]').hide();
-                                } else if (protocol == "vmfs") {                                    
-                                    $form.find('[rel=server]').css('display', 'block');                                    
+                                } else if (protocol == "vmfs") {
+                                    $form.find('[rel=server]').css('display', 'block');
                                     $form.find('[rel=server]').find(".value").find("input").val("");
-                                   
+
                                     $form.find('[rel=path]').hide();
-                                   
+
                                     $form.find('[rel=smbUsername]').hide();
                                     $form.find('[rel=smbPassword]').hide();
                                     $form.find('[rel=smbDomain]').hide();
-                                    
+
                                     $form.find('[rel=iqn]').hide();
                                     $form.find('[rel=lun]').hide();
-                                   
+
                                     $form.find('[rel=volumegroup]').hide();
-                                   
+
                                     $form.find('[rel=vCenterDataCenter]').css('display', 'block');
                                     $form.find('[rel=vCenterDataStore]').css('display', 'block');
 
+                                    $form.find('[rel=rbdmonitor]').hide();
+                                    $form.find('[rel=rbdpool]').hide();
+                                    $form.find('[rel=rbdid]').hide();
+                                    $form.find('[rel=rbdsecret]').hide();
+
                                     $form.find('[rel=glustervolume]').hide();
-                                } else if (protocol == "SharedMountPoint") { //"SharedMountPoint" show the same fields as "nfs" does.                                   
-                                    $form.find('[rel=server]').hide();                                    
+                                } else if (protocol == "SharedMountPoint") { //"SharedMountPoint" show the same fields as "nfs" does.
+                                    $form.find('[rel=server]').hide();
                                     $form.find('[rel=server]').find(".value").find("input").val("localhost");
-                                   
-                                    $form.find('[rel=path]').css('display', 'block');                                   
-                                   
+
+                                    $form.find('[rel=path]').css('display', 'block');
+
                                     $form.find('[rel=smbUsername]').hide();
                                     $form.find('[rel=smbPassword]').hide();
                                     $form.find('[rel=smbDomain]').hide();
-                                    
+
                                     $form.find('[rel=iqn]').hide();
                                     $form.find('[rel=lun]').hide();
-                                   
+
                                     $form.find('[rel=volumegroup]').hide();
-                                   
+
                                     $form.find('[rel=vCenterDataCenter]').hide();
                                     $form.find('[rel=vCenterDataStore]').hide();
+
+                                    $form.find('[rel=rbdmonitor]').hide();
+                                    $form.find('[rel=rbdpool]').hide();
+                                    $form.find('[rel=rbdid]').hide();
+                                    $form.find('[rel=rbdsecret]').hide();
 
                                     $form.find('[rel=glustervolume]').hide();
                                 } else if (protocol == "gluster") {
@@ -1727,7 +1678,7 @@
                                     $form.find('[rel=server]').find(".value").find("input").val("");
 
                                     $form.find('[rel=path]').hide();
-                                   
+
                                     $form.find('[rel=smbUsername]').hide();
                                     $form.find('[rel=smbPassword]').hide();
                                     $form.find('[rel=smbDomain]').hide();
@@ -1739,23 +1690,59 @@
 
                                     $form.find('[rel=vCenterDataCenter]').hide();
                                     $form.find('[rel=vCenterDataStore]').hide();
+
+                                    $form.find('[rel=rbdmonitor]').hide();
+                                    $form.find('[rel=rbdpool]').hide();
+                                    $form.find('[rel=rbdid]').hide();
+                                    $form.find('[rel=rbdsecret]').hide();
 
                                     $form.find('[rel=glustervolume]').css('display', 'block');
-                                } else {                                    
-                                    $form.find('[rel=server]').css('display', 'block');                                    
-                                    $form.find('[rel=server]').find(".value").find("input").val("");
-                                   
+                                } else if (protocol == "rbd") {
+                                    $form.find('[rel=rbdmonitor]').css('display', 'inline-block');
+                                    $form.find('[rel=rbdmonitor]').find(".name").find("label").text("RADOS Monitor:");
+
+                                    $form.find('[rel=rbdpool]').css('display', 'inline-block');
+                                    $form.find('[rel=rbdpool]').find(".name").find("label").text("RADOS Pool:");
+
+                                    $form.find('[rel=rbdid]').css('display', 'inline-block');
+                                    $form.find('[rel=rbdid]').find(".name").find("label").text("RADOS User:");
+
+                                    $form.find('[rel=rbdsecret]').css('display', 'inline-block');
+                                    $form.find('[rel=rbdsecret]').find(".name").find("label").text("RADOS Secret:");
+
+                                    $form.find('[rel=server]').hide();
+                                    $form.find('[rel=iqn]').hide();
+                                    $form.find('[rel=lun]').hide();
+                                    $form.find('[rel=volumegroup]').hide();
+                                    $form.find('[rel=path]').hide();
+                                    $form.find('[rel=vCenterDataCenter]').hide();
+                                    $form.find('[rel=vCenterDataStore]').hide();
+
                                     $form.find('[rel=smbUsername]').hide();
                                     $form.find('[rel=smbPassword]').hide();
                                     $form.find('[rel=smbDomain]').hide();
-                                    
+
+                                    $form.find('[rel=glustervolume]').hide();
+                                } else {
+                                    $form.find('[rel=server]').css('display', 'block');
+                                    $form.find('[rel=server]').find(".value").find("input").val("");
+
+                                    $form.find('[rel=smbUsername]').hide();
+                                    $form.find('[rel=smbPassword]').hide();
+                                    $form.find('[rel=smbDomain]').hide();
+
                                     $form.find('[rel=iqn]').hide();
                                     $form.find('[rel=lun]').hide();
-                                   
+
                                     $form.find('[rel=volumegroup]').hide();
-                                    
+
                                     $form.find('[rel=vCenterDataCenter]').hide();
                                     $form.find('[rel=vCenterDataStore]').hide();
+
+                                    $form.find('[rel=rbdmonitor]').hide();
+                                    $form.find('[rel=rbdpool]').hide();
+                                    $form.find('[rel=rbdid]').hide();
+                                    $form.find('[rel=rbdsecret]').hide();
 
                                     $form.find('[rel=glustervolume]').hide();
                                 }
@@ -1783,29 +1770,29 @@
 
                     //SMB
                     smbDomain: {
-                    	label: 'label.smb.domain',
-                    	validation: {
+                        label: 'label.smb.domain',
+                        validation: {
                             required: true
                         },
                         isHidden: true
-                    },          
+                    },
                     smbUsername: {
-                    	label: 'label.smb.username',
-                    	validation: {
+                        label: 'label.smb.username',
+                        validation: {
                             required: true
                         },
                         isHidden: true
                     },
                     smbPassword: {
-                    	label: 'label.smb.password',
-                    	isPassword: true,
-                    	validation: {
+                        label: 'label.smb.password',
+                        isPassword: true,
+                        validation: {
                             required: true
                         },
                         isHidden: true
                     },
-                                    
-                    
+
+
                     //iscsi
                     iqn: {
                         label: 'label.target.iqn',
@@ -1856,6 +1843,40 @@
                         isHidden: true
                     },
 
+                    // RBD
+                    rbdmonitor: {
+                        label: 'label.rbd.monitor',
+                        docID: 'helpPrimaryStorageRBDMonitor',
+                        validation: {
+                            required: true
+                        },
+                        isHidden: true
+                    },
+                    rbdpool: {
+                        label: 'label.rbd.pool',
+                        docID: 'helpPrimaryStorageRBDPool',
+                        validation: {
+                            required: true
+                        },
+                        isHidden: true
+                    },
+                    rbdid: {
+                        label: 'label.rbd.id',
+                        docID: 'helpPrimaryStorageRBDId',
+                        validation: {
+                            required: false
+                        },
+                        isHidden: true
+                    },
+                    rbdsecret: {
+                        label: 'label.rbd.secret',
+                        docID: 'helpPrimaryStorageRBDSecret',
+                        validation: {
+                            required: false
+                        },
+                        isHidden: true
+                    },
+
                     //always appear (begin)
                     storageTags: {
                         label: 'label.storage.tags',
@@ -1867,45 +1888,45 @@
                 }
             },
             secondaryStorage: {
-                fields: {                    
+                fields: {
                     provider: {
                         label: 'label.provider',
                         select: function(args) {
-                        	var storageproviders = [];  
-                        	storageproviders.push({ id: '', description: ''});                         	
-                        	
-                        	$.ajax({
-                        		url: createURL('listImageStores'),
-                        		data: {
-                        			provider: 'S3'
-                        		},
-                        		async: true,
-                        		success: function(json) {                        			
-                        			var s3stores = json.listimagestoresresponse.imagestore;
-                        			if(s3stores != null && s3stores.length > 0) {                        				
-                        				storageproviders.push({ id: 'S3', description: 'S3'}); //if (region-wide) S3 store exists already, only "S3" option should be included here. Any other type of store is not allowed to be created since cloudstack doesn't support multiple types of store at this point. 
-                        			} else {
-                        				/*                                                	  
-                                    	UI no longer gets providers from "listStorageProviders&type=image" because:
-                                    	(1) Not all of returned values are handled by UI (e.g. Provider "NetApp" is not handled by UI).
-                                    	(2) Provider "SMB" which is handled by UI is not returned from "listStorageProviders&type=image" 
-                                    	*/
-                        				storageproviders.push({ id: 'NFS', description: 'NFS'});
-                        				storageproviders.push({ id: 'SMB', description: 'SMB/CIFS'});
-                        				storageproviders.push({ id: 'S3', description: 'S3'});
-                        				storageproviders.push({ id: 'Swift', description: 'Swift'});                        				
-                        			}                        		                    			
+                            var storageproviders = [];
+                            storageproviders.push({ id: '', description: ''});
+
+                            $.ajax({
+                                url: createURL('listImageStores'),
+                                data: {
+                                    provider: 'S3'
+                                },
+                                async: true,
+                                success: function(json) {
+                                    var s3stores = json.listimagestoresresponse.imagestore;
+                                    if(s3stores != null && s3stores.length > 0) {
+                                        storageproviders.push({ id: 'S3', description: 'S3'}); //if (region-wide) S3 store exists already, only "S3" option should be included here. Any other type of store is not allowed to be created since cloudstack doesn't support multiple types of store at this point.
+                                    } else {
+                                        /*
+                                        UI no longer gets providers from "listStorageProviders&type=image" because:
+                                        (1) Not all of returned values are handled by UI (e.g. Provider "NetApp" is not handled by UI).
+                                        (2) Provider "SMB" which is handled by UI is not returned from "listStorageProviders&type=image"
+                                        */
+                                        storageproviders.push({ id: 'NFS', description: 'NFS'});
+                                        storageproviders.push({ id: 'SMB', description: 'SMB/CIFS'});
+                                        storageproviders.push({ id: 'S3', description: 'S3'});
+                                        storageproviders.push({ id: 'Swift', description: 'Swift'});
+                                    }
                                     args.response.success({
                                         data: storageproviders
-                                    });                                                      
-                                    
-                                    args.$select.change(function() {                                    
+                                    });
+
+                                    args.$select.change(function() {
                                         var $form = $(this).closest('form');
                                         var $fields = $form.find('.field');
 
                                         if ($(this).val() == "") {
-                                        	$fields.filter('[rel=name]').hide();
-                                        	
+                                            $fields.filter('[rel=name]').hide();
+
                                             //NFS
                                             $fields.filter('[rel=zoneid]').hide();
                                             $fields.filter('[rel=nfsServer]').hide();
@@ -1915,7 +1936,7 @@
                                             $fields.filter('[rel=smbUsername]').hide();
                                             $fields.filter('[rel=smbPassword]').hide();
                                             $fields.filter('[rel=smbDomain]').hide();
-                                            
+
                                             //S3
                                             $fields.filter('[rel=accesskey]').hide();
                                             $fields.filter('[rel=secretkey]').hide();
@@ -1937,9 +1958,9 @@
                                             $fields.filter('[rel=username]').hide();
                                             $fields.filter('[rel=key]').hide();
                                         } else if ($(this).val() == "NFS") {
-                                        	$fields.filter('[rel=name]').css('display', 'inline-block');
-                                        	
-                                        	//NFS
+                                            $fields.filter('[rel=name]').css('display', 'inline-block');
+
+                                            //NFS
                                             $fields.filter('[rel=zoneid]').css('display', 'inline-block');
                                             $fields.filter('[rel=nfsServer]').css('display', 'inline-block');
                                             $fields.filter('[rel=path]').css('display', 'inline-block');
@@ -1948,7 +1969,7 @@
                                             $fields.filter('[rel=smbUsername]').hide();
                                             $fields.filter('[rel=smbPassword]').hide();
                                             $fields.filter('[rel=smbDomain]').hide();
-                                            
+
                                             //S3
                                             $fields.filter('[rel=accesskey]').hide();
                                             $fields.filter('[rel=secretkey]').hide();
@@ -1970,9 +1991,9 @@
                                             $fields.filter('[rel=username]').hide();
                                             $fields.filter('[rel=key]').hide();
                                         } else if ($(this).val() == "SMB") {
-                                        	$fields.filter('[rel=name]').css('display', 'inline-block');
-                                        	
-                                        	//NFS
+                                            $fields.filter('[rel=name]').css('display', 'inline-block');
+
+                                            //NFS
                                             $fields.filter('[rel=zoneid]').css('display', 'inline-block');
                                             $fields.filter('[rel=nfsServer]').css('display', 'inline-block');
                                             $fields.filter('[rel=path]').css('display', 'inline-block');
@@ -1981,7 +2002,7 @@
                                             $fields.filter('[rel=smbUsername]').css('display', 'inline-block');
                                             $fields.filter('[rel=smbPassword]').css('display', 'inline-block');
                                             $fields.filter('[rel=smbDomain]').css('display', 'inline-block');
-                                            
+
                                             //S3
                                             $fields.filter('[rel=accesskey]').hide();
                                             $fields.filter('[rel=secretkey]').hide();
@@ -2003,17 +2024,17 @@
                                             $fields.filter('[rel=username]').hide();
                                             $fields.filter('[rel=key]').hide();
                                         } else if ($(this).val() == "S3") {
-                                        	$fields.filter('[rel=name]').css('display', 'inline-block');
-                                        	                                        	
-                                        	if(s3stores != null && s3stores.length > 0) {
-                                        		$fields.filter('[rel=name]').find('input').val(s3stores[0].name);
-                                        		$fields.filter('[rel=name]').find('input').attr("disabled", "disabled");
-                                        	} else {
-                                        		//$fields.filter('[rel=name]').find('input').val("");
-                                        		$fields.filter('[rel=name]').find('input').removeAttr("disabled");
-                                        	}                                        	
-                                        	
-                                        	//NFS
+                                            $fields.filter('[rel=name]').css('display', 'inline-block');
+
+                                            if(s3stores != null && s3stores.length > 0) {
+                                                $fields.filter('[rel=name]').find('input').val(s3stores[0].name);
+                                                $fields.filter('[rel=name]').find('input').attr("disabled", "disabled");
+                                            } else {
+                                                //$fields.filter('[rel=name]').find('input').val("");
+                                                $fields.filter('[rel=name]').find('input').removeAttr("disabled");
+                                            }
+
+                                            //NFS
                                             $fields.filter('[rel=zoneid]').hide();
                                             $fields.filter('[rel=nfsServer]').hide();
                                             $fields.filter('[rel=path]').hide();
@@ -2022,19 +2043,19 @@
                                             $fields.filter('[rel=smbUsername]').hide();
                                             $fields.filter('[rel=smbPassword]').hide();
                                             $fields.filter('[rel=smbDomain]').hide();
-                                            
+
                                             //S3
                                             if(s3stores != null && s3stores.length > 0) {
-                                            	 $fields.filter('[rel=accesskey]').hide();
+                                                 $fields.filter('[rel=accesskey]').hide();
                                                  $fields.filter('[rel=secretkey]').hide();
                                                  $fields.filter('[rel=bucket]').hide();
                                                  $fields.filter('[rel=endpoint]').hide();
                                                  $fields.filter('[rel=usehttps]').hide();
                                                  $fields.filter('[rel=connectiontimeout]').hide();
                                                  $fields.filter('[rel=maxerrorretry]').hide();
-                                                 $fields.filter('[rel=sockettimeout]').hide();   
+                                                 $fields.filter('[rel=sockettimeout]').hide();
                                             } else {
-                                            	 $fields.filter('[rel=accesskey]').css('display', 'inline-block');
+                                                 $fields.filter('[rel=accesskey]').css('display', 'inline-block');
                                                  $fields.filter('[rel=secretkey]').css('display', 'inline-block');
                                                  $fields.filter('[rel=bucket]').css('display', 'inline-block');
                                                  $fields.filter('[rel=endpoint]').css('display', 'inline-block');
@@ -2042,22 +2063,22 @@
                                                  $fields.filter('[rel=connectiontimeout]').css('display', 'inline-block');
                                                  $fields.filter('[rel=maxerrorretry]').css('display', 'inline-block');
                                                  $fields.filter('[rel=sockettimeout]').css('display', 'inline-block');
-                                            }      
+                                            }
                                             $fields.filter('[rel=createNfsCache]').find('input').attr('checked', 'checked');
                                             $fields.filter('[rel=createNfsCache]').find('input').attr("disabled", "disabled");  //Create NFS staging is required for S3 at this moment. So, disallow user to uncheck "Create NFS Secondary Staging" checkbox
                                             $fields.filter('[rel=createNfsCache]').css('display', 'inline-block');
                                             $fields.filter('[rel=nfsCacheNfsServer]').css('display', 'inline-block');
                                             $fields.filter('[rel=nfsCachePath]').css('display', 'inline-block');
-                                            
+
                                             //Swift
                                             $fields.filter('[rel=url]').hide();
                                             $fields.filter('[rel=account]').hide();
                                             $fields.filter('[rel=username]').hide();
                                             $fields.filter('[rel=key]').hide();
                                         } else if ($(this).val() == "Swift") {
-                                        	$fields.filter('[rel=name]').css('display', 'inline-block');
-                                        	
-                                        	//NFS
+                                            $fields.filter('[rel=name]').css('display', 'inline-block');
+
+                                            //NFS
                                             $fields.filter('[rel=zoneid]').hide();
                                             $fields.filter('[rel=nfsServer]').hide();
                                             $fields.filter('[rel=path]').hide();
@@ -2066,7 +2087,7 @@
                                             $fields.filter('[rel=smbUsername]').hide();
                                             $fields.filter('[rel=smbPassword]').hide();
                                             $fields.filter('[rel=smbDomain]').hide();
-                                            
+
                                             //S3
                                             $fields.filter('[rel=accesskey]').hide();
                                             $fields.filter('[rel=secretkey]').hide();
@@ -2088,10 +2109,10 @@
                                             $fields.filter('[rel=username]').css('display', 'inline-block');
                                             $fields.filter('[rel=key]').css('display', 'inline-block');
                                         }
-                                    });                                  
-                                    args.$select.change();     
-                        		}
-                        	});                         	
+                                    });
+                                    args.$select.change();
+                                }
+                            });
                         }
                     },
 
@@ -2099,7 +2120,7 @@
                         label: 'label.name',
                         isHidden: true
                     },
-                    
+
                     //NFS, SMB (begin)
                     nfsServer: {
                         label: 'label.server', //change label from "NFS Server" to "Server" since this field is also shown when provider "SMB/CIFS" is elected.
@@ -2117,29 +2138,28 @@
                     },
                     //NFS, SMB (end)
 
-
-                    //SMB (begin) 
+                    //SMB (begin)
                     smbDomain: {
-                    	label: 'label.smb.domain',
-                    	validation: {
+                        label: 'label.smb.domain',
+                        validation: {
                             required: true
                         }
                     },
                     smbUsername: {
-                    	label: 'label.smb.username',
-                    	validation: {
+                        label: 'label.smb.username',
+                        validation: {
                             required: true
                         }
                     },
                     smbPassword: {
-                    	label: 'label.smb.password',
-                    	isPassword: true,
-                    	validation: {
+                        label: 'label.smb.password',
+                        isPassword: true,
+                        validation: {
                             required: true
                         }
-                    },                    
+                    },
                     //SMB (end)
-                    
+
                     //S3 (begin)
                     accesskey: {
                         label: 'label.s3.access_key',
@@ -2167,7 +2187,7 @@
                         isHidden: true
                     },
                     usehttps: {
-                        label: 'label.s3.use_https',                        
+                        label: 'label.s3.use_https',
                         isBoolean: true,
                         isChecked: true,
                         isHidden: true
@@ -2208,7 +2228,6 @@
                         isHidden: true
                     },
                     //S3 (end)
-
 
                     //Swift (begin)
                     url: {
@@ -2266,7 +2285,7 @@
 
                             if (args.data.zone.guestcidraddress != null && args.data.zone.guestcidraddress.length > 0)
                                 array1.push("&guestcidraddress=" + todb(args.data.zone.guestcidraddress));
-                        } else { // args.data.zone.sgEnabled	== true
+                        } else { // args.data.zone.sgEnabled    == true
                             array1.push("&securitygroupenabled=true");
                         }
                     }
@@ -2303,29 +2322,29 @@
                         url: createURL("createZone" + array1.join("")),
                         dataType: "json",
                         async: false,
-                        success: function(json) {                        	
+                        success: function(json) {
                             if (args.data.pluginFrom == null) { //from zone wizard, not from quick instsaller(args.data.pluginFrom != null && args.data.pluginFrom.name == 'installWizard') who doesn't have public checkbox
-                                if(args.data.zone.isdedicated == 'on'){ //dedicated checkbox in zone wizard is checked    
-                            	    message(dictionary['message.dedicate.zone']);                            	    
-                            	    var data = {
-                            	    	zoneid: json.createzoneresponse.zone.id	
-                            	    };    
-                                    if (args.data.zone.domain != null) 
-                                    	$.extend(data, {
-                                    		domainid: args.data.zone.domain
-                                    	});  
-                                    if (args.data.zone.account != "") 
-                                    	$.extend(data, {
-                                    		account: args.data.zone.account
-                                    	});   
+                                if(args.data.zone.isdedicated == 'on'){ //dedicated checkbox in zone wizard is checked
+                                    message(dictionary['message.dedicate.zone']);
+                                    var data = {
+                                        zoneid: json.createzoneresponse.zone.id
+                                    };
+                                    if (args.data.zone.domain != null)
+                                        $.extend(data, {
+                                            domainid: args.data.zone.domain
+                                        });
+                                    if (args.data.zone.account != "")
+                                        $.extend(data, {
+                                            account: args.data.zone.account
+                                        });
                                     $.ajax({
                                         url: createURL('dedicateZone'),
                                         data: data,
                                         success: function(json) {}
-                                    });                                    
+                                    });
                                 }
-                            }                        	                       	
-                        	
+                            }
+
                             stepFns.addPhysicalNetworks({
                                 data: $.extend(args.data, {
                                     returnedZone: json.createzoneresponse.zone
@@ -2343,7 +2362,7 @@
                 },
 
                 addPhysicalNetworks: function(args) {
-                    message(dictionary['message.creating.physical.networks']);
+                    message(_l('message.creating.physical.networks'));
 
                     var returnedPhysicalNetworks = [];
 
@@ -2682,7 +2701,7 @@
 
                 //afterCreateZonePhysicalNetworkTrafficTypes: enable physical network, enable virtual router element, enable network service provider
                 configurePhysicalNetwork: function(args) {
-                    message(dictionary['message.configuring.physical.networks']);
+                    message(_l('message.configuring.physical.networks'));
 
                     if (args.data.zone.networkType == "Basic") {
                         $.ajax({
@@ -2837,7 +2856,7 @@
                                                                                                                 selectedNetworkOfferingHavingSG = args.data.pluginFrom.selectedNetworkOfferingHavingSG;
                                                                                                             }
                                                                                                             if (selectedNetworkOfferingHavingSG == true) { //need to Enable security group provider first
-                                                                                                                message(dictionary['message.enabling.security.group.provider']);
+                                                                                                                message(_l('message.enabling.security.group.provider'));
 
                                                                                                                 // get network service provider ID of Security Group
                                                                                                                 var securityGroupProviderId;
@@ -3034,7 +3053,7 @@
                                                                                                                         stepFns.addPod({
                                                                                                                             data: args.data
                                                                                                                         });
-                                                                                                                    } else { //args.data.zone.sgEnabled	== true  //Advanced SG-enabled zone
+                                                                                                                    } else { //args.data.zone.sgEnabled    == true  //Advanced SG-enabled zone
                                                                                                                         stepFns.addGuestNetwork({
                                                                                                                             data: args.data
                                                                                                                         });
@@ -3559,8 +3578,8 @@
                                                                 }
                                                             });
                                                             // ***** VPC Virtual Router ***** (end) *****
-                                                        } else { //args.data.zone.sgEnabled == true  //Advanced SG-enabled zone                                                         
-                                                            message(dictionary['message.enabling.security.group.provider']);
+                                                        } else { //args.data.zone.sgEnabled == true  //Advanced SG-enabled zone
+                                                            message(_l('message.enabling.security.group.provider'));
 
                                                             // get network service provider ID of Security Group
                                                             var securityGroupProviderId;
@@ -3631,7 +3650,7 @@
                 addNetscalerProvider: function(args) {
 
                     if (selectedNetworkOfferingHavingNetscaler == true) {
-                        message(dictionary['message.adding.Netscaler.provider']);
+                        message(_l('message.adding.Netscaler.provider'));
 
                         $.ajax({
                             url: createURL("addNetworkServiceProvider&name=Netscaler&physicalnetworkid=" + args.data.returnedBasicPhysicalNetwork.id),
@@ -3678,7 +3697,7 @@
 
 
                 addNetscalerDevice: function(args) {
-                    message(dictionary['message.adding.Netscaler.device']);
+                    message(_l('message.adding.Netscaler.device'));
 
                     var array1 = [];
                     array1.push("&physicalnetworkid=" + args.data.returnedBasicPhysicalNetwork.id);
@@ -3752,7 +3771,7 @@
                         url.push("lbdevicecapacity=" + capacity);
                     }
 
-                    var dedicated = (args.data.basicPhysicalNetwork.dedicated == "on"); //boolean	(true/false)
+                    var dedicated = (args.data.basicPhysicalNetwork.dedicated == "on"); //boolean    (true/false)
                     if (isQuestionMarkAdded == false) {
                         url.push("?");
                         isQuestionMarkAdded = true;
@@ -3838,7 +3857,7 @@
                 },
 
                 addGuestNetwork: function(args) { //create a guest network for Basic zone or Advanced zone with SG
-                    message(dictionary['message.creating.guest.network']);
+                    message(_l('message.creating.guest.network'));
 
                     var data = {
                         zoneid: args.data.returnedZone.id,
@@ -3882,7 +3901,7 @@
                 },
 
                 addPod: function(args) {
-                    message(dictionary['message.creating.pod']);
+                    message(_l('message.creating.pod'));
 
                     var array3 = [];
                     array3.push("&zoneId=" + args.data.returnedZone.id);
@@ -3919,7 +3938,7 @@
                 configurePublicTraffic: function(args) {
                     if ((args.data.zone.networkType == "Basic" && (selectedNetworkOfferingHavingSG == true && selectedNetworkOfferingHavingEIP == true && selectedNetworkOfferingHavingELB == true)) || (args.data.zone.networkType == "Advanced" && args.data.zone.sgEnabled != true)) {
 
-                        message(dictionary['message.configuring.public.traffic']);
+                        message(_l('message.configuring.public.traffic'));
 
                         var stopNow = false;
 
@@ -3958,7 +3977,7 @@
                             } else if (args.data.zone.networkType == "Advanced") {
                                 if (args.data.zone.sgEnabled != true) {
                                     array1.push("&forVirtualNetwork=true");
-                                } else { //args.data.zone.sgEnabled	== true
+                                } else { //args.data.zone.sgEnabled    == true
                                     array1.push("&forVirtualNetwork=false");
                                 }
                             }
@@ -4025,7 +4044,7 @@
                         return complete({});
                     }
 
-                    message(dictionary['message.configuring.storage.traffic']);
+                    message(_l('message.configuring.storage.traffic'));
 
                     var storageIPRanges = args.data.storageTraffic;
                     var tasks = [];
@@ -4115,7 +4134,7 @@
                         return;
                     }
 
-                    message(dictionary['message.configuring.guest.traffic']);
+                    message(_l('message.configuring.guest.traffic'));
 
                     if (args.data.returnedZone.networktype == "Basic") { //create an VlanIpRange for guest network in basic zone
                         var array1 = [];
@@ -4232,7 +4251,7 @@
                 },
 
                 addCluster: function(args) {
-                    message(dictionary['message.creating.cluster']);
+                    message(_l('message.creating.cluster'));
 
                     // Have cluster use zone's hypervisor
                     args.data.cluster.hypervisor = args.data.zone.hypervisor ?
@@ -4257,38 +4276,17 @@
                         array1.push("&username=" + todb(args.data.cluster.vCenterUsername));
                         array1.push("&password=" + todb(args.data.cluster.vCenterPassword));
 
-                        //dvswitch is enabled
-						/*
-                        if (args.data.cluster.vSwitchPublicType != "")
-                            array1.push('&publicvswitchtype=' + args.data.cluster.vSwitchPublicType);
-						*/
-
-						/*
-                        if (args.data.cluster.vSwitchPublicName != "")
-                            array1.push("&publicvswitchname=" + args.data.cluster.vSwitchPublicName);
-                        */
-
-                        /*
-                        if (args.data.cluster.vSwitchGuestType != "")
-                            array1.push('&guestvswitchtype=' + args.data.cluster.vSwitchGuestType);
-                        */
-						
-						/*
-                        if (args.data.cluster.vSwitchGuestName != "")
-                            array1.push("&guestvswitchname=" + args.data.cluster.vSwitchGuestName);
-						*/
-
-                        if (args.data.cluster.vsmipaddress != null && args.data.cluster.vsmipaddress.length > 0) { 
+                        if (args.data.cluster.vsmipaddress != null && args.data.cluster.vsmipaddress.length > 0) {
                             array1.push('&vsmipaddress=' + args.data.cluster.vsmipaddress);
                         }
-                        
+
                         if(args.data.cluster.vsmusername != null && args.data.cluster.vsmusername.length > 0) {
-                        	array1.push('&vsmusername=' + args.data.cluster.vsmusername);
+                            array1.push('&vsmusername=' + args.data.cluster.vsmusername);
                         }
-                          
+
                         if(args.data.cluster.vsmpassword != null && args.data.cluster.vsmpassword.length > 0) {
-                        	array1.push('&vsmpassword=' + args.data.cluster.vsmpassword);
-                        }  
+                            array1.push('&vsmpassword=' + args.data.cluster.vsmpassword);
+                        }
 
                         var hostname = args.data.cluster.vCenterHost;
                         var dcName = args.data.cluster.vCenterDatacenter;
@@ -4354,7 +4352,7 @@
                         $.ajax({
                             url: createURL("addCluster" + array1.join("")),
                             dataType: "json",
-                            type: "POST",                            
+                            type: "POST",
                             success: function(json) {
                                 stepFns.addHost({
                                     data: $.extend(args.data, {
@@ -4374,7 +4372,7 @@
                 },
 
                 addHost: function(args) {
-                    message(dictionary['message.adding.host']);
+                    message(_l('message.adding.host'));
 
                     var data = {
                         zoneid: args.data.returnedZone.id,
@@ -4455,14 +4453,14 @@
                 },
 
                 addPrimaryStorage: function(args) {
-                    if (args.data.zone.localstorageenabled == 'on' && args.data.zone.localstorageenabledforsystemvm == 'on') { //use local storage, don't need primary storage. So, skip
+                    if (args.data.zone.localstorageenabled == 'on' && args.data.zone.localstorageenabledforsystemvm == 'on') { //use local storage, don't need primary storage. So, skip this step.
                         stepFns.addSecondaryStorage({
                             data: args.data
                         });
                         return;
                     }
 
-                    message(dictionary['message.creating.primary.storage']);
+                    message(_l('message.creating.primary.storage'));
 
                     var array1 = [];
                     array1.push("&zoneid=" + args.data.returnedZone.id);
@@ -4473,59 +4471,65 @@
 
                     //zone-wide-primary-storage is supported only for KVM and VMWare
                     if (args.data.primaryStorage.scope == "zone") { //hypervisor type of the hosts in zone that will be attached to this storage pool. KVM, VMware supported as of now.
-                        if(args.data.cluster.hypervisor != undefined) {        
-                    	    array1.push("&hypervisor=" + todb(args.data.cluster.hypervisor)); 
-                        } else if(args.data.returnedCluster.hypervisortype != undefined) {        
-                    	    array1.push("&hypervisor=" + todb(args.data.returnedCluster.hypervisortype)); 
+                        if(args.data.cluster.hypervisor != undefined) {
+                            array1.push("&hypervisor=" + todb(args.data.cluster.hypervisor));
+                        } else if(args.data.returnedCluster.hypervisortype != undefined) {
+                            array1.push("&hypervisor=" + todb(args.data.returnedCluster.hypervisortype));
                         } else {
-                        	cloudStack.dialog.notice({
-                            	message: "Error: args.data.cluster.hypervisor is undefined. So is args.data.returnedCluster.hypervisortype (zone-wide-primary-storage)"
-                            });     
+                            cloudStack.dialog.notice({
+                                message: "Error: args.data.cluster.hypervisor is undefined. So is args.data.returnedCluster.hypervisortype (zone-wide-primary-storage)"
+                            });
                         }
                     }
 
                     var server = args.data.primaryStorage.server;
                     var url = null;
-                    if (args.data.primaryStorage.protocol == "nfs") {                        
+                    if (args.data.primaryStorage.protocol == "nfs") {
                         var path = args.data.primaryStorage.path;
                         if (path.substring(0, 1) != "/")
                             path = "/" + path;
                         url = nfsURL(server, path);
                     } else if (args.data.primaryStorage.protocol == "SMB") {
-                    	var path = args.data.primaryStorage.path;
+                        var path = args.data.primaryStorage.path;
                         if (path.substring(0, 1) != "/")
                             path = "/" + path;
                         url = smbURL(server, path);
                         array1.push("&details[0].user=" + args.data.primaryStorage.smbUsername);
                         array1.push("&details[1].password=" + todb(args.data.primaryStorage.smbPassword));
                         array1.push("&details[2].domain=" + args.data.primaryStorage.smbDomain);
-                    } else if (args.data.primaryStorage.protocol == "PreSetup") {                        
+                    } else if (args.data.primaryStorage.protocol == "PreSetup") {
                         var path = args.data.primaryStorage.path;
                         if (path.substring(0, 1) != "/")
                             path = "/" + path;
                         url = presetupURL(server, path);
-                    } else if (args.data.primaryStorage.protocol == "ocfs2") {                        
+                    } else if (args.data.primaryStorage.protocol == "ocfs2") {
                         var path = args.data.primaryStorage.path;
                         if (path.substring(0, 1) != "/")
                             path = "/" + path;
                         url = ocfs2URL(server, path);
-                    } else if (args.data.primaryStorage.protocol == "SharedMountPoint") {                        
+                    } else if (args.data.primaryStorage.protocol == "SharedMountPoint") {
                         var path = args.data.primaryStorage.path;
                         if (path.substring(0, 1) != "/")
                             path = "/" + path;
                         url = SharedMountPointURL(server, path);
-                    } else if (args.data.primaryStorage.protocol == "clvm") {                       
+                    } else if (args.data.primaryStorage.protocol == "clvm") {
                         var vg = args.data.primaryStorage.volumegroup;
                         if (vg.substring(0, 1) != "/")
                             vg = "/" + vg;
                         url = clvmURL(vg);
-                    } else if (args.data.primaryStorage.protocol == "vmfs") {                        
+                    } else if (args.data.primaryStorage.protocol == "rbd") {
+                        var rbdmonitor = args.data.primaryStorage.rbdmonitor;
+                        var rbdpool = args.data.primaryStorage.rbdpool;
+                        var rbdid = args.data.primaryStorage.rbdid;
+                        var rbdsecret = args.data.primaryStorage.rbdsecret;
+                        url = rbdURL(rbdmonitor, rbdpool, rbdid, rbdsecret);
+                    } else if (args.data.primaryStorage.protocol == "vmfs") {
                         var path = args.data.primaryStorage.vCenterDataCenter;
                         if (path.substring(0, 1) != "/")
                             path = "/" + path;
                         path += "/" + args.data.primaryStorage.vCenterDataStore;
                         url = vmfsURL("dummy", path);
-                    } else {                       
+                    } else {
                         var iqn = args.data.primaryStorage.iqn;
                         if (iqn.substring(0, 1) != "/")
                             iqn = "/" + iqn;
@@ -4558,15 +4562,15 @@
                 },
 
                 addSecondaryStorage: function(args) {
-                	if (args.data.secondaryStorage.provider == '') {
+                    if (args.data.secondaryStorage.provider == '') {
                         complete({
                             data: args.data
-                        });                        
+                        });
                         return; //skip addSecondaryStorage if provider dropdown is blank
-                	}
-                	
-                	
-                	message(dictionary['message.creating.secondary.storage']);
+                    }
+
+
+                    message(_l('message.creating.secondary.storage'));
 
                     var data = {};
                     if (args.data.secondaryStorage.name != null && args.data.secondaryStorage.name.length > 0) {
@@ -4639,13 +4643,13 @@
                                 });
                             }
                         });
-                    } else if (args.data.secondaryStorage.provider == 'S3') {           	               	                	
-                    	if($wizard.find('form[rel=secondaryStorage]').find('div[rel=name]').find('input').attr("disabled") == "disabled") { //Name textbox is disabled (and populated with S3 image setore name) when S3 image store exists. In this case, do not call addImageStore to create S3 image store.                    		
+                    } else if (args.data.secondaryStorage.provider == 'S3') {
+                        if($wizard.find('form[rel=secondaryStorage]').find('div[rel=name]').find('input').attr("disabled") == "disabled") { //Name textbox is disabled (and populated with S3 image setore name) when S3 image store exists. In this case, do not call addImageStore to create S3 image store.
                             complete({
                                 data: args.data
-                            });        		
-                    	} else { //Name textbox is not disabled when S3 image store does not exist. In this case, call addImageStore to create S3 image store.                    	
-                    		$.extend(data, {
+                            });
+                        } else { //Name textbox is not disabled when S3 image store does not exist. In this case, call addImageStore to create S3 image store.
+                            $.extend(data, {
                                 provider: args.data.secondaryStorage.provider,
                                 'details[0].key': 'accesskey',
                                 'details[0].value': args.data.secondaryStorage.accesskey,
@@ -4681,9 +4685,9 @@
                             $.ajax({
                                 url: createURL('addImageStore'),
                                 data: data,
-                                success: function(json) {   
-                                	g_regionsecondaryenabled = true;
-                                	
+                                success: function(json) {
+                                    g_regionsecondaryenabled = true;
+
                                     complete({
                                         data: $.extend(args.data, {
                                             returnedSecondaryStorage: json.addimagestoreresponse.secondarystorage
@@ -4697,9 +4701,9 @@
                                         args: args
                                     });
                                 }
-                            });                 
-                    	}
-                    	                     
+                            });
+                        }
+
                         //NFS Cache
                         if ($wizard.find('form[rel=secondaryStorage]').find('div[rel=createNfsCache]').find("input[type=checkbox]").is(':checked') == true) {
                             var zoneid = args.data.secondaryStorage.nfsCacheZoneid;
@@ -4753,14 +4757,14 @@
                         $.ajax({
                             url: createURL('addImageStore'),
                             data: data,
-                            success: function(json) {  
-                            	g_regionsecondaryenabled = true;
-                            	
+                            success: function(json) {
+                                g_regionsecondaryenabled = true;
+
                                 complete({
                                     data: $.extend(args.data, {
                                         returnedSecondaryStorage: json.addimagestoreresponse.secondarystorage
                                     })
-                                });                                
+                                });
                             },
                             error: function(XMLHttpResponse) {
                                 var errorMsg = parseXMLHttpResponse(XMLHttpResponse);
@@ -4771,11 +4775,11 @@
                             }
                         });
                     }
-                }                
+                }
             };
 
             var complete = function(args) {
-                message(dictionary['message.Zone.creation.complete']);
+                message(_l('message.Zone.creation.complete'));
                 success(args);
             };
 

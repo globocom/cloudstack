@@ -18,8 +18,6 @@ package com.cloud.network.dao;
 
 import java.util.List;
 
-import javax.ejb.Local;
-
 import org.springframework.stereotype.Component;
 
 import com.cloud.utils.db.GenericDaoBase;
@@ -28,7 +26,6 @@ import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.SearchCriteria.Op;
 
 @Component
-@Local(value = {LoadBalancerNetworkMapDao.class})
 public class LoadBalancerNetworkMapDaoImpl extends GenericDaoBase<LoadBalancerNetworkMapVO, Long> implements LoadBalancerNetworkMapDao {
 
     final SearchBuilder<LoadBalancerNetworkMapVO> allFieldsSearch;

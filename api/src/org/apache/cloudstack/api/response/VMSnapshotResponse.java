@@ -185,11 +185,11 @@ public class VMSnapshotResponse extends BaseResponse implements ControlledEntity
     }
 
     public String getParent() {
-        return parent;
+      return parent;
     }
 
     public void setParent(String parent) {
-        this.parent = parent;
+      this.parent = parent;
     }
 
     public String getType() {

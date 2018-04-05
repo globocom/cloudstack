@@ -16,6 +16,7 @@
 // under the License.
 package org.apache.cloudstack.api.command.user.template;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
@@ -51,18 +52,31 @@ public class CopyTemplateCmd extends BaseAsyncCmd {
     @Parameter(name = ApiConstants.DESTINATION_ZONE_ID,
                type = CommandType.UUID,
                entityType = ZoneResponse.class,
-               required = true,
+               required = false,
                description = "ID of the zone the template is being copied to.")
-    private Long destZoneId;
+    protected Long destZoneId;
 
-    @Parameter(name = ApiConstants.ID, type = CommandType.UUID, entityType = TemplateResponse.class, required = true, description = "Template ID.")
+    @Parameter(name = ApiConstants.ID, type = CommandType.UUID,
+            entityType = TemplateResponse.class, required = true, description = "Template ID.")
     private Long id;
 
     @Parameter(name = ApiConstants.SOURCE_ZONE_ID,
                type = CommandType.UUID,
                entityType = ZoneResponse.class,
-            description = "ID of the zone the template is currently hosted on. If not specified and template is cross-zone, then we will sync this template to region wide image store.")
+            description = "ID of the zone the template is currently hosted on. " +
+                    "If not specified and template is cross-zone, " +
+                    "then we will sync this template to region wide image store.")
     private Long sourceZoneId;
+
+    @Parameter(name = ApiConstants.DESTINATION_ZONE_ID_LIST,
+                    type=CommandType.LIST,
+                    collectionType = CommandType.UUID,
+                    entityType = ZoneResponse.class,
+                    required = false,
+                    description = "A list of IDs of the zones that the template needs to be copied to." +
+                            "Specify this list if the template needs to copied to multiple zones in one go. " +
+                            "Do not specify destzoneid and destzoneids together, however one of them is required.")
+    protected List<Long> destZoneIds;
 
     @Parameter(name = "force", type = CommandType.BOOLEAN, description = "Force copy template when template is cross zones")
     private boolean force = false;
@@ -71,8 +85,16 @@ public class CopyTemplateCmd extends BaseAsyncCmd {
     /////////////////// Accessors ///////////////////////
     /////////////////////////////////////////////////////
 
-    public Long getDestinationZoneId() {
-        return destZoneId;
+    public List<Long> getDestinationZoneIds() {
+        if (destZoneIds != null && destZoneIds.size() != 0) {
+            return destZoneIds;
+        }
+        if (destZoneId != null) {
+            List < Long > destIds = new ArrayList<>();
+            destIds.add(destZoneId);
+            return destIds;
+        }
+        return null;
     }
 
     public Long getId() {
@@ -114,7 +136,8 @@ public class CopyTemplateCmd extends BaseAsyncCmd {
 
     @Override
     public String getEventDescription() {
-        return  "copying template: " + getId() + " from zone: " + getSourceZoneId() + " to zone: " + getDestinationZoneId();
+        return  "copying template: " + getId() + " from zone: " + getSourceZoneId()
+                + " to zone: " + getDestinationZoneIds();
     }
 
     @Override
@@ -130,11 +153,20 @@ public class CopyTemplateCmd extends BaseAsyncCmd {
     @Override
     public void execute() throws ResourceAllocationException {
         try {
+            if (destZoneId == null && (destZoneIds == null || destZoneIds.size() == 0))
+                throw new ServerApiException(ApiErrorCode.PARAM_ERROR,
+                        "Either destzoneid or destzoneids parameters have to be specified.");
+
+            if (destZoneId != null && destZoneIds != null && destZoneIds.size() != 0)
+                throw new ServerApiException(ApiErrorCode.PARAM_ERROR,
+                        "Both destzoneid and destzoneids cannot be specified at the same time.");
+
             CallContext.current().setEventDetails(getEventDescription());
             VirtualMachineTemplate template = _templateService.copyTemplate(this);
 
             if (template != null){
-                List<TemplateResponse> listResponse = _responseGenerator.createTemplateResponses(ResponseView.Restricted, template, getDestinationZoneId(), false);
+                List<TemplateResponse> listResponse = _responseGenerator.createTemplateResponses(ResponseView.Restricted,
+                                                            template, getDestinationZoneIds(), false);
                 TemplateResponse response = new TemplateResponse();
                 if (listResponse != null && !listResponse.isEmpty()) {
                     response = listResponse.get(0);
@@ -150,7 +182,6 @@ public class CopyTemplateCmd extends BaseAsyncCmd {
             throw new ServerApiException(ApiErrorCode.RESOURCE_UNAVAILABLE_ERROR, ex.getMessage());
         }
     }
-
 
     public boolean isForce() {
         return force;

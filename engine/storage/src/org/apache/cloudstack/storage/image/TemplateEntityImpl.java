@@ -290,4 +290,25 @@ public class TemplateEntityImpl implements TemplateEntity {
     public Class<?> getEntityType() {
         return VirtualMachineTemplate.class;
     }
+
+    @Override
+    public long getUpdatedCount() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public void incrUpdatedCount() {
+        // TODO Auto-generated method stub
+    }
+
+    @Override
+    public Date getUpdated() {
+        return null;
+    }
+
+    @Override
+    public Long getParentTemplateId() {
+        return null;
+    }
 }

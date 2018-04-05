@@ -21,18 +21,13 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
-
-import net.juniper.contrail.api.types.MacAddressesType;
-import net.juniper.contrail.api.types.VirtualMachineInterface;
-
-import org.apache.log4j.Logger;
 
 import org.apache.cloudstack.network.contrail.model.InstanceIpModel;
 import org.apache.cloudstack.network.contrail.model.VMInterfaceModel;
 import org.apache.cloudstack.network.contrail.model.VirtualMachineModel;
 import org.apache.cloudstack.network.contrail.model.VirtualNetworkModel;
+import org.apache.log4j.Logger;
 
 import com.cloud.dc.DataCenter;
 import com.cloud.dc.DataCenter.NetworkType;
@@ -73,7 +68,9 @@ import com.cloud.vm.VMInstanceVO;
 import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.dao.NicDao;
 
-@Local(value = {NetworkGuru.class})
+import net.juniper.contrail.api.types.MacAddressesType;
+import net.juniper.contrail.api.types.VirtualMachineInterface;
+
 public class ContrailGuru extends AdapterBase implements NetworkGuru {
     @Inject
     NetworkDao _networkDao;
@@ -132,7 +129,7 @@ public class ContrailGuru extends AdapterBase implements NetworkGuru {
         }
         NetworkVO network =
                 new NetworkVO(offering.getTrafficType(), Mode.Dhcp, BroadcastDomainType.Lswitch, offering.getId(), State.Allocated, plan.getDataCenterId(),
-                        plan.getPhysicalNetworkId());
+                        plan.getPhysicalNetworkId(), offering.getRedundantRouter());
         if (userSpecified.getCidr() != null) {
             network.setCidr(userSpecified.getCidr());
             network.setGateway(userSpecified.getGateway());
@@ -193,14 +190,14 @@ public class ContrailGuru extends AdapterBase implements NetworkGuru {
     InsufficientAddressCapacityException, ConcurrentOperationException {
         s_logger.debug("allocate NicProfile on " + network.getName());
 
-        if (profile != null && profile.getRequestedIpv4() != null) {
+        if (profile != null && profile.getRequestedIPv4() != null) {
             throw new CloudRuntimeException("Does not support custom ip allocation at this time: " + profile);
         }
         if (profile == null) {
             profile = new NicProfile(ReservationStrategy.Create, null, null, null, null);
         }
 
-        profile.setStrategy(ReservationStrategy.Start);
+        profile.setReservationStrategy(ReservationStrategy.Start);
         URI broadcastUri = null;
         try {
             broadcastUri = new URI("vlan://untagged");
@@ -256,9 +253,9 @@ public class ContrailGuru extends AdapterBase implements NetworkGuru {
         } else {
             s_logger.debug("Reuse existing instance-ip object on " + ipModel.getName());
         }
-        if (nic.getIp4Address() != null) {
-            s_logger.debug("Nic using existing IP address " + nic.getIp4Address());
-            ipModel.setAddress(nic.getIp4Address());
+        if (nic.getIPv4Address() != null) {
+            s_logger.debug("Nic using existing IP address " + nic.getIPv4Address());
+            ipModel.setAddress(nic.getIPv4Address());
         }
 
         try {
@@ -282,13 +279,13 @@ public class ContrailGuru extends AdapterBase implements NetworkGuru {
             }
         }
 
-        if (nic.getIp4Address() == null) {
+        if (nic.getIPv4Address() == null) {
             s_logger.debug("Allocated IP address " + ipModel.getAddress());
-            nic.setIp4Address(ipModel.getAddress());
+            nic.setIPv4Address(ipModel.getAddress());
             if (network.getCidr() != null) {
-                nic.setNetmask(NetUtils.cidr2Netmask(network.getCidr()));
+                nic.setIPv4Netmask(NetUtils.cidr2Netmask(network.getCidr()));
             }
-            nic.setGateway(network.getGateway());
+            nic.setIPv4Gateway(network.getGateway());
             nic.setFormat(AddressFormat.Ip4);
         }
     }

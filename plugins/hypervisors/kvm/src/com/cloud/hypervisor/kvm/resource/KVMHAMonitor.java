@@ -16,6 +16,14 @@
 // under the License.
 package com.cloud.hypervisor.kvm.resource;
 
+import com.cloud.utils.script.Script;
+import org.apache.cloudstack.managed.context.ManagedContextRunnable;
+import org.apache.log4j.Logger;
+import org.libvirt.Connect;
+import org.libvirt.LibvirtException;
+import org.libvirt.StoragePool;
+import org.libvirt.StoragePoolInfo.StoragePoolState;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -23,27 +31,21 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.log4j.Logger;
-import org.libvirt.Connect;
-import org.libvirt.LibvirtException;
-import org.libvirt.StoragePool;
-import org.libvirt.StoragePoolInfo.StoragePoolState;
-
-import org.apache.cloudstack.managed.context.ManagedContextRunnable;
-
-import com.cloud.utils.script.Script;
-
 public class KVMHAMonitor extends KVMHABase implements Runnable {
     private static final Logger s_logger = Logger.getLogger(KVMHAMonitor.class);
-    private Map<String, NfsStoragePool> _storagePool = new ConcurrentHashMap<String, NfsStoragePool>();
+    private final Map<String, NfsStoragePool> _storagePool = new ConcurrentHashMap<String, NfsStoragePool>();
 
-    private String _hostIP; /* private ip address */
+    private final String _hostIP; /* private ip address */
 
     public KVMHAMonitor(NfsStoragePool pool, String host, String scriptPath) {
         if (pool != null) {
             _storagePool.put(pool._poolUUID, pool);
         }
         _hostIP = host;
+        configureHeartBeatPath(scriptPath);
+    }
+
+    private static synchronized void configureHeartBeatPath(String scriptPath) {
         KVMHABase.s_heartBeatPath = scriptPath;
     }
 
@@ -66,6 +68,12 @@ public class KVMHAMonitor extends KVMHABase implements Runnable {
     public List<NfsStoragePool> getStoragePools() {
         synchronized (_storagePool) {
             return new ArrayList<NfsStoragePool>(_storagePool.values());
+        }
+    }
+
+    public NfsStoragePool getStoragePool(String uuid) {
+        synchronized (_storagePool) {
+            return _storagePool.get(uuid);
         }
     }
 
@@ -156,13 +164,13 @@ public class KVMHAMonitor extends KVMHABase implements Runnable {
             try {
                 monitorThread.join();
             } catch (InterruptedException e) {
-
+                s_logger.debug("[ignored] interupted joining monitor.");
             }
 
             try {
                 Thread.sleep(_heartBeatUpdateFreq);
             } catch (InterruptedException e) {
-
+                s_logger.debug("[ignored] interupted between heartbeats.");
             }
         }
     }

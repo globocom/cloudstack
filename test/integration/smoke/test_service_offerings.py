@@ -31,7 +31,7 @@ from marvin.lib.common import (list_service_offering,
                                list_virtual_machines,
                                get_domain,
                                get_zone,
-                               get_template)
+                               get_test_template)
 from nose.plugins.attrib import attr
 
 
@@ -75,7 +75,7 @@ class TestCreateServiceOffering(cloudstackTestCase):
 
         service_offering = ServiceOffering.create(
             self.apiclient,
-            self.services["service_offerings"]
+            self.services["service_offerings"]["tiny"]
         )
         self.cleanup.append(service_offering)
 
@@ -101,27 +101,27 @@ class TestCreateServiceOffering(cloudstackTestCase):
 
         self.assertEqual(
             list_service_response[0].cpunumber,
-            self.services["service_offerings"]["cpunumber"],
+            self.services["service_offerings"]["tiny"]["cpunumber"],
             "Check server id in createServiceOffering"
         )
         self.assertEqual(
             list_service_response[0].cpuspeed,
-            self.services["service_offerings"]["cpuspeed"],
+            self.services["service_offerings"]["tiny"]["cpuspeed"],
             "Check cpuspeed in createServiceOffering"
         )
         self.assertEqual(
             list_service_response[0].displaytext,
-            self.services["service_offerings"]["displaytext"],
+            self.services["service_offerings"]["tiny"]["displaytext"],
             "Check server displaytext in createServiceOfferings"
         )
         self.assertEqual(
             list_service_response[0].memory,
-            self.services["service_offerings"]["memory"],
+            self.services["service_offerings"]["tiny"]["memory"],
             "Check memory in createServiceOffering"
         )
         self.assertEqual(
             list_service_response[0].name,
-            self.services["service_offerings"]["name"],
+            self.services["service_offerings"]["tiny"]["name"],
             "Check name in createServiceOffering"
         )
         return
@@ -157,27 +157,24 @@ class TestServiceOfferings(cloudstackTestCase):
 
         cls.service_offering_1 = ServiceOffering.create(
             cls.apiclient,
-            cls.services["service_offerings"]
+            cls.services["service_offerings"]["tiny"]
         )
         cls.service_offering_2 = ServiceOffering.create(
             cls.apiclient,
-            cls.services["service_offerings"]
+            cls.services["service_offerings"]["tiny"]
         )
-        template = get_template(
+        template = get_test_template(
             cls.apiclient,
             cls.zone.id,
-            cls.services["ostype"]
+            cls.hypervisor
         )
         if template == FAILED:
-            assert False, "get_template() failed to return\
-                    template with description %s" % cls.services["ostype"]
+            assert False, "get_test_template() failed to return template"
 
         # Set Zones and disk offerings
         cls.services["small"]["zoneid"] = cls.zone.id
         cls.services["small"]["template"] = template.id
 
-        cls.services["medium"]["zoneid"] = cls.zone.id
-        cls.services["medium"]["template"] = template.id
 
         # Create VMs, NAT Rules etc
         cls.account = Account.create(
@@ -197,7 +194,7 @@ class TestServiceOfferings(cloudstackTestCase):
         )
         cls.medium_virtual_machine = VirtualMachine.create(
             cls.apiclient,
-            cls.services["medium"],
+            cls.services["small"],
             accountid=cls.account.name,
             domainid=cls.account.domainid,
             serviceofferingid=cls.medium_offering.id,
@@ -326,6 +323,8 @@ class TestServiceOfferings(cloudstackTestCase):
         # 2. Using  listVM command verify that this Vm
         #    has Small service offering Id.
 
+        if self.hypervisor.lower() == "lxc":
+            self.skipTest("Skipping this test for {} due to bug CS-38153".format(self.hypervisor))
         try:
             self.medium_virtual_machine.stop(self.apiclient)
         except Exception as e:
@@ -386,7 +385,7 @@ class TestServiceOfferings(cloudstackTestCase):
             "Check CPU Speed for small offering"
         )
 
-        range = 20
+        range = 25
         if self.hypervisor.lower() == "hyperv":
             range = 200
         # TODO: Find the memory allocated to VM on hyperv hypervisor using

@@ -20,7 +20,6 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 
 import org.apache.log4j.Logger;
 
@@ -31,7 +30,6 @@ import com.cloud.network.vpc.dao.VpcDao;
 import com.cloud.utils.db.DB;
 import com.cloud.utils.db.GenericDaoBase;
 
-@Local(value = VpcDao.class)
 @DB()
 public class MockVpcDaoImpl extends GenericDaoBase<VpcVO, Long> implements VpcDao {
     private static final Logger s_logger = Logger.getLogger(MockNetworkOfferingDaoImpl.class);
@@ -98,9 +96,9 @@ public class MockVpcDaoImpl extends GenericDaoBase<VpcVO, Long> implements VpcDa
     public VpcVO findById(Long id) {
         VpcVO vo = null;
         if (id.longValue() == 1) {
-            vo = new VpcVO(1, "new vpc", "new vpc", 1, 1, 1, "0.0.0.0/0", "vpc domain", false, false);
+            vo = new VpcVO(1, "new vpc", "new vpc", 1, 1, 1, "0.0.0.0/0", "vpc domain", false, false, false);
         } else if (id.longValue() == 2) {
-            vo = new VpcVO(1, "new vpc", "new vpc", 1, 1, 1, "0.0.0.0/0", "vpc domain", false, false);
+            vo = new VpcVO(1, "new vpc", "new vpc", 1, 1, 1, "0.0.0.0/0", "vpc domain", false, false, false);
             vo.setState(State.Inactive);
         }
 

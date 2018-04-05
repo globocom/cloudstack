@@ -16,6 +16,10 @@
 // under the License.
 package com.cloud.api;
 
+import com.cloud.network.as.AutoScaleVmProfileNetworkMapVO;
+import com.cloud.network.as.dao.AutoScaleVmProfileNetworkMapDao;
+import com.cloud.network.dao.LoadBalancerOptionsDao;
+import com.cloud.network.dao.LoadBalancerOptionsVO;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -27,20 +31,20 @@ import java.util.Set;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 
-import com.cloud.network.as.AutoScaleVmProfileNetworkMapVO;
-import com.cloud.network.as.dao.AutoScaleVmProfileNetworkMapDao;
-import com.cloud.network.dao.LoadBalancerOptionsDao;
-import com.cloud.network.dao.LoadBalancerOptionsVO;
+import org.apache.cloudstack.acl.Role;
+import org.apache.cloudstack.acl.RoleService;
 import org.apache.cloudstack.affinity.AffinityGroup;
 import org.apache.cloudstack.affinity.AffinityGroupResponse;
 import org.apache.cloudstack.affinity.dao.AffinityGroupDao;
 import org.apache.cloudstack.api.ApiCommandJobType;
+import org.apache.cloudstack.api.ApiConstants.DomainDetails;
 import org.apache.cloudstack.api.ApiConstants.HostDetails;
 import org.apache.cloudstack.api.ApiConstants.VMDetails;
 import org.apache.cloudstack.api.ResponseObject.ResponseView;
 import org.apache.cloudstack.api.response.AccountResponse;
 import org.apache.cloudstack.api.response.AsyncJobResponse;
 import org.apache.cloudstack.api.response.DiskOfferingResponse;
+import org.apache.cloudstack.api.response.DomainResponse;
 import org.apache.cloudstack.api.response.DomainRouterResponse;
 import org.apache.cloudstack.api.response.EventResponse;
 import org.apache.cloudstack.api.response.HostForMigrationResponse;
@@ -77,6 +81,7 @@ import com.cloud.api.query.dao.AffinityGroupJoinDao;
 import com.cloud.api.query.dao.AsyncJobJoinDao;
 import com.cloud.api.query.dao.DataCenterJoinDao;
 import com.cloud.api.query.dao.DiskOfferingJoinDao;
+import com.cloud.api.query.dao.DomainJoinDao;
 import com.cloud.api.query.dao.DomainRouterJoinDao;
 import com.cloud.api.query.dao.HostJoinDao;
 import com.cloud.api.query.dao.HostTagDao;
@@ -89,7 +94,6 @@ import com.cloud.api.query.dao.ResourceTagJoinDao;
 import com.cloud.api.query.dao.SecurityGroupJoinDao;
 import com.cloud.api.query.dao.ServiceOfferingJoinDao;
 import com.cloud.api.query.dao.StoragePoolJoinDao;
-import com.cloud.api.query.dao.StorageTagDao;
 import com.cloud.api.query.dao.TemplateJoinDao;
 import com.cloud.api.query.dao.UserAccountJoinDao;
 import com.cloud.api.query.dao.UserVmJoinDao;
@@ -99,6 +103,7 @@ import com.cloud.api.query.vo.AffinityGroupJoinVO;
 import com.cloud.api.query.vo.AsyncJobJoinVO;
 import com.cloud.api.query.vo.DataCenterJoinVO;
 import com.cloud.api.query.vo.DiskOfferingJoinVO;
+import com.cloud.api.query.vo.DomainJoinVO;
 import com.cloud.api.query.vo.DomainRouterJoinVO;
 import com.cloud.api.query.vo.EventJoinVO;
 import com.cloud.api.query.vo.HostJoinVO;
@@ -112,7 +117,6 @@ import com.cloud.api.query.vo.ResourceTagJoinVO;
 import com.cloud.api.query.vo.SecurityGroupJoinVO;
 import com.cloud.api.query.vo.ServiceOfferingJoinVO;
 import com.cloud.api.query.vo.StoragePoolJoinVO;
-import com.cloud.api.query.vo.StorageTagVO;
 import com.cloud.api.query.vo.TemplateJoinVO;
 import com.cloud.api.query.vo.UserAccountJoinVO;
 import com.cloud.api.query.vo.UserVmJoinVO;
@@ -124,6 +128,7 @@ import com.cloud.capacity.dao.CapacityDaoImpl.SummedCapacity;
 import com.cloud.configuration.Config;
 import com.cloud.configuration.ConfigurationManager;
 import com.cloud.configuration.ConfigurationService;
+import com.cloud.configuration.Resource;
 import com.cloud.configuration.Resource.ResourceType;
 import com.cloud.dc.AccountVlanMapVO;
 import com.cloud.dc.ClusterDetailsDao;
@@ -139,6 +144,7 @@ import com.cloud.dc.dao.ClusterDao;
 import com.cloud.dc.dao.DataCenterDao;
 import com.cloud.dc.dao.HostPodDao;
 import com.cloud.dc.dao.VlanDao;
+import com.cloud.domain.Domain;
 import com.cloud.domain.DomainVO;
 import com.cloud.domain.dao.DomainDao;
 import com.cloud.event.Event;
@@ -256,17 +262,20 @@ import com.cloud.storage.Storage.ImageFormat;
 import com.cloud.storage.Storage.StoragePoolType;
 import com.cloud.storage.StorageManager;
 import com.cloud.storage.StoragePool;
+import com.cloud.storage.StoragePoolTagVO;
 import com.cloud.storage.StorageStats;
 import com.cloud.storage.UploadVO;
 import com.cloud.storage.VMTemplateVO;
 import com.cloud.storage.Volume;
 import com.cloud.storage.Volume.Type;
+import com.cloud.storage.VolumeStats;
 import com.cloud.storage.VolumeVO;
 import com.cloud.storage.dao.DiskOfferingDao;
 import com.cloud.storage.dao.GuestOSCategoryDao;
 import com.cloud.storage.dao.GuestOSDao;
 import com.cloud.storage.dao.SnapshotDao;
 import com.cloud.storage.dao.SnapshotPolicyDao;
+import com.cloud.storage.dao.StoragePoolTagsDao;
 import com.cloud.storage.dao.UploadDao;
 import com.cloud.storage.dao.VMTemplateDao;
 import com.cloud.storage.dao.VMTemplateDetailsDao;
@@ -290,7 +299,6 @@ import com.cloud.user.dao.UserDao;
 import com.cloud.user.dao.UserStatisticsDao;
 import com.cloud.uservm.UserVm;
 import com.cloud.utils.EnumUtils;
-import com.cloud.utils.NumbersUtil;
 import com.cloud.utils.Pair;
 import com.cloud.vm.ConsoleProxyVO;
 import com.cloud.vm.DomainRouterVO;
@@ -312,6 +320,8 @@ import com.cloud.vm.dao.UserVmDetailsDao;
 import com.cloud.vm.dao.VMInstanceDao;
 import com.cloud.vm.snapshot.VMSnapshot;
 import com.cloud.vm.snapshot.dao.VMSnapshotDao;
+import com.cloud.user.AccountManager;
+import com.cloud.network.dao.FirewallRulesDcidrsDao;
 
 public class ApiDBUtils {
     private static ManagementServer s_ms;
@@ -335,6 +345,7 @@ public class ApiDBUtils {
     static DiskOfferingJoinDao s_diskOfferingJoinDao;
     static DataCenterJoinDao s_dcJoinDao;
     static DomainDao s_domainDao;
+    static DomainJoinDao s_domainJoinDao;
     static DomainRouterDao s_domainRouterDao;
     static DomainRouterJoinDao s_domainRouterJoinDao;
     static GuestOSDao s_guestOSDao;
@@ -374,6 +385,7 @@ public class ApiDBUtils {
     static ConfigurationDao s_configDao;
     static ConsoleProxyDao s_consoleProxyDao;
     static FirewallRulesCidrsDao s_firewallCidrsDao;
+    static FirewallRulesDcidrsDao s_firewallDcidrsDao;
     static VMInstanceDao s_vmDao;
     static ResourceLimitService s_resourceLimitMgr;
     static ProjectService s_projectMgr;
@@ -404,7 +416,7 @@ public class ApiDBUtils {
     static HostJoinDao s_hostJoinDao;
     static VolumeJoinDao s_volJoinDao;
     static StoragePoolJoinDao s_poolJoinDao;
-    static StorageTagDao s_tagDao;
+    static StoragePoolTagsDao s_tagDao;
     static HostTagDao s_hostTagDao;
     static ImageStoreJoinDao s_imageStoreJoinDao;
     static AccountJoinDao s_accountJoinDao;
@@ -429,6 +441,7 @@ public class ApiDBUtils {
     static AffinityGroupJoinDao s_affinityGroupJoinDao;
     static GlobalLoadBalancingRulesService s_gslbService;
     static NetworkACLDao s_networkACLDao;
+    static RoleService s_roleService;
     static AccountService s_accountService;
     static ResourceMetaDataService s_resourceDetailsService;
     static HostGpuGroupsDao s_hostGpuGroupsDao;
@@ -471,6 +484,8 @@ public class ApiDBUtils {
     private DiskOfferingJoinDao diskOfferingJoinDao;
     @Inject
     private DomainDao domainDao;
+    @Inject
+    private DomainJoinDao domainJoinDao;
     @Inject
     private DomainRouterDao domainRouterDao;
     @Inject
@@ -550,6 +565,8 @@ public class ApiDBUtils {
     @Inject
     private FirewallRulesCidrsDao firewallCidrsDao;
     @Inject
+    private FirewallRulesDcidrsDao firewalDcidrsDao;
+    @Inject
     private VMInstanceDao vmDao;
     @Inject
     private ResourceLimitService resourceLimitMgr;
@@ -609,7 +626,7 @@ public class ApiDBUtils {
     @Inject
     private StoragePoolJoinDao poolJoinDao;
     @Inject
-    private StorageTagDao tagDao;
+    private StoragePoolTagsDao tagDao;
     @Inject
     private HostTagDao hosttagDao;
     @Inject
@@ -658,6 +675,8 @@ public class ApiDBUtils {
     @Inject
     private NetworkACLDao networkACLDao;
     @Inject
+    private RoleService roleService;
+    @Inject
     private AccountService accountService;
     @Inject
     private ConfigurationManager configMgr;
@@ -690,6 +709,7 @@ public class ApiDBUtils {
         s_diskOfferingDao = diskOfferingDao;
         s_diskOfferingJoinDao = diskOfferingJoinDao;
         s_domainDao = domainDao;
+        s_domainJoinDao = domainJoinDao;
         s_domainRouterDao = domainRouterDao;
         s_domainRouterJoinDao = domainRouterJoinDao;
         s_guestOSDao = guestOSDao;
@@ -727,6 +747,7 @@ public class ApiDBUtils {
         s_configDao = configDao;
         s_consoleProxyDao = consoleProxyDao;
         s_firewallCidrsDao = firewallCidrsDao;
+        s_firewallDcidrsDao  = firewalDcidrsDao;
         s_vmDao = vmDao;
         s_resourceLimitMgr = resourceLimitMgr;
         s_projectMgr = projectMgr;
@@ -783,6 +804,7 @@ public class ApiDBUtils {
         // Note: stats collector should already have been initialized by this time, otherwise a null instance is returned
         s_statsCollector = StatsCollector.getInstance();
         s_networkACLDao = networkACLDao;
+        s_roleService = roleService;
         s_accountService = accountService;
         s_resourceDetailsService = resourceDetailsService;
         s_hostGpuGroupsDao = hostGpuGroupsDao;
@@ -794,7 +816,7 @@ public class ApiDBUtils {
     // ///////////////////////////////////////////////////////////
 
     public static VMInstanceVO findVMInstanceById(long vmId) {
-        return s_vmDao.findById(vmId);
+        return s_vmDao.findByIdIncludingRemoved(vmId);
     }
 
     public static long getStorageCapacitybyPool(Long poolId, short capacityType) {
@@ -831,6 +853,30 @@ public class ApiDBUtils {
     // Manager methods //
     // ///////////////////////////////////////////////////////////
 
+    public static long findCorrectResourceLimitForDomain(ResourceType type, long domainId) {
+        DomainVO domain = s_domainDao.findById(domainId);
+
+        if (domain == null) {
+            return -1;
+        }
+
+        return s_resourceLimitMgr.findCorrectResourceLimitForDomain(domain, type);
+    }
+
+    public static long findCorrectResourceLimitForDomain(Long limit, boolean isRootDomain, ResourceType type, long domainId) {
+        long max = Resource.RESOURCE_UNLIMITED; // if resource limit is not found, then we treat it as unlimited
+
+        // No limits for Root domain
+        if (isRootDomain) {
+            return max;
+        }
+        if (limit != null) {
+            return limit.longValue();
+        } else {
+            return findCorrectResourceLimitForDomain(type, domainId);
+        }
+    }
+
     public static long findCorrectResourceLimit(ResourceType type, long accountId) {
         AccountVO account = s_accountDao.findById(accountId);
 
@@ -843,6 +889,15 @@ public class ApiDBUtils {
 
     public static long findCorrectResourceLimit(Long limit, long accountId, ResourceType type) {
         return s_resourceLimitMgr.findCorrectResourceLimitForAccount(accountId, limit, type);
+    }
+
+    public static long findCorrectResourceLimitForDomain(Long limit, ResourceType resourceType, long domainId) {
+        //-- No limits for Root domain
+        if (domainId == Domain.ROOT_DOMAIN) {
+            return Resource.RESOURCE_UNLIMITED;
+        }
+        //--If limit doesn't have a value then fetch default limit from the configs
+        return (limit == null) ? s_resourceLimitMgr.findDefaultResourceLimitForDomain(resourceType) : limit;
     }
 
     public static long getResourceCount(ResourceType type, long accountId) {
@@ -866,6 +921,12 @@ public class ApiDBUtils {
     public static String getSnapshotIntervalTypes(long snapshotId) {
         SnapshotVO snapshot = s_snapshotDao.findById(snapshotId);
         return snapshot.getRecurringType().name();
+    }
+
+    public static String getSnapshotLocationType(long snapshotId) {
+        SnapshotVO snapshot = s_snapshotDao.findById(snapshotId);
+
+        return snapshot.getLocationType() != null ? snapshot.getLocationType().name() : null;
     }
 
     public static String getStoragePoolTags(long poolId) {
@@ -894,6 +955,10 @@ public class ApiDBUtils {
 
     public static VmStats getVmStatistics(long hostId) {
         return s_statsCollector.getVmStats(hostId);
+    }
+
+    public static VolumeStats getVolumeStatistics(String volumeUuid) {
+        return s_statsCollector.getVolumeStats(volumeUuid);
     }
 
     public static StorageStats getSecondaryStorageStatistics(long id) {
@@ -947,6 +1012,10 @@ public class ApiDBUtils {
 
     public static DomainVO findDomainById(Long domainId) {
         return s_domainDao.findByIdIncludingRemoved(domainId);
+    }
+
+    public static DomainJoinVO findDomainJoinVOById(Long domainId) {
+        return s_domainJoinDao.findByIdIncludingRemoved(domainId);
     }
 
     public static DomainVO findDomainByIdIncludingRemoved(Long domainId) {
@@ -1025,12 +1094,7 @@ public class ApiDBUtils {
     }
 
     public static Snapshot findSnapshotById(long snapshotId) {
-        SnapshotVO snapshot = s_snapshotDao.findById(snapshotId);
-        if (snapshot != null && snapshot.getRemoved() == null && snapshot.getState() == Snapshot.State.BackedUp) {
-            return snapshot;
-        } else {
-            return null;
-        }
+        return s_snapshotDao.findByIdIncludingRemoved(snapshotId);
     }
 
     public static StoragePoolVO findStoragePoolById(Long storagePoolId) {
@@ -1214,7 +1278,7 @@ public class ApiDBUtils {
     }
 
     public static NetworkVO findNetworkById(long id) {
-        return s_networkDao.findById(id);
+        return s_networkDao.findByIdIncludingRemoved(id);
     }
 
     public static Map<Service, Map<Capability, String>> getNetworkCapabilities(long networkId, long zoneId) {
@@ -1242,6 +1306,10 @@ public class ApiDBUtils {
         return s_configSvc.getVlanAccount(vlanId);
     }
 
+    public static Domain getVlanDomain(long vlanId) {
+        return s_configSvc.getVlanDomain(vlanId);
+    }
+
     public static boolean isSecurityGroupEnabledInZone(long zoneId) {
         DataCenterVO dc = s_zoneDao.findById(zoneId);
         if (dc == null) {
@@ -1255,10 +1323,14 @@ public class ApiDBUtils {
         return s_networkModel.getDedicatedNetworkDomain(networkId);
     }
 
-    public static float getCpuOverprovisioningFactor() {
-        String opFactor = s_configDao.getValue(CapacityManager.CpuOverprovisioningFactorCK);
-        float cpuOverprovisioningFactor = NumbersUtil.parseFloat(opFactor, 1);
-        return cpuOverprovisioningFactor;
+    public static float getCpuOverprovisioningFactor(long clusterId) {
+        float opFactor = CapacityManager.CpuOverprovisioningFactor.valueIn(clusterId);
+        return opFactor;
+    }
+
+    public static float getMemOverprovisioningFactor(long clusterId) {
+        float opFactor = CapacityManager.MemOverprovisioningFactor.valueIn(clusterId);
+        return opFactor;
     }
 
     public static boolean isExtractionDisabled() {
@@ -1277,6 +1349,10 @@ public class ApiDBUtils {
 
     public static List<String> findFirewallSourceCidrs(long id) {
         return s_firewallCidrsDao.getSourceCidrs(id);
+    }
+
+    public static List<String> findFirewallDestCidrs(long id){
+        return s_firewallDcidrsDao.getDestCidrs(id);
     }
 
     public static Account getProjectOwner(long projectId) {
@@ -1600,6 +1676,11 @@ public class ApiDBUtils {
             if (group != null) {
                 jobInstanceId = group.getUuid();
             }
+        } else if (jobInstanceType == ApiCommandJobType.Network) {
+            NetworkVO networkVO = ApiDBUtils.findNetworkById(job.getInstanceId());
+            if(networkVO != null) {
+                jobInstanceId = networkVO.getUuid();
+            }
         } else if (jobInstanceType != ApiCommandJobType.None) {
             // TODO : when we hit here, we need to add instanceType -> UUID
             // entity table mapping
@@ -1686,6 +1767,18 @@ public class ApiDBUtils {
 
     public static UserResponse newUserResponse(UserAccountJoinVO usr, Long domainId) {
         UserResponse response = s_userAccountJoinDao.newUserResponse(usr);
+        if(!AccountManager.UseSecretKeyInResponse.value()){
+            response.setSecretKey(null);
+        }
+        // Populate user account role information
+        if (usr.getAccountRoleId() != null) {
+            Role role = s_roleService.findRole( usr.getAccountRoleId());
+            if (role != null) {
+                response.setRoleId(role.getUuid());
+                response.setRoleType(role.getRoleType());
+                response.setRoleName(role.getName());
+            }
+        }
         if (domainId != null && usr.getDomainId() != domainId)
             response.setIsCallerChildDomain(true);
         else
@@ -1770,7 +1863,7 @@ public class ApiDBUtils {
         return s_poolJoinDao.newStoragePoolResponse(vr);
     }
 
-    public static StorageTagResponse newStorageTagResponse(StorageTagVO vr) {
+    public static StorageTagResponse newStorageTagResponse(StoragePoolTagVO vr) {
         return s_tagDao.newStorageTagResponse(vr);
     }
 
@@ -1806,9 +1899,22 @@ public class ApiDBUtils {
         return s_imageStoreJoinDao.newImageStoreView(vr);
     }
 
+    public static DomainResponse newDomainResponse(ResponseView view, EnumSet<DomainDetails> details, DomainJoinVO ve) {
+        return s_domainJoinDao.newDomainResponse(view, details, ve);
+    }
 
     public static AccountResponse newAccountResponse(ResponseView view, AccountJoinVO ve) {
-        return s_accountJoinDao.newAccountResponse(view, ve);
+        AccountResponse response = s_accountJoinDao.newAccountResponse(view, ve);
+        // Populate account role information
+        if (ve.getRoleId() != null) {
+            Role role = s_roleService.findRole(ve.getRoleId());
+            if (role != null) {
+                response.setRoleId(role.getUuid());
+                response.setRoleType(role.getRoleType());
+                response.setRoleName(role.getName());
+            }
+        }
+        return response;
     }
 
     public static AccountJoinVO newAccountView(Account e) {

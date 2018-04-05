@@ -105,6 +105,7 @@ public class VMInstanceUsageParser {
             }
 
             if (vmStartDate.after(endDate)) {
+                //Ignore records created after endDate
                 continue;
             }
 

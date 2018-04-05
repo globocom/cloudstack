@@ -19,7 +19,6 @@ package com.cloud.ha;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
@@ -39,7 +38,6 @@ import com.cloud.vm.UserVmVO;
 import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.dao.UserVmDao;
 
-@Local(value = {Investigator.class})
 public class UserVmDomRInvestigator extends AbstractInvestigatorImpl {
     private static final Logger s_logger = Logger.getLogger(UserVmDomRInvestigator.class);
 
@@ -53,12 +51,12 @@ public class UserVmDomRInvestigator extends AbstractInvestigatorImpl {
     private final VpcVirtualNetworkApplianceManager _vnaMgr = null;
 
     @Override
-    public Boolean isVmAlive(VirtualMachine vm, Host host) {
+    public boolean isVmAlive(VirtualMachine vm, Host host) throws UnknownVM {
         if (vm.getType() != VirtualMachine.Type.User) {
             if (s_logger.isDebugEnabled()) {
                 s_logger.debug("Not a User Vm, unable to determine state of " + vm + " returning null");
             }
-            return null;
+            throw new UnknownVM();
         }
 
         if (s_logger.isDebugEnabled()) {
@@ -70,7 +68,7 @@ public class UserVmDomRInvestigator extends AbstractInvestigatorImpl {
         List<? extends Nic> nics = _networkMgr.getNicsForTraffic(userVm.getId(), TrafficType.Guest);
 
         for (Nic nic : nics) {
-            if (nic.getIp4Address() == null) {
+            if (nic.getIPv4Address() == null) {
                 continue;
             }
 
@@ -100,7 +98,7 @@ public class UserVmDomRInvestigator extends AbstractInvestigatorImpl {
         if (s_logger.isDebugEnabled()) {
             s_logger.debug("Returning null since we're unable to determine state of " + vm);
         }
-        return null;
+        throw new UnknownVM();
     }
 
     @Override
@@ -154,7 +152,7 @@ public class UserVmDomRInvestigator extends AbstractInvestigatorImpl {
     }
 
     private Boolean testUserVM(VirtualMachine vm, Nic nic, VirtualRouter router) {
-        String privateIp = nic.getIp4Address();
+        String privateIp = nic.getIPv4Address();
         String routerPrivateIp = router.getPrivateIpAddress();
 
         List<Long> otherHosts = new ArrayList<Long>();

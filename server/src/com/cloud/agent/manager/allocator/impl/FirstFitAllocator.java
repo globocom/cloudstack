@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -32,6 +31,9 @@ import org.springframework.stereotype.Component;
 
 import com.cloud.agent.manager.allocator.HostAllocator;
 import com.cloud.capacity.CapacityManager;
+import com.cloud.capacity.CapacityVO;
+import com.cloud.capacity.dao.CapacityDao;
+import com.cloud.configuration.Config;
 import com.cloud.dc.ClusterDetailsDao;
 import com.cloud.dc.ClusterDetailsVO;
 import com.cloud.dc.dao.ClusterDao;
@@ -64,7 +66,6 @@ import com.cloud.vm.dao.VMInstanceDao;
  * An allocator that tries to find a fit on a computing host.  This allocator does not care whether or not the host supports routing.
  */
 @Component
-@Local(value = {HostAllocator.class})
 public class FirstFitAllocator extends AdapterBase implements HostAllocator {
     private static final Logger s_logger = Logger.getLogger(FirstFitAllocator.class);
     @Inject
@@ -89,6 +90,8 @@ public class FirstFitAllocator extends AdapterBase implements HostAllocator {
     ServiceOfferingDetailsDao _serviceOfferingDetailsDao;
     @Inject
     CapacityManager _capacityMgr;
+    @Inject
+    CapacityDao _capacityDao;
 
     boolean _checkHvm = true;
     protected String _allocationAlgorithm = "random";
@@ -192,6 +195,7 @@ public class FirstFitAllocator extends AdapterBase implements HostAllocator {
         VMTemplateVO template = (VMTemplateVO)vmProfile.getTemplate();
         Account account = vmProfile.getOwner();
         List<Host> suitableHosts = new ArrayList<Host>();
+        List<Host> hostsCopy = new ArrayList<Host>(hosts);
 
         if (type == Host.Type.Storage) {
             // FirstFitAllocator should be used for user VMs only since it won't care whether the host is capable of
@@ -206,23 +210,38 @@ public class FirstFitAllocator extends AdapterBase implements HostAllocator {
 
         String haVmTag = (String)vmProfile.getParameter(VirtualMachineProfile.Param.HaTag);
         if (haVmTag != null) {
-            hosts.retainAll(_hostDao.listByHostTag(type, clusterId, podId, dcId, haVmTag));
+            hostsCopy.retainAll(_hostDao.listByHostTag(type, clusterId, podId, dcId, haVmTag));
         } else {
             if (hostTagOnOffering == null && hostTagOnTemplate == null) {
-                hosts.retainAll(_resourceMgr.listAllUpAndEnabledNonHAHosts(type, clusterId, podId, dcId));
+                hostsCopy.retainAll(_resourceMgr.listAllUpAndEnabledNonHAHosts(type, clusterId, podId, dcId));
             } else {
                 if (hasSvcOfferingTag) {
-                    hosts.retainAll(_hostDao.listByHostTag(type, clusterId, podId, dcId, hostTagOnOffering));
+                    if (s_logger.isDebugEnabled()) {
+                        s_logger.debug("Looking for hosts having tag specified on SvcOffering:" + hostTagOnOffering);
+                    }
+                    hostsCopy.retainAll(_hostDao.listByHostTag(type, clusterId, podId, dcId, hostTagOnOffering));
+
+                    if (s_logger.isDebugEnabled()) {
+                        s_logger.debug("Hosts with tag '" + hostTagOnOffering + "' are:" + hostsCopy);
+                    }
                 }
 
                 if (hasTemplateTag) {
-                    hosts.retainAll(_hostDao.listByHostTag(type, clusterId, podId, dcId, hostTagOnTemplate));
+                    if (s_logger.isDebugEnabled()) {
+                        s_logger.debug("Looking for hosts having tag specified on Template:" + hostTagOnTemplate);
+                    }
+
+                    hostsCopy.retainAll(_hostDao.listByHostTag(type, clusterId, podId, dcId, hostTagOnTemplate));
+
+                    if (s_logger.isDebugEnabled()) {
+                        s_logger.debug("Hosts with tag '" + hostTagOnTemplate + "' are:" + hostsCopy);
+                    }
                 }
             }
         }
 
-        if (!hosts.isEmpty()) {
-            suitableHosts = allocateTo(plan, offering, template, avoid, hosts, returnUpTo, considerReservedCapacity, account);
+        if (!hostsCopy.isEmpty()) {
+            suitableHosts = allocateTo(plan, offering, template, avoid, hostsCopy, returnUpTo, considerReservedCapacity, account);
         }
 
         return suitableHosts;
@@ -235,6 +254,8 @@ public class FirstFitAllocator extends AdapterBase implements HostAllocator {
             Collections.shuffle(hosts);
         } else if (_allocationAlgorithm.equals("userdispersing")) {
             hosts = reorderHostsByNumberOfVms(plan, hosts, account);
+        }else if(_allocationAlgorithm.equals("firstfitleastconsumed")){
+            hosts = reorderHostsByCapacity(plan, hosts);
         }
 
         if (s_logger.isDebugEnabled()) {
@@ -274,6 +295,7 @@ public class FirstFitAllocator extends AdapterBase implements HostAllocator {
                     s_logger.debug("Host name: " + host.getName() + ", hostId: " + host.getId() +
                         " already has max Running VMs(count includes system VMs), skipping this and trying other available hosts");
                 }
+                avoid.addHost(host.getId());
                 continue;
             }
 
@@ -282,6 +304,7 @@ public class FirstFitAllocator extends AdapterBase implements HostAllocator {
                 ServiceOfferingDetailsVO groupName = _serviceOfferingDetailsDao.findDetail(serviceOfferingId, GPU.Keys.pciDevice.toString());
                 if(!_resourceMgr.isGPUDeviceAvailable(host.getId(), groupName.getValue(), offeringDetails.getValue())){
                     s_logger.info("Host name: " + host.getName() + ", hostId: "+ host.getId() +" does not have required GPU devices available");
+                    avoid.addHost(host.getId());
                     continue;
                 }
             }
@@ -316,6 +339,37 @@ public class FirstFitAllocator extends AdapterBase implements HostAllocator {
         }
 
         return suitableHosts;
+    }
+
+    // Reorder hosts in the decreasing order of free capacity.
+    private List<? extends Host> reorderHostsByCapacity(DeploymentPlan plan, List<? extends Host> hosts) {
+        Long clusterId = plan.getClusterId();
+        //Get capacity by which we should reorder
+        String capacityTypeToOrder = _configDao.getValue(Config.HostCapacityTypeToOrderClusters.key());
+        short capacityType = CapacityVO.CAPACITY_TYPE_CPU;
+        if("RAM".equalsIgnoreCase(capacityTypeToOrder)){
+            capacityType = CapacityVO.CAPACITY_TYPE_MEMORY;
+        }
+        List<Long> hostIdsByFreeCapacity = _capacityDao.orderHostsByFreeCapacity(clusterId, capacityType);
+        if (s_logger.isDebugEnabled()) {
+            s_logger.debug("List of hosts in descending order of free capacity in the cluster: "+ hostIdsByFreeCapacity);
+        }
+
+        //now filter the given list of Hosts by this ordered list
+        Map<Long, Host> hostMap = new HashMap<Long, Host>();
+        for (Host host : hosts) {
+            hostMap.put(host.getId(), host);
+        }
+        List<Long> matchingHostIds = new ArrayList<Long>(hostMap.keySet());
+
+        hostIdsByFreeCapacity.retainAll(matchingHostIds);
+
+        List<Host> reorderedHosts = new ArrayList<Host>();
+        for(Long id: hostIdsByFreeCapacity){
+            reorderedHosts.add(hostMap.get(id));
+        }
+
+        return reorderedHosts;
     }
 
     private List<? extends Host> reorderHostsByNumberOfVms(DeploymentPlan plan, List<? extends Host> hosts, Account account) {

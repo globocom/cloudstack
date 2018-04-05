@@ -38,6 +38,7 @@ import org.apache.cloudstack.engine.subsystem.api.storage.PrimaryDataStoreDriver
 import org.apache.cloudstack.engine.subsystem.api.storage.SnapshotInfo;
 import org.apache.cloudstack.engine.subsystem.api.storage.StorageAction;
 import org.apache.cloudstack.engine.subsystem.api.storage.TemplateDataFactory;
+import org.apache.cloudstack.engine.subsystem.api.storage.TemplateInfo;
 import org.apache.cloudstack.engine.subsystem.api.storage.VolumeInfo;
 import org.apache.cloudstack.framework.async.AsyncCompletionCallback;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
@@ -46,6 +47,7 @@ import org.apache.cloudstack.storage.command.CopyCmdAnswer;
 import org.apache.cloudstack.storage.command.CopyCommand;
 import org.apache.cloudstack.storage.command.CreateObjectCommand;
 import org.apache.cloudstack.storage.command.DeleteCommand;
+import org.apache.cloudstack.storage.command.RevertSnapshotCommand;
 import org.apache.cloudstack.storage.datastore.db.PrimaryDataStoreDao;
 import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
 import org.apache.cloudstack.storage.to.SnapshotObjectTO;
@@ -69,7 +71,6 @@ import com.cloud.storage.ResizeVolumePayload;
 import com.cloud.storage.Storage;
 import com.cloud.storage.StorageManager;
 import com.cloud.storage.StoragePool;
-import com.cloud.storage.Volume;
 import com.cloud.storage.dao.DiskOfferingDao;
 import com.cloud.storage.dao.SnapshotDao;
 import com.cloud.storage.dao.VMTemplateDao;
@@ -144,17 +145,17 @@ public class CloudStackPrimaryDataStoreDriverImpl implements PrimaryDataStoreDri
     }
 
     @Override
-    public ChapInfo getChapInfo(VolumeInfo volumeInfo) {
+    public ChapInfo getChapInfo(DataObject dataObject) {
         return null;
     }
 
     @Override
-    public boolean connectVolumeToHost(VolumeInfo volumeInfo, Host host, DataStore dataStore) {
+    public boolean grantAccess(DataObject dataObject, Host host, DataStore dataStore) {
         return false;
     }
 
     @Override
-    public void disconnectVolumeFromHost(VolumeInfo volumeInfo, Host host, DataStore dataStore) {
+    public void revokeAccess(DataObject dataObject, Host host, DataStore dataStore) {
     }
 
     @Override
@@ -163,8 +164,18 @@ public class CloudStackPrimaryDataStoreDriverImpl implements PrimaryDataStoreDri
     }
 
     @Override
-    public long getVolumeSizeIncludingHypervisorSnapshotReserve(Volume volume, StoragePool pool) {
-        return volume.getSize();
+    public long getUsedIops(StoragePool storagePool) {
+        return 0;
+    }
+
+    @Override
+    public long getDataObjectSizeIncludingHypervisorSnapshotReserve(DataObject dataObject, StoragePool pool) {
+        return dataObject.getSize();
+    }
+
+    @Override
+    public long getBytesRequiredForTemplate(TemplateInfo templateInfo, StoragePool storagePool) {
+        return 0;
     }
 
     @Override
@@ -318,7 +329,28 @@ public class CloudStackPrimaryDataStoreDriverImpl implements PrimaryDataStoreDri
     }
 
     @Override
-    public void revertSnapshot(SnapshotInfo snapshot, AsyncCompletionCallback<CommandResult> callback) {
+    public void revertSnapshot(SnapshotInfo snapshot, SnapshotInfo snapshotOnPrimaryStore, AsyncCompletionCallback<CommandResult> callback) {
+        SnapshotObjectTO snapshotTO = (SnapshotObjectTO)snapshot.getTO();
+        RevertSnapshotCommand cmd = new RevertSnapshotCommand(snapshotTO);
+
+        CommandResult result = new CommandResult();
+        try {
+            EndPoint ep = epSelector.select(snapshotOnPrimaryStore);
+            if ( ep == null ){
+                String errMsg = "No remote endpoint to send RevertSnapshotCommand, check if host or ssvm is down?";
+                s_logger.error(errMsg);
+                result.setResult(errMsg);
+            } else {
+                Answer answer = ep.sendMessage(cmd);
+                if (answer != null && !answer.getResult()) {
+                    result.setResult(answer.getDetails());
+                }
+            }
+        } catch (Exception ex) {
+            s_logger.debug("Unable to revert snapshot " + snapshot.getId(), ex);
+            result.setResult(ex.toString());
+        }
+        callback.complete(result);
     }
 
     @Override

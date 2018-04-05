@@ -234,17 +234,17 @@
                         }
                     }
                 }
-            },      
+            },
             baremetalRct: {
                 type: 'select',
-                title: 'Baremetal Rack Configuration',
+                title: 'label.baremetal.rack.configuration',
                 listView: {
                     id: 'baremetalRct',
-                    label: 'Baremetal Rack Configuration',
-                    fields: {   
-                    	id: {
-                    		label: 'label.id'
-                    	},
+                    label: 'label.baremetal.rack.configuration',
+                    fields: {
+                        id: {
+                            label: 'label.id'
+                        },
                         url: {
                             label: 'label.url'
                         }
@@ -252,25 +252,25 @@
                     dataProvider: function(args) {
                         var data = {};
                         listViewDataProvider(args, data);
-                        
+
                         $.ajax({
-                        	url: createURL("listBaremetalRct"),
-                        	data: data,
-                        	success: function(json) {                        		
-                        		args.response.success({ data: json.listbaremetalrctresponse.baremetalrct });
-                        	}
-                        });   
+                            url: createURL("listBaremetalRct"),
+                            data: data,
+                            success: function(json) {
+                                args.response.success({ data: json.listbaremetalrctresponse.baremetalrct });
+                            }
+                        });
                     },
                     actions: {
                         add: {
-                            label: 'Add Baremetal Rack Configuration',
-                            messages: {                                
+                            label: 'label.add.baremetal.rack.configuration',
+                            messages: {
                                 notification: function(args) {
-                                    return 'Add Baremetal Rack Configuration';
+                                    return 'label.add.baremetal.rack.configuration';
                                 }
                             },
                             createForm: {
-                                title: 'Add Baremetal Rack Configuration',
+                                title: 'label.add.baremetal.rack.configuration',
                                 fields: {
                                     url: {
                                         label: 'label.url',
@@ -280,45 +280,45 @@
                                     }
                                 }
                             },
-                            action: function(args) {                                
+                            action: function(args) {
                                 $.ajax({
-                                	url: createURL("addBaremetalRct"),
-                                	data: {
-                                		baremetalrcturl: args.data.url
-                                	},
-                                	success: function(json) {                                		
-                                		var jid = json.addbaremetalrctresponse.jobid
-                                		args.response.success({
+                                    url: createURL("addBaremetalRct"),
+                                    data: {
+                                        baremetalrcturl: args.data.url
+                                    },
+                                    success: function(json) {
+                                        var jid = json.addbaremetalrctresponse.jobid
+                                        args.response.success({
                                             _custom: {
                                                 jobId: jid,
-                                                getUpdatedItem: function(json) {                                                	
+                                                getUpdatedItem: function(json) {
                                                     return json.queryasyncjobresultresponse.jobresult.baremetalrct;
                                                 }
                                             }
                                         });
-                                	}
+                                    }
                                 });
                             },
                             notification: {
                                 poll: pollAsyncJobResult
                             }
                         }
-                    },                    
-                    
+                    },
+
                     detailView: {
-                    	name: "details",
-                    	actions: {
-                    		remove: {
-                                label: 'Delete Baremetal Rack Configuration',
+                        name: "details",
+                        actions: {
+                            remove: {
+                                label: 'label.delete.baremetal.rack.configuration',
                                 messages: {
                                     confirm: function(args) {
-                                        return 'Please confirm that you want to delete Baremetal Rack Configuration.';
+                                        return 'message.confirm.delete.baremetal.rack.configuration';
                                     },
                                     notification: function(args) {
-                                        return 'Delete Baremetal Rack Configuration';
+                                        return 'label.delete.baremetal.rack.configuration';
                                     }
                                 },
-                                action: function(args) {                                	
+                                action: function(args) {
                                     var data = {
                                         id: args.context.baremetalRct[0].id
                                     };
@@ -326,12 +326,12 @@
                                         url: createURL('deleteBaremetalRct'),
                                         data: data,
                                         success: function(json) {
-                                        	var jid = json.deletebaremetalrctresponse.jobid;                                        	                                   	
+                                            var jid = json.deletebaremetalrctresponse.jobid;
                                             args.response.success({
                                                 _custom: {
                                                     jobId: jid
                                                 }
-                                            });                                        	
+                                            });
                                         }
                                     });
                                 },
@@ -339,35 +339,35 @@
                                     poll: pollAsyncJobResult
                                 }
                             }
-                    	},                    	
-                    	tabs: {
+                        },
+                        tabs: {
                             details: {
                                 title: 'label.details',
                                 fields: [{
-                                	id: {
-                                		label: 'label.id'
-                                	},
+                                    id: {
+                                        label: 'label.id'
+                                    },
                                     url: {
                                         label: 'label.url'
                                     }
                                 }],
-                                dataProvider: function(args) {                                	
+                                dataProvider: function(args) {
                                     var data = {
                                         id: args.context.baremetalRct[0].id
-                                    };                                    
+                                    };
                                     $.ajax({
-                                    	url: createURL("listBaremetalRct"),
-                                    	data: data,
-                                    	success: function(json) {                                         		
-                                    		args.response.success({ data: json.listbaremetalrctresponse.baremetalrct[0] });
-                                    	}
-                                    });                                       
+                                        url: createURL("listBaremetalRct"),
+                                        data: data,
+                                        success: function(json) {
+                                            args.response.success({ data: json.listbaremetalrctresponse.baremetalrct[0] });
+                                        }
+                                    });
                                 }
                             }
-                        }                    	
-                    }                    
+                        }
+                    }
                 }
-            },        
+            },
             hypervisorCapabilities: {
                 type: 'select',
                 title: 'label.hypervisor.capabilities',

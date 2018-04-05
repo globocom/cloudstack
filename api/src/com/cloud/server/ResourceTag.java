@@ -38,6 +38,7 @@ public interface ResourceTag extends ControlledEntity, Identity, InternalIdentit
         SecurityGroupRule(true, false),
         PublicIpAddress(true, true),
         Project(true, false),
+        Account(true, false),
         Vpc(true, true),
         NetworkACL(true, true),
         StaticRoute(true, false),
@@ -57,7 +58,10 @@ public interface ResourceTag extends ControlledEntity, Identity, InternalIdentit
         AutoScaleVmGroup(true, true),
         LBStickinessPolicy(false, true),
         LBHealthCheckPolicy(false, true),
-        SnapshotPolicy(false, true);
+        SnapshotPolicy(false, true),
+        GuestOs(false, true),
+        NetworkOffering(false, true),
+        VpcOffering(true, false);
 
 
         ResourceObjectType(boolean resourceTagsSupport, boolean resourceMetadataSupport) {
@@ -91,6 +95,8 @@ public interface ResourceTag extends ControlledEntity, Identity, InternalIdentit
      * @return
      */
     long getResourceId();
+
+    void setResourceId(long resourceId);
 
     /**
      * @return

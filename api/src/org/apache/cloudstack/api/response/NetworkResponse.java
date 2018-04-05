@@ -229,6 +229,10 @@ public class NetworkResponse extends BaseResponse implements ControlledEntityRes
     @Param(description = "The name of the network guru that implements this network", since = "4.6")
     private String guruName;
 
+    @SerializedName(ApiConstants.EXTERNAL_ID)
+    @Param(description = "The external id of the network", since = "4.11")
+    private String externalId;
+
     public Boolean getDisplayNetwork() {
         return displayNetwork;
     }
@@ -436,5 +440,9 @@ public class NetworkResponse extends BaseResponse implements ControlledEntityRes
 
     public void setGuruName(String guruName) {
         this.guruName = guruName;
+    }
+
+    public void setExternalId(String externalId) {
+        this.externalId = externalId;
     }
 }

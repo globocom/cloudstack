@@ -16,8 +16,6 @@
 // under the License.
 package com.cloud.capacity;
 
-import org.apache.log4j.Logger;
-
 import com.cloud.agent.Listener;
 import com.cloud.agent.api.AgentControlAnswer;
 import com.cloud.agent.api.AgentControlCommand;
@@ -31,7 +29,6 @@ import com.cloud.host.Host;
 import com.cloud.host.Status;
 
 public class ComputeCapacityListener implements Listener {
-    private static final Logger s_logger = Logger.getLogger(ComputeCapacityListener.class);
     CapacityDao _capacityDao;
     CapacityManager _capacityMgr;
     float _cpuOverProvisioningFactor = 1.0f;
@@ -59,6 +56,10 @@ public class ComputeCapacityListener implements Listener {
     }
 
     @Override
+    public void processHostAdded(long hostId) {
+    }
+
+    @Override
     public void processConnect(Host server, StartupCommand startup, boolean forRebalance) throws ConnectionException {
         if (!(startup instanceof StartupRoutingCommand)) {
             return;
@@ -69,6 +70,14 @@ public class ComputeCapacityListener implements Listener {
     @Override
     public boolean processDisconnect(long agentId, Status state) {
         return false;
+    }
+
+    @Override
+    public void processHostAboutToBeRemoved(long hostId) {
+    }
+
+    @Override
+    public void processHostRemoved(long hostId, long clusterId) {
     }
 
     @Override

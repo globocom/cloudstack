@@ -18,7 +18,7 @@
 from marvin.codes import FAILED
 from marvin.cloudstackTestCase import cloudstackTestCase
 from marvin.lib.base import Account, VirtualMachine, ServiceOffering, Host, Cluster
-from marvin.lib.common import get_zone, get_domain, get_template
+from marvin.lib.common import get_zone, get_domain, get_test_template
 from marvin.lib.utils import cleanup_resources
 from nose.plugins.attrib import attr
 
@@ -36,14 +36,15 @@ class TestDeployVmWithVariedPlanners(cloudstackTestCase):
         # Get Zone, Domain and templates
         cls.domain = get_domain(cls.apiclient)
         cls.zone = get_zone(cls.apiclient, testClient.getZoneForTests())
-        cls.template = get_template(
+        cls.hypervisor = testClient.getHypervisorInfo()
+        cls.template = get_test_template(
             cls.apiclient,
             cls.zone.id,
-            cls.services["ostype"]
+            cls.hypervisor
         )
 
         if cls.template == FAILED:
-            assert false, "get_template() failed to return template with description %s" % cls.services["ostype"]
+            assert False, "get_test_template() failed to return template"
 
         cls.services["virtual_machine"]["zoneid"] = cls.zone.id
         cls.services["template"] = cls.template.id
@@ -67,7 +68,7 @@ class TestDeployVmWithVariedPlanners(cloudstackTestCase):
         #FIXME: How do we know that first fit actually happened?
         self.service_offering_firstfit = ServiceOffering.create(
             self.apiclient,
-            self.services["service_offerings"],
+            self.services["service_offerings"]["tiny"],
             deploymentplanner='FirstFitPlanner'
         )
 
@@ -110,7 +111,7 @@ class TestDeployVmWithVariedPlanners(cloudstackTestCase):
         """
         self.service_offering_userdispersing = ServiceOffering.create(
             self.apiclient,
-            self.services["service_offerings"],
+            self.services["service_offerings"]["tiny"],
             deploymentplanner='UserDispersingPlanner'
         )
 
@@ -169,7 +170,7 @@ class TestDeployVmWithVariedPlanners(cloudstackTestCase):
         """
         self.service_offering_userconcentrated = ServiceOffering.create(
             self.apiclient,
-            self.services["service_offerings"],
+            self.services["service_offerings"]["tiny"],
             deploymentplanner='UserConcentratedPodPlanner'
         )
 

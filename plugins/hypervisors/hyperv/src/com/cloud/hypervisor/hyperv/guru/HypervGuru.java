@@ -22,23 +22,22 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import com.cloud.agent.api.to.NicTO;
 import com.cloud.agent.api.to.VirtualMachineTO;
+import com.cloud.exception.InsufficientAddressCapacityException;
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
 import com.cloud.hypervisor.HypervisorGuru;
 import com.cloud.hypervisor.HypervisorGuruBase;
-import com.cloud.storage.GuestOSVO;
-import com.cloud.storage.dao.GuestOSDao;
-import com.cloud.exception.InsufficientAddressCapacityException;
 import com.cloud.hypervisor.hyperv.manager.HypervManager;
 import com.cloud.network.NetworkModel;
 import com.cloud.network.Networks.BroadcastDomainType;
 import com.cloud.network.Networks.TrafficType;
 import com.cloud.network.dao.NetworkDao;
 import com.cloud.network.dao.NetworkVO;
+import com.cloud.storage.GuestOSVO;
+import com.cloud.storage.dao.GuestOSDao;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.vm.NicProfile;
 import com.cloud.vm.VirtualMachine;
@@ -47,7 +46,6 @@ import com.cloud.vm.VirtualMachineProfile;
 /**
  * Implementation of Hypervisor guru for Hyper-V.
  **/
-@Local(value = HypervisorGuru.class)
 public class HypervGuru extends HypervisorGuruBase implements HypervisorGuru {
 
     @Inject
@@ -129,10 +127,10 @@ public class HypervGuru extends HypervisorGuruBase implements HypervisorGuru {
                     } catch (InsufficientAddressCapacityException e) {
                         throw new CloudRuntimeException("unable to allocate mac address on network: " + networkId);
                     }
-                    nicTo.setDns1(profile.getDns1());
-                    nicTo.setDns2(profile.getDns2());
-                    if (publicNicProfile != null && publicNicProfile.getGateway() != null) {
-                        nicTo.setGateway(publicNicProfile.getGateway());
+                    nicTo.setDns1(profile.getIPv4Dns1());
+                    nicTo.setDns2(profile.getIPv4Dns2());
+                    if (publicNicProfile != null && publicNicProfile.getIPv4Gateway() != null) {
+                        nicTo.setGateway(publicNicProfile.getIPv4Gateway());
                     } else {
                         nicTo.setGateway(network.getGateway());
                     }

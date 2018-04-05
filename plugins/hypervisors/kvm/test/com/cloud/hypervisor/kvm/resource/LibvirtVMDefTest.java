@@ -19,30 +19,75 @@
 
 package com.cloud.hypervisor.kvm.resource;
 
+import java.io.File;
+
 import junit.framework.TestCase;
+
+import com.cloud.hypervisor.kvm.resource.LibvirtVMDef.ChannelDef;
 import com.cloud.hypervisor.kvm.resource.LibvirtVMDef.DiskDef;
+import com.cloud.hypervisor.kvm.resource.LibvirtVMDef.SCSIDef;
 import com.cloud.utils.Pair;
 
 public class LibvirtVMDefTest extends TestCase {
 
     public void testInterfaceEtehrnet() {
         LibvirtVMDef.InterfaceDef ifDef = new LibvirtVMDef.InterfaceDef();
-        ifDef.defEthernet("targetDeviceName", "00:11:22:aa:bb:dd", LibvirtVMDef.InterfaceDef.nicModel.VIRTIO);
+        ifDef.defEthernet("targetDeviceName", "00:11:22:aa:bb:dd", LibvirtVMDef.InterfaceDef.NicModel.VIRTIO);
 
         String expected =
-            "<interface type='ethernet'>\n" + "<target dev='targetDeviceName'/>\n" + "<mac address='00:11:22:aa:bb:dd'/>\n" + "<model type='virtio'/>\n"
-                + "</interface>\n";
+            "<interface type='ethernet'>\n"
+                    + "<target dev='targetDeviceName'/>\n"
+                    + "<mac address='00:11:22:aa:bb:dd'/>\n"
+                    + "<model type='virtio'/>\n"
+                    + "<link state='up'/>\n"
+                    + "</interface>\n";
 
         assertEquals(expected, ifDef.toString());
     }
 
     public void testInterfaceDirectNet() {
         LibvirtVMDef.InterfaceDef ifDef = new LibvirtVMDef.InterfaceDef();
-        ifDef.defDirectNet("targetDeviceName", null, "00:11:22:aa:bb:dd", LibvirtVMDef.InterfaceDef.nicModel.VIRTIO, "private");
+        ifDef.defDirectNet("targetDeviceName", null, "00:11:22:aa:bb:dd", LibvirtVMDef.InterfaceDef.NicModel.VIRTIO, "private");
 
         String expected =
-            "<interface type='" + LibvirtVMDef.InterfaceDef.guestNetType.DIRECT + "'>\n" + "<source dev='targetDeviceName' mode='private'/>\n" +
-                "<mac address='00:11:22:aa:bb:dd'/>\n" + "<model type='virtio'/>\n" + "</interface>\n";
+            "<interface type='" + LibvirtVMDef.InterfaceDef.GuestNetType.DIRECT + "'>\n"
+                    + "<source dev='targetDeviceName' mode='private'/>\n"
+                    + "<mac address='00:11:22:aa:bb:dd'/>\n"
+                    + "<model type='virtio'/>\n"
+                    + "<link state='up'/>\n"
+                    + "</interface>\n";
+
+        assertEquals(expected, ifDef.toString());
+    }
+
+    public void testInterfaceBridgeSlot() {
+        LibvirtVMDef.InterfaceDef ifDef = new LibvirtVMDef.InterfaceDef();
+        ifDef.defBridgeNet("targetDeviceName", null, "00:11:22:aa:bb:dd", LibvirtVMDef.InterfaceDef.NicModel.VIRTIO);
+        ifDef.setSlot(16);
+
+        String expected =
+                "<interface type='" + LibvirtVMDef.InterfaceDef.GuestNetType.BRIDGE + "'>\n"
+                        + "<source bridge='targetDeviceName'/>\n"
+                        + "<mac address='00:11:22:aa:bb:dd'/>\n"
+                        + "<model type='virtio'/>\n"
+                        + "<link state='up'/>\n"
+                        + "<address type='pci' domain='0x0000' bus='0x00' slot='0x10' function='0x0'/>\n"
+                        + "</interface>\n";
+
+        assertEquals(expected, ifDef.toString());
+
+        ifDef.setLinkStateUp(false);
+        ifDef.setDevName("vnet11");
+
+        expected =
+                "<interface type='" + LibvirtVMDef.InterfaceDef.GuestNetType.BRIDGE + "'>\n"
+                        + "<source bridge='targetDeviceName'/>\n"
+                        + "<target dev='vnet11'/>\n"
+                        + "<mac address='00:11:22:aa:bb:dd'/>\n"
+                        + "<model type='virtio'/>\n"
+                        + "<link state='down'/>\n"
+                        + "<address type='pci' domain='0x0000' bus='0x00' slot='0x10' function='0x0'/>\n"
+                        + "</interface>\n";
 
         assertEquals(expected, ifDef.toString());
     }
@@ -72,9 +117,9 @@ public class LibvirtVMDefTest extends TestCase {
         String diskLabel = "vda";
 
         DiskDef disk = new DiskDef();
-        DiskDef.diskBus bus = DiskDef.diskBus.VIRTIO;
-        DiskDef.diskFmtType type = DiskDef.diskFmtType.QCOW2;
-        DiskDef.diskCacheMode cacheMode = DiskDef.diskCacheMode.WRITEBACK;
+        DiskDef.DiskBus bus = DiskDef.DiskBus.VIRTIO;
+        DiskDef.DiskFmtType type = DiskDef.DiskFmtType.QCOW2;
+        DiskDef.DiskCacheMode cacheMode = DiskDef.DiskCacheMode.WRITEBACK;
 
         disk.defFileBasedDisk(filePath, diskLabel, bus, type);
         disk.setCacheMode(cacheMode);
@@ -82,7 +127,7 @@ public class LibvirtVMDefTest extends TestCase {
         assertEquals(filePath, disk.getDiskPath());
         assertEquals(diskLabel, disk.getDiskLabel());
         assertEquals(bus, disk.getBusType());
-        assertEquals(DiskDef.deviceType.DISK, disk.getDeviceType());
+        assertEquals(DiskDef.DeviceType.DISK, disk.getDeviceType());
 
         String xmlDef = disk.toString();
         String expectedXml = "<disk  device='disk' type='file'>\n<driver name='qemu' type='" + type.toString() + "' cache='" + cacheMode.toString() + "' />\n" +
@@ -94,22 +139,74 @@ public class LibvirtVMDefTest extends TestCase {
     public void testHypervEnlightDef() {
         LibvirtVMDef.FeaturesDef featuresDef = new LibvirtVMDef.FeaturesDef();
         LibvirtVMDef.HyperVEnlightenmentFeatureDef hyperVEnlightenmentFeatureDef = new LibvirtVMDef.HyperVEnlightenmentFeatureDef();
-        hyperVEnlightenmentFeatureDef.setRelaxed(true);
+        hyperVEnlightenmentFeatureDef.setFeature("relaxed", true);
+        hyperVEnlightenmentFeatureDef.setFeature("vapic", true);
+        hyperVEnlightenmentFeatureDef.setFeature("spinlocks", true);
+        hyperVEnlightenmentFeatureDef.setRetries(8096);
         featuresDef.addHyperVFeature(hyperVEnlightenmentFeatureDef);
         String defs = featuresDef.toString();
         assertTrue(defs.contains("relaxed"));
+        assertTrue(defs.contains("vapic"));
+        assertTrue(defs.contains("spinlocks"));
 
         featuresDef = new LibvirtVMDef.FeaturesDef();
         featuresDef.addFeatures("pae");
         defs = featuresDef.toString();
         assertFalse(defs.contains("relaxed"));
-
+        assertFalse(defs.contains("vapic"));
+        assertFalse(defs.contains("spinlocks"));
         assertTrue("Windows Server 2008 R2".contains("Windows Server 2008"));
 
         Pair<Integer,Integer> hostOsVersion = new Pair<Integer,Integer>(6,5);
         assertTrue((hostOsVersion.first() == 6 && hostOsVersion.second() >= 5) || (hostOsVersion.first() >= 7));
         hostOsVersion = new Pair<Integer,Integer>(7,1);
         assertTrue((hostOsVersion.first() == 6 && hostOsVersion.second() >= 5) || (hostOsVersion.first() >= 7));
+    }
+
+    public void testRngDef() {
+        LibvirtVMDef.RngDef.RngBackendModel backendModel = LibvirtVMDef.RngDef.RngBackendModel.RANDOM;
+        String path = "/dev/random";
+        int period = 2000;
+        int bytes = 2048;
+
+        LibvirtVMDef.RngDef def = new LibvirtVMDef.RngDef(path, backendModel, bytes, period);
+        assertEquals(def.getPath(), path);
+        assertEquals(def.getRngBackendModel(), backendModel);
+        assertEquals(def.getRngModel(), LibvirtVMDef.RngDef.RngModel.VIRTIO);
+        assertEquals(def.getRngRateBytes(), bytes);
+        assertEquals(def.getRngRatePeriod(), period);
+    }
+
+    public void testChannelDef() {
+        ChannelDef.ChannelType type = ChannelDef.ChannelType.UNIX;
+        ChannelDef.ChannelState state = ChannelDef.ChannelState.CONNECTED;
+        String name = "v-136-VM.vport";
+        File path = new File("/var/lib/libvirt/qemu/" + name);
+
+        ChannelDef channelDef = new ChannelDef(name, type, state, path);
+
+        assertEquals(state, channelDef.getChannelState());
+        assertEquals(type, channelDef.getChannelType());
+        assertEquals(name, channelDef.getName());
+        assertEquals(path, channelDef.getPath());
+    }
+
+    public void testWatchDogDef() {
+        LibvirtVMDef.WatchDogDef.WatchDogModel model = LibvirtVMDef.WatchDogDef.WatchDogModel.I6300ESB;
+        LibvirtVMDef.WatchDogDef.WatchDogAction action = LibvirtVMDef.WatchDogDef.WatchDogAction.RESET;
+
+        LibvirtVMDef.WatchDogDef def = new LibvirtVMDef.WatchDogDef(action, model);
+        assertEquals(def.getModel(), model);
+        assertEquals(def.getAction(), action);
+    }
+
+    public void testSCSIDef() {
+        SCSIDef def = new SCSIDef();
+        String str = def.toString();
+        String expected = "<controller type='scsi' index='0' model='virtio-scsi'>\n" +
+                "<address type='pci' domain='0x0000' bus='0x00' slot='0x09' function='0x0'/>\n" +
+                "</controller>\n";
+        assertEquals(str, expected);
     }
 
 }

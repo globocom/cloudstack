@@ -46,6 +46,7 @@ import com.vmware.vim25.HostNetworkInfo;
 import com.vmware.vim25.HostNetworkPolicy;
 import com.vmware.vim25.HostNetworkSecurityPolicy;
 import com.vmware.vim25.HostNetworkTrafficShapingPolicy;
+import com.vmware.vim25.HostOpaqueNetworkInfo;
 import com.vmware.vim25.HostPortGroup;
 import com.vmware.vim25.HostPortGroupSpec;
 import com.vmware.vim25.HostRuntimeInfo;
@@ -62,7 +63,6 @@ import com.vmware.vim25.PropertySpec;
 import com.vmware.vim25.TraversalSpec;
 import com.vmware.vim25.VirtualMachineConfigSpec;
 import com.vmware.vim25.VirtualNicManagerNetConfig;
-
 import com.cloud.hypervisor.vmware.util.VmwareContext;
 import com.cloud.hypervisor.vmware.util.VmwareHelper;
 import com.cloud.utils.Pair;
@@ -141,6 +141,26 @@ public class HostMO extends BaseMO implements VmwareHypervisorHost {
         }
 
         return null;
+    }
+
+    @Override
+    public boolean isHAEnabled() throws Exception {
+        ManagedObjectReference morParent = getParentMor();
+        if (morParent.getType().equals("ClusterComputeResource")) {
+            ClusterMO clusterMo = new ClusterMO(_context, morParent);
+            return clusterMo.isHAEnabled();
+        }
+
+        return false;
+    }
+
+    @Override
+    public void setRestartPriorityForVM(VirtualMachineMO vmMo, String priority) throws Exception {
+        ManagedObjectReference morParent = getParentMor();
+        if (morParent.getType().equals("ClusterComputeResource")) {
+            ClusterMO clusterMo = new ClusterMO(_context, morParent);
+            clusterMo.setRestartPriorityForVM(vmMo, priority);
+        }
     }
 
     @Override
@@ -355,6 +375,23 @@ public class HostMO extends BaseMO implements VmwareHypervisorHost {
         }
 
         return null;
+    }
+
+    public boolean hasOpaqueNSXNetwork() throws Exception{
+        HostNetworkInfo netInfo = getHostNetworkInfo();
+        List<HostOpaqueNetworkInfo> opaqueNetworks = netInfo.getOpaqueNetwork();
+        if (opaqueNetworks != null){
+            for (HostOpaqueNetworkInfo opaqueNetwork : opaqueNetworks){
+                if (opaqueNetwork.getOpaqueNetworkId() != null && opaqueNetwork.getOpaqueNetworkId().equals("br-int")
+                        && opaqueNetwork.getOpaqueNetworkType() != null && opaqueNetwork.getOpaqueNetworkType().equals("nsx.network")){
+                    return true;
+                }
+            }
+            throw new Exception("NSX API VERSION >= 4.2 BUT br-int (nsx.network) NOT FOUND");
+        }
+        else {
+            throw new Exception("NSX API VERSION >= 4.2 BUT br-int (nsx.network) NOT FOUND");
+        }
     }
 
     public boolean hasPortGroup(HostVirtualSwitch vSwitch, String portGroupName) throws Exception {
@@ -734,16 +771,17 @@ public class HostMO extends BaseMO implements VmwareHypervisorHost {
 
     @Override
     public boolean createBlankVm(String vmName, String vmInternalCSName, int cpuCount, int cpuSpeedMHz, int cpuReservedMHz, boolean limitCpuUse, int memoryMB,
-            int memoryReserveMB, String guestOsIdentifier, ManagedObjectReference morDs, boolean snapshotDirToParent) throws Exception {
+            int memoryReserveMB, String guestOsIdentifier, ManagedObjectReference morDs, boolean snapshotDirToParent, Pair<String, String> controllerInfo, Boolean systemVm) throws Exception {
 
         if (s_logger.isTraceEnabled())
             s_logger.trace("vCenter API trace - createBlankVm(). target MOR: " + _mor.getValue() + ", vmName: " + vmName + ", cpuCount: " + cpuCount + ", cpuSpeedMhz: " +
                     cpuSpeedMHz + ", cpuReservedMHz: " + cpuReservedMHz + ", limitCpu: " + limitCpuUse + ", memoryMB: " + memoryMB + ", guestOS: " + guestOsIdentifier +
-                    ", datastore: " + morDs.getValue() + ", snapshotDirToParent: " + snapshotDirToParent);
+                    ", datastore: " + morDs.getValue() + ", snapshotDirToParent: " + snapshotDirToParent +
+                    ", controllerInfo:[" + controllerInfo.first() + "," + controllerInfo.second() + "], systemvm: " + systemVm);
 
         boolean result =
                 HypervisorHostHelper.createBlankVm(this, vmName, vmInternalCSName, cpuCount, cpuSpeedMHz, cpuReservedMHz, limitCpuUse, memoryMB, memoryReserveMB,
-                        guestOsIdentifier, morDs, snapshotDirToParent);
+                        guestOsIdentifier, morDs, snapshotDirToParent, controllerInfo, systemVm);
 
         if (s_logger.isTraceEnabled())
             s_logger.trace("vCenter API trace - createBlankVm() done");
@@ -908,13 +946,20 @@ public class HostMO extends BaseMO implements VmwareHypervisorHost {
 
         if (getHostType() == VmwareHostType.ESXi) {
             List<VirtualNicManagerNetConfig> netConfigs =
- _context.getVimClient().getDynamicProperty(_mor, "config.virtualNicManagerInfo.netConfig");
+                    _context.getVimClient().getDynamicProperty(_mor, "config.virtualNicManagerInfo.netConfig");
             assert (netConfigs != null);
 
+            String dvPortGroupKey;
+            String portGroup;
             for (VirtualNicManagerNetConfig netConfig : netConfigs) {
                 if (netConfig.getNicType().equals("management")) {
                     for (HostVirtualNic nic : netConfig.getCandidateVnic()) {
-                        if (nic.getPortgroup().equals(managementPortGroup)) {
+                        portGroup = nic.getPortgroup();
+                        if (portGroup == null || portGroup.isEmpty()) {
+                            dvPortGroupKey = nic.getSpec().getDistributedVirtualPort().getPortgroupKey();
+                            portGroup = getNetworkName(dvPortGroupKey);
+                        }
+                        if (portGroup.equalsIgnoreCase(managementPortGroup)) {
                             summary.setHostIp(nic.getSpec().getIp().getIpAddress());
                             summary.setHostNetmask(nic.getSpec().getIp().getSubnetMask());
                             summary.setHostMacAddress(nic.getSpec().getMac());
@@ -994,7 +1039,7 @@ public class HostMO extends BaseMO implements VmwareHypervisorHost {
     @Override
     public boolean isHyperHostConnected() throws Exception {
         HostRuntimeInfo runtimeInfo = (HostRuntimeInfo)_context.getVimClient().getDynamicProperty(_mor, "runtime");
-        return runtimeInfo.getConnectionState() == HostSystemConnectionState.CONNECTED;
+        return runtimeInfo != null && runtimeInfo.getConnectionState() == HostSystemConnectionState.CONNECTED;
     }
 
     public boolean revertToSnapshot(ManagedObjectReference morSnapshot) throws Exception {
@@ -1045,6 +1090,16 @@ public class HostMO extends BaseMO implements VmwareHypervisorHost {
         }
     }
 
+    @Override
+    public String getRecommendedDiskController(String guestOsId) throws Exception {
+        ManagedObjectReference morParent = getParentMor();
+        if (morParent.getType().equals("ClusterComputeResource")) {
+            ClusterMO clusterMo = new ClusterMO(_context, morParent);
+            return clusterMo.getRecommendedDiskController(guestOsId);
+        }
+        return null;
+    }
+
     public String getHostManagementIp(String managementPortGroup) throws Exception {
         HostNetworkInfo netInfo = getHostNetworkInfo();
 
@@ -1058,5 +1113,75 @@ public class HostMO extends BaseMO implements VmwareHypervisorHost {
         }
 
         return null;
+    }
+
+    public List<ManagedObjectReference> getHostNetworks() throws Exception {
+        return _context.getVimClient().getDynamicProperty(_mor, "network");
+    }
+
+    public String getNetworkName(String netMorVal) throws Exception {
+        String networkName = "";
+        List<ManagedObjectReference> hostNetworks = getHostNetworks();
+        for (ManagedObjectReference hostNetwork : hostNetworks) {
+            if (hostNetwork.getValue().equals(netMorVal)) {
+                networkName = _context.getVimClient().getDynamicProperty(hostNetwork, "name");
+                break;
+            }
+        }
+        return networkName;
+    }
+
+    public void createPortGroup(HostVirtualSwitch vSwitch, String portGroupName, Integer vlanId,
+            HostNetworkSecurityPolicy secPolicy, HostNetworkTrafficShapingPolicy shapingPolicy, long timeOutMs)
+            throws Exception {
+        assert (portGroupName != null);
+
+        // Prepare lock to avoid simultaneous execution of the synchronized block for
+        // duplicate port groups on the ESXi host it's being created on.
+        String hostPortGroup = _mor.getValue() + "-" + portGroupName;
+        synchronized (hostPortGroup.intern()) {
+            // Check if port group exists already
+            if (hasPortGroup(vSwitch, portGroupName)) {
+                if (s_logger.isDebugEnabled()) {
+                    s_logger.debug("Found port group " + portGroupName + " in vSwitch " + vSwitch.getName()
+                        + ". Not attempting to create port group as it already exists.");
+                }
+                return;
+            } else {
+                if (s_logger.isDebugEnabled()) {
+                    s_logger.debug("Port group " + portGroupName + " doesn't exist in vSwitch " + vSwitch.getName()
+                        + ". Attempting to create port group in this vSwitch.");
+                }
+            }
+            // Create port group if not exists already
+            createPortGroup(vSwitch, portGroupName, vlanId, secPolicy, shapingPolicy);
+
+            // Wait for port group to turn up ready on vCenter upto timeout of timeOutMs milli seconds
+            waitForPortGroup(portGroupName, timeOutMs);
+        }
+
+        if (s_logger.isDebugEnabled()) {
+            s_logger.debug("Successfully created port group " + portGroupName + " in vSwitch " + vSwitch.getName()
+                + " on host " + getHostName());
+        }
+    }
+
+    public ManagedObjectReference waitForPortGroup(String networkName, long timeOutMs) throws Exception {
+        ManagedObjectReference morNetwork = null;
+        // if portGroup is just created, getNetwork may fail to retrieve it, we
+        // need to retry
+        long startTick = System.currentTimeMillis();
+        while (System.currentTimeMillis() - startTick <= timeOutMs) {
+            morNetwork = getNetworkMor(networkName);
+            if (morNetwork != null) {
+                break;
+            }
+
+            if (s_logger.isInfoEnabled()) {
+                s_logger.info("Waiting for network " + networkName + " to be ready");
+            }
+            Thread.sleep(1000);
+        }
+        return morNetwork;
     }
 }

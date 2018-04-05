@@ -18,10 +18,10 @@ package com.cloud.ha;
 
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
+import org.apache.cloudstack.ha.HAManager;
 
 import com.cloud.agent.AgentManager;
 import com.cloud.agent.api.Answer;
@@ -41,7 +41,6 @@ import com.cloud.utils.component.AdapterBase;
 import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachine.PowerState;
 
-@Local(value=Investigator.class)
 public class SimulatorInvestigator extends AdapterBase implements Investigator {
     private final static Logger s_logger = Logger.getLogger(SimulatorInvestigator.class);
     @Inject
@@ -50,6 +49,8 @@ public class SimulatorInvestigator extends AdapterBase implements Investigator {
     ResourceManager _resourceMgr;
     @Inject
     MockConfigurationDao _mockConfigDao;
+    @Inject
+    private HAManager haManager;
 
     protected SimulatorInvestigator() {
     }
@@ -58,6 +59,10 @@ public class SimulatorInvestigator extends AdapterBase implements Investigator {
     public Status isAgentAlive(Host agent) {
         if (agent.getHypervisorType() != HypervisorType.Simulator) {
             return null;
+        }
+
+        if (haManager.isHAEligible(agent)) {
+            return haManager.getHostStatus(agent);
         }
 
         CheckOnHostCommand cmd = new CheckOnHostCommand(agent);
@@ -80,23 +85,26 @@ public class SimulatorInvestigator extends AdapterBase implements Investigator {
     }
 
     @Override
-    public Boolean isVmAlive(VirtualMachine vm, Host host) {
+    public boolean isVmAlive(VirtualMachine vm, Host host) throws UnknownVM {
+        if (haManager.isHAEligible(host)) {
+            return haManager.isVMAliveOnHost(host);
+        }
         CheckVirtualMachineCommand cmd = new CheckVirtualMachineCommand(vm.getInstanceName());
         try {
             Answer answer = _agentMgr.send(vm.getHostId(), cmd);
             if (!answer.getResult()) {
                 s_logger.debug("Unable to get vm state on " + vm.toString());
-                return null;
+                throw new UnknownVM();
             }
             CheckVirtualMachineAnswer cvmAnswer = (CheckVirtualMachineAnswer)answer;
             s_logger.debug("Agent responded with state " + cvmAnswer.getState().toString());
             return cvmAnswer.getState() == PowerState.PowerOn;
         } catch (AgentUnavailableException e) {
             s_logger.debug("Unable to reach the agent for " + vm.toString() + ": " + e.getMessage());
-            return null;
+            throw new UnknownVM();
         } catch (OperationTimedoutException e) {
             s_logger.debug("Operation timed out for " + vm.toString() + ": " + e.getMessage());
-            return null;
+            throw new UnknownVM();
         }
     }
 }

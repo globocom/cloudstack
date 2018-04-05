@@ -35,6 +35,7 @@ from marvin.lib.utils import (random_gen)
 from marvin.config.test_data import test_data
 from sys import exit
 import os
+import errno
 import pickle
 from time import sleep, strftime, localtime
 from optparse import OptionParser
@@ -65,18 +66,16 @@ class DeployDataCenters(object):
     def __persistDcConfig(self):
         try:
             if self.__logFolderPath:
-                dc_file_path = self.__logFolderPath + "/dc_entries.obj"
+                dc_file_path = os.path.join(self.__logFolderPath, "dc_entries.obj")
             else:
                 ts = strftime("%b_%d_%Y_%H_%M_%S", localtime())
                 dc_file_path = "dc_entries_" + str(ts) + ".obj"
+
             file_to_write = open(dc_file_path, 'w')
             if file_to_write:
                 pickle.dump(self.__cleanUp, file_to_write)
-                print "\n=== Data Center Settings are dumped to %s===" % \
-                      dc_file_path
-                self.__tcRunLogger.debug(
-                    "\n=== Data Center Settings are dumped to %s===" %
-                    dc_file_path)
+                print "\n=== Data Center Settings are dumped to %s===" % dc_file_path
+                self.__tcRunLogger.debug("\n=== Data Center Settings are dumped to %s===" % dc_file_path)
         except Exception as e:
             print "Exception Occurred  while persisting DC Settings: %s" % \
                   GetDetailExceptionInfo(e)
@@ -133,6 +132,12 @@ class DeployDataCenters(object):
                 hostcmd.username = host.username
                 hostcmd.zoneid = zoneId
                 hostcmd.hypervisor = hypervisor
+                if hostcmd.hypervisor.lower() == "baremetal":
+                    hostcmd.hostmac=host.hostmac
+                    hostcmd.cpunumber=host.cpunumber
+                    hostcmd.cpuspeed=host.cpuspeed
+                    hostcmd.memory=host.memory
+                    hostcmd.hosttags=host.hosttags
                 ret = self.__apiClient.addHost(hostcmd)
                 if ret:
                     self.__tcRunLogger.debug("=== Add Host Successful ===")
@@ -164,6 +169,25 @@ class DeployDataCenters(object):
             self.__tcRunLogger.exception("=== Adding VmWare DC Failed===")
             self.__cleanAndExit()
 
+    def addBaremetalRct(self, config):
+        networktype= config.zones[0].networktype
+        baremetalrcturl= config.zones[0].baremetalrcturl
+        if networktype is None or baremetalrcturl  is None:
+            return
+        if networktype.lower()=="advanced":
+
+            try:
+                brctcmd = addBaremetalRct.addBaremetalRctCmd()
+                brctcmd.baremetalrcturl=baremetalrcturl
+                ret = self.__apiClient.addBaremetalRct(brctcmd)
+                if ret.id:
+                    self.__tcRunLogger.debug("=== Adding Baremetal Rct file  Successful===")
+                    self.__addToCleanUp("BaremetalRct", ret.id)
+            except Exception as e:
+                print "Exception Occurred: %s" % GetDetailExceptionInfo(e)
+                self.__tcRunLogger.exception("=== Adding  Baremetal Rct file Failed===")
+                self.__cleanAndExit()
+
     def createClusters(self, clusters, zoneId, podId, vmwareDc=None):
         try:
             if clusters is None:
@@ -193,10 +217,12 @@ class DeployDataCenters(object):
                     self.addHosts(cluster.hosts, zoneId, podId, clusterId,
                                   cluster.hypervisor)
                 self.waitForHost(zoneId, clusterId)
-                self.createPrimaryStorages(cluster.primaryStorages,
-                                           zoneId,
-                                           podId,
-                                           clusterId)
+                if cluster.hypervisor.lower() != "baremetal":
+                    self.createPrimaryStorages(cluster.primaryStorages,
+                                               zoneId,
+                                               podId,
+                                               clusterId)
+
         except Exception as e:
             print "Exception Occurred %s" % GetDetailExceptionInfo(e)
             self.__tcRunLogger.exception("====Cluster %s Creation Failed"
@@ -229,8 +255,8 @@ class DeployDataCenters(object):
     def createPrimaryStorages(self,
                               primaryStorages,
                               zoneId,
-                              podId,
-                              clusterId):
+                              podId=None,
+                              clusterId=None):
         try:
             if primaryStorages is None:
                 return
@@ -240,11 +266,17 @@ class DeployDataCenters(object):
                     for key, value in vars(primary.details).iteritems():
                         primarycmd.details.append({ key: value})
                 primarycmd.name = primary.name
-                primarycmd.podid = podId
+
                 primarycmd.tags = primary.tags
                 primarycmd.url = primary.url
+                if primary.scope == 'zone' or clusterId is None:
+                    primarycmd.scope = 'zone'
+                    primarycmd.hypervisor = primary.hypervisor
+                else:
+                    primarycmd.podid = podId
+                    primarycmd.clusterid = clusterId
                 primarycmd.zoneid = zoneId
-                primarycmd.clusterid = clusterId
+
                 ret = self.__apiClient.createStoragePool(primarycmd)
                 if ret.id:
                     self.__tcRunLogger.debug(
@@ -423,6 +455,9 @@ class DeployDataCenters(object):
             phynet.zoneid = zoneid
             phynet.name = net.name
             phynet.isolationmethods = net.isolationmethods
+            if net.tags:
+                phynet.tags = net.tags
+
             phynetwrk = self.__apiClient.createPhysicalNetwork(phynet)
             if phynetwrk.id:
                 self.__tcRunLogger.\
@@ -528,7 +563,7 @@ class DeployDataCenters(object):
                     netprov.physicalnetworkid = phynetwrk.id
                     result = self.__apiClient.addNetworkServiceProvider(netprov)
                     self.enableProvider(result.id)
-                elif provider.name in ['Netscaler', 'JuniperSRX', 'F5BigIp']:
+                elif provider.name in ['Netscaler', 'JuniperSRX', 'F5BigIp', 'NiciraNvp', 'NuageVsp']:
                     netprov = addNetworkServiceProvider.\
                         addNetworkServiceProviderCmd()
                     netprov.name = provider.name
@@ -542,55 +577,82 @@ class DeployDataCenters(object):
                         self.__addToCleanUp(
                             "NetworkServiceProvider",
                             result.id)
-                    for device in provider.devices:
-                        if provider.name == 'Netscaler':
-                            dev = addNetscalerLoadBalancer.\
-                                addNetscalerLoadBalancerCmd()
-                            dev.username = device.username
-                            dev.password = device.password
-                            dev.networkdevicetype = device.networkdevicetype
-                            dev.url = configGenerator.getDeviceUrl(device)
-                            dev.physicalnetworkid = phynetwrk.id
-                            ret = self.__apiClient.addNetscalerLoadBalancer(
-                                dev)
-                            if ret.id:
+                    if provider.devices is not None:
+                        for device in provider.devices:
+                            if provider.name == 'Netscaler':
+                                dev = addNetscalerLoadBalancer.\
+                                    addNetscalerLoadBalancerCmd()
+                                dev.username = device.username
+                                dev.password = device.password
+                                dev.networkdevicetype = device.networkdevicetype
+                                dev.url = configGenerator.getDeviceUrl(device)
+                                dev.physicalnetworkid = phynetwrk.id
+                                ret = self.__apiClient.addNetscalerLoadBalancer(
+                                    dev)
+                                if ret.id:
+                                    self.__tcRunLogger.\
+                                        debug("==== AddNetScalerLB "
+                                              "Successful=====")
+                                    self.__addToCleanUp(
+                                        "NetscalerLoadBalancer",
+                                        ret.id)
+                            elif provider.name == 'JuniperSRX':
+                                dev = addSrxFirewall.addSrxFirewallCmd()
+                                dev.username = device.username
+                                dev.password = device.password
+                                dev.networkdevicetype = device.networkdevicetype
+                                dev.url = configGenerator.getDeviceUrl(device)
+                                dev.physicalnetworkid = phynetwrk.id
+                                ret = self.__apiClient.addSrxFirewall(dev)
+                                if ret.id:
+                                    self.__tcRunLogger.\
+                                        debug("==== AddSrx "
+                                              "Successful=====")
+                                    self.__addToCleanUp("SrxFirewall", ret.id)
+                            elif provider.name == 'F5BigIp':
+                                dev = addF5LoadBalancer.addF5LoadBalancerCmd()
+                                dev.username = device.username
+                                dev.password = device.password
+                                dev.networkdevicetype = device.networkdevicetype
+                                dev.url = configGenerator.getDeviceUrl(device)
+                                dev.physicalnetworkid = phynetwrk.id
+                                ret = self.__apiClient.addF5LoadBalancer(dev)
+                                if ret.id:
+                                    self.__tcRunLogger.\
+                                        debug("==== AddF5 "
+                                              "Successful=====")
+                                    self.__addToCleanUp("F5LoadBalancer", ret.id)
+                            elif provider.name == 'NiciraNvp':
+                                cmd =  addNiciraNvpDevice.addNiciraNvpDeviceCmd()
+                                cmd.hostname = device.hostname
+                                cmd.username = device.username
+                                cmd.password = device.password
+                                cmd.transportzoneuuid = device.transportzoneuuid
+                                cmd.physicalnetworkid = phynetwrk.id
+                                ret = self.__apiClient.addNiciraNvpDevice(cmd)
                                 self.__tcRunLogger.\
-                                    debug("==== AddNetScalerLB "
-                                          "Successful=====")
-                                self.__addToCleanUp(
-                                    "NetscalerLoadBalancer",
-                                    ret.id)
-                        elif provider.name == 'JuniperSRX':
-                            dev = addSrxFirewall.addSrxFirewallCmd()
-                            dev.username = device.username
-                            dev.password = device.password
-                            dev.networkdevicetype = device.networkdevicetype
-                            dev.url = configGenerator.getDeviceUrl(device)
-                            dev.physicalnetworkid = phynetwrk.id
-                            ret = self.__apiClient.addSrxFirewall(dev)
-                            if ret.id:
-                                self.__tcRunLogger.\
-                                    debug("==== AddSrx "
-                                          "Successful=====")
-                                self.__addToCleanUp("SrxFirewall", ret.id)
-                        elif provider.name == 'F5BigIp':
-                            dev = addF5LoadBalancer.addF5LoadBalancerCmd()
-                            dev.username = device.username
-                            dev.password = device.password
-                            dev.networkdevicetype = device.networkdevicetype
-                            dev.url = configGenerator.getDeviceUrl(device)
-                            dev.physicalnetworkid = phynetwrk.id
-                            ret = self.__apiClient.addF5LoadBalancer(dev)
-                            if ret.id:
-                                self.__tcRunLogger.\
-                                    debug("==== AddF5 "
-                                          "Successful=====")
-                                self.__addToCleanUp("F5LoadBalancer", ret.id)
-                        else:
-                            raise InvalidParameterException(
-                                "Device %s doesn't match "
-                                "any know provider "
-                                "type" % device)
+                                    debug("==== AddNiciraNvp Successful =====")
+                                self.__addToCleanUp("NiciraNvp", ret.id)
+                            elif provider.name == 'NuageVsp':
+                                dev = addNuageVspDevice.addNuageVspDeviceCmd()
+                                dev.hostname = device.hostname
+                                dev.port = device.port
+                                dev.username = device.username
+                                dev.password = device.password
+                                dev.retrycount = device.retrycount
+                                dev.retryinterval = device.retryinterval
+                                dev.physicalnetworkid = phynetwrk.id
+                                ret = self.__apiClient.addNuageVspDevice(dev)
+                                if ret.id:
+                                    self.__tcRunLogger.\
+                                        debug("==== addNuageVspDevice "
+                                              "Successful=====")
+                                    self.__addToCleanUp("addNuageVspDevice", ret.id)
+                            else:
+                                raise InvalidParameterException(
+                                    "Device %s doesn't match "
+                                    "any know provider "
+                                    "type" % device)
                     self.enableProvider(result.id)
         except Exception as e:
             print "Exception Occurred: %s" % GetDetailExceptionInfo(e)
@@ -779,6 +841,11 @@ class DeployDataCenters(object):
                 '''Note: Swift needs cache storage first'''
                 self.createCacheStorages(zone.cacheStorages, zoneId)
                 self.createSecondaryStorages(zone.secondaryStorages, zoneId)
+                #add zone wide primary storages if any
+                if zone.primaryStorages:
+                    self.createPrimaryStorages(zone.primaryStorages,
+                                               zoneId,
+                                               )
                 enabled = getattr(zone, 'enabled', 'True')
                 if enabled == 'True' or enabled is None:
                     self.enableZone(zoneId, "Enabled")
@@ -865,6 +932,12 @@ class DeployDataCenters(object):
             self.__persistDcConfig()
             print "\n====Deploy DC Successful====="
             self.__tcRunLogger.debug("\n====Deploy DC Successful====")
+            '''
+            Upload baremetalSwitch configuration(.rct) file if  enabled zone has baremetal isolated network.
+            '''
+            self.addBaremetalRct(self.__config)
+            self.__tcRunLogger.debug("\n==== AddbaremetalRct Successful====")
+
             return SUCCESS
         except Exception as e:
             print "\nException Occurred Under deploy :%s" % \
@@ -1036,38 +1109,46 @@ class DeleteDataCenters:
         finally:
             return ret
 
+def mkdirpath(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
 
 if __name__ == "__main__":
     '''
     @Desc : This module facilitates the following:
             1. Deploying DataCenter by using the input provided
             configuration.
-              EX: python deployDataCenter.py -i <inp-cfg-file>
+              EX: python deployDataCenter.py -i <inp-cfg-file> [-l <directory with logs and output data location>]
             2. Removes a created DataCenter by providing
             the input configuration file and data center settings file
               EX: python deployDataCenter.py -i <inp-cfg-file>
-              -r <dc_exported_entries>
+              -r <dc_exported_entries> [-l <directory with logs and output data location>] 
     '''
     parser = OptionParser()
-    parser.add_option("-i", "--input", action="store",
-                      default=None, dest="input",
-                      help="the path \
-                      where the json config file generated")
+    parser.add_option("-i", "--input", action="store", default=None, dest="input",
+                      help="The path where the json zones config file is located.")
 
-    parser.add_option("-r", "--remove", action="store",
-                      default=None, dest="remove",
-                      help="path to file\
-                      where the created dc entries are kept")
+    parser.add_option("-r", "--remove", action="store", default=None, dest="remove",
+                      help="The path to file where the created dc entries are kept.")
+
+    parser.add_option("-l", "--logdir", action="store", default=None, dest="logdir",
+                      help="The directory where result logs of running the script are stored:"
+                      "[dc_entries.obj, failed_plus_exceptions.txt, runinfo.txt]." +
+                      "Created automatically if doesn't exists.")
+
     (options, args) = parser.parse_args()
 
     '''
     Verify the input validity
     '''
     if options.input is None and options.remove is None:
-        print "\n==== For DeployDataCenter: Please Specify a " \
-              "Valid Input Configuration File===="
-        print "\n==== For DeleteDataCenters: Please Specify a " \
-              "Valid Input Configuration File and DC Settings===="
+        print "\n==== For DeployDataCenter: Please Specify a valid Input Configuration File===="
+        print "\n==== For DeleteDataCenters: Please Specify a valid Input Configuration File and DC Settings===="
         exit(1)
 
     '''
@@ -1087,8 +1168,10 @@ if __name__ == "__main__":
     cfg = configGenerator.getSetupConfig(options.input)
     log = cfg.logger
 
-    ret = log_obj.createLogs("DeployDataCenter",
-                             log)
+    if options.logdir != None:
+        mkdirpath(options.logdir)
+
+    ret = log_obj.createLogs("DeployDataCenter", log, options.logdir, options.logdir == None)
     if ret != FAILED:
         log_folder_path = log_obj.getLogFolderPath()
         tc_run_logger = log_obj.getLogger()
@@ -1122,7 +1205,7 @@ if __name__ == "__main__":
             print "\n===Deploy Failed==="
             tc_run_logger.debug("\n===Deploy Failed===");
             exit(1)
-            
+
 
     if options.remove and os.path.isfile(options.remove) and options.input:
         '''

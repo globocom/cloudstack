@@ -27,7 +27,7 @@ except ImportError:
         raise RuntimeError("python setuptools is required to build Marvin")
 
 
-VERSION = "4.5.2"
+VERSION = "4.11.0.0"
 
 setup(name="Marvin",
       version=VERSION,
@@ -50,8 +50,15 @@ setup(name="Marvin",
           "requests >= 2.2.1",
           "paramiko >= 1.13.0",
           "nose >= 1.3.3",
-          "ddt >= 0.4.0"
+          "ddt >= 0.4.0",
+          "pyvmomi >= 5.5.0",
+          "netaddr >= 0.7.14",
+          "dnspython",
+          "ipmisim >= 0.7"
       ],
+      extras_require={
+        "nuagevsp": ["libVSD", "PyYAML", "futures", "netaddr", "retries", "jpype1"]
+      },
       py_modules=['marvin.marvinPlugin'],
       zip_safe=False,
       entry_points={

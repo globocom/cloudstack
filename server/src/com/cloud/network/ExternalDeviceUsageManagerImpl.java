@@ -25,15 +25,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
-import org.apache.log4j.Logger;
-import org.springframework.stereotype.Component;
-
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 import org.apache.cloudstack.managed.context.ManagedContextRunnable;
+import org.apache.log4j.Logger;
+import org.springframework.stereotype.Component;
 
 import com.cloud.agent.AgentManager;
 import com.cloud.agent.api.ExternalNetworkResourceUsageAnswer;
@@ -45,6 +43,7 @@ import com.cloud.dc.dao.HostPodDao;
 import com.cloud.dc.dao.VlanDao;
 import com.cloud.host.Host;
 import com.cloud.host.HostVO;
+import com.cloud.host.Host.Type;
 import com.cloud.host.dao.HostDao;
 import com.cloud.host.dao.HostDetailsDao;
 import com.cloud.network.Networks.BroadcastDomainType;
@@ -70,6 +69,7 @@ import com.cloud.network.dao.PhysicalNetworkServiceProviderDao;
 import com.cloud.network.rules.LoadBalancerContainer.Scheme;
 import com.cloud.network.rules.PortForwardingRuleVO;
 import com.cloud.network.rules.dao.PortForwardingRulesDao;
+import com.cloud.offering.NetworkOffering;
 import com.cloud.offerings.dao.NetworkOfferingDao;
 import com.cloud.resource.ResourceManager;
 import com.cloud.user.AccountManager;
@@ -91,7 +91,6 @@ import com.cloud.vm.dao.DomainRouterDao;
 import com.cloud.vm.dao.NicDao;
 
 @Component
-@Local(value = {ExternalDeviceUsageManager.class})
 public class ExternalDeviceUsageManagerImpl extends ManagerBase implements ExternalDeviceUsageManager {
 
     String _name;
@@ -272,7 +271,7 @@ public class ExternalDeviceUsageManagerImpl extends ManagerBase implements Exter
 
                 if (mapping != null) {
                     NicVO nic = _nicDao.findById(mapping.getNicId());
-                    String loadBalancingIpAddress = nic.getIp4Address();
+                    String loadBalancingIpAddress = nic.getIPv4Address();
                     bytesSentAndReceived = lbAnswer.ipBytes.get(loadBalancingIpAddress);
 
                     if (bytesSentAndReceived != null) {
@@ -335,6 +334,21 @@ public class ExternalDeviceUsageManagerImpl extends ManagerBase implements Exter
         });
     }
 
+    public boolean isNccServiceProvider(Network network) {
+        NetworkOffering networkOffering = _networkOfferingDao.findById(network.getNetworkOfferingId());
+        if(null!= networkOffering && networkOffering.getServicePackage() != null ) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    public HostVO getNetScalerControlCenterForNetwork(Network guestConfig) {
+        long zoneId = guestConfig.getDataCenterId();
+        return _hostDao.findByTypeNameAndZoneId(zoneId, "NetscalerControlCenter", Type.NetScalerControlCenter);
+    }
+
     protected class ExternalDeviceNetworkUsageTask extends ManagedContextRunnable {
 
         public ExternalDeviceNetworkUsageTask() {
@@ -343,6 +357,15 @@ public class ExternalDeviceUsageManagerImpl extends ManagerBase implements Exter
 
         @Override
         protected void runInContext() {
+
+            // Check if there are any external devices
+            // Skip external device usage collection if none exist
+
+            if(_hostDao.listByType(Host.Type.ExternalFirewall).isEmpty() && _hostDao.listByType(Host.Type.ExternalLoadBalancer).isEmpty()){
+                s_logger.debug("External devices are not used. Skipping external device usage collection");
+                return;
+            }
+
             GlobalLock scanLock = GlobalLock.getInternLock("ExternalDeviceNetworkUsageManagerImpl");
             try {
                 if (scanLock.lock(20)) {
@@ -359,7 +382,7 @@ public class ExternalDeviceUsageManagerImpl extends ManagerBase implements Exter
             }
         }
 
-        private void runExternalDeviceNetworkUsageTask() {
+        protected void runExternalDeviceNetworkUsageTask() {
             s_logger.debug("External devices stats collector is running...");
 
             for (DataCenterVO zone : _dcDao.listAll()) {
@@ -394,10 +417,19 @@ public class ExternalDeviceUsageManagerImpl extends ManagerBase implements Exter
                             continue;
                         }
 
-                        ExternalFirewallDeviceVO fwDeviceVO = getExternalFirewallForNetwork(network);
                         ExternalLoadBalancerDeviceVO lbDeviceVO = getExternalLoadBalancerForNetwork(network);
-                        if (lbDeviceVO == null && fwDeviceVO == null) {
+                        HostVO externalNcc = null;
+                        boolean isNccNetwork = isNccServiceProvider(network);
+                        if(isNccNetwork) {
+                            externalNcc = getNetScalerControlCenterForNetwork(network);
+                        }
+                        ExternalFirewallDeviceVO fwDeviceVO = getExternalFirewallForNetwork(network);
+
+                        if (fwDeviceVO == null) {
                             continue;
+                        }
+                        if(externalNcc == null && lbDeviceVO == null) {
+                            return;
                         }
 
                         // Get network stats from the external firewall
@@ -434,13 +466,17 @@ public class ExternalDeviceUsageManagerImpl extends ManagerBase implements Exter
                         // Get network stats from the external load balancer
                         ExternalNetworkResourceUsageAnswer lbAnswer = null;
                         HostVO externalLoadBalancer = null;
-                        if (lbDeviceVO != null) {
-                            externalLoadBalancer = _hostDao.findById(lbDeviceVO.getHostId());
+                        if (lbDeviceVO != null || externalNcc != null) {
+                            if(isNccNetwork) {
+                                externalLoadBalancer = externalNcc;
+                            } else {
+                                externalLoadBalancer = _hostDao.findById(lbDeviceVO.getHostId());
+                            }
                             if (externalLoadBalancer != null) {
                                 Long lbDeviceId = new Long(externalLoadBalancer.getId());
                                 if (!lbDeviceUsageAnswerMap.containsKey(lbDeviceId)) {
                                     try {
-                                        ExternalNetworkResourceUsageCommand cmd = new ExternalNetworkResourceUsageCommand();
+                                        ExternalNetworkResourceUsageCommand cmd = new ExternalNetworkResourceUsageCommand(network.getId());
                                         lbAnswer = (ExternalNetworkResourceUsageAnswer)_agentMgr.easySend(externalLoadBalancer.getId(), cmd);
                                         if (lbAnswer == null || !lbAnswer.getResult()) {
                                             String details = (lbAnswer != null) ? lbAnswer.getDetails() : "details unavailable";
@@ -542,7 +578,7 @@ public class ExternalDeviceUsageManagerImpl extends ManagerBase implements Exter
 
                     if (mapping != null) {
                         NicVO nic = _nicDao.findById(mapping.getNicId());
-                        String loadBalancingIpAddress = nic.getIp4Address();
+                        String loadBalancingIpAddress = nic.getIPv4Address();
                         bytesSentAndReceived = answer.ipBytes.get(loadBalancingIpAddress);
 
                         if (bytesSentAndReceived != null) {

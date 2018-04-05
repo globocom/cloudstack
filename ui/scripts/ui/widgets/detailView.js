@@ -235,11 +235,11 @@
                                         }
 
                                         if (messages.complete) {
-                                        	if( messages.complete(args2.data) != null && messages.complete(args2.data).length > 0) {
-                                        		 cloudStack.dialog.notice({
+                                            if( messages.complete(args2.data) != null && messages.complete(args2.data).length > 0) {
+                                                 cloudStack.dialog.notice({
                                                      message: messages.complete(args2.data)
                                                  });
-                                        	} 
+                                            }
                                         }
                                         if (additional && additional.complete) additional.complete($.extend(true, args, {
                                             $detailView: $detailView
@@ -301,7 +301,7 @@
                     }),
 
                     // Window options
-                    'menubar=0,resizable=0,' + 'width=' + externalLinkAction.width + ',' + 'height=' + externalLinkAction.height
+                    'menubar=0,resizable=1,' + 'width=' + externalLinkAction.width + ',' + 'height=' + externalLinkAction.height
                 );
             } else {
                 notification.desc = messages.notification(messageArgs);
@@ -311,7 +311,7 @@
                     if (messages && messages.confirm) {
                         cloudStack.dialog.confirm({
                             message: messages.confirm(messageArgs),
-			    isWarning: messages.isWarning,
+                isWarning: messages.isWarning,
                             action: function() {
                                 performAction({
                                     id: id
@@ -387,48 +387,48 @@
                 }
             });
         },
-            
+
         destroy: function($detailView, args) {
             var tab = args.tabs[args.activeTab];
             var isMultiple = tab.multiple;
 
             uiActions.standard($detailView, args, {
                 noRefresh: true,
-                complete: function(args, args2) {                   	
-                	if ((!('id' in args2.data)) && ('toRemove' in args2.data) && (args2.data.toRemove == true)) {   
-	                    if (isMultiple && $detailView.is(':visible')) {
-	                        $detailView.find('.refresh').click(); // Reload tab
-	                    } else {
-	                        var $browser = $('#browser .container');
-	                        var $panel = $detailView.closest('.panel');
-	
-	                        if ($detailView.is(':visible')) {
-	                            $browser.cloudBrowser('selectPanel', {
-	                                panel: $panel.prev()
-	                            });
-	                        }
-	
-	                        if ($detailView.data("list-view-row") != null) {
-	                            var $row = $detailView.data('list-view-row');
-	                            var $tbody = $row.closest('tbody');
-	
-	                            $row.remove();
-	                            if (!$tbody.find('tr').size()) {
-	                                $("<tr>").addClass('empty').append(
-	                                    $("<td>").html(_l('label.no.data'))
-	                                ).appendTo($tbody);
-	                            }
-	                            $tbody.closest('table').dataTable('refresh');
-	                        }
-	                    }
-                	}  else {
-                		$detailView.find('.refresh').click(); // Reload tab
-                	}
+                complete: function(args, args2) {
+                    if ((!('id' in args2.data)) && ('toRemove' in args2.data) && (args2.data.toRemove == true)) {
+                        if (isMultiple && $detailView.is(':visible')) {
+                            $detailView.find('.refresh').click(); // Reload tab
+                        } else {
+                            var $browser = $('#browser .container');
+                            var $panel = $detailView.closest('.panel');
+
+                            if ($detailView.is(':visible')) {
+                                $browser.cloudBrowser('selectPanel', {
+                                    panel: $panel.prev()
+                                });
+                            }
+
+                            if ($detailView.data("list-view-row") != null) {
+                                var $row = $detailView.data('list-view-row');
+                                var $tbody = $row.closest('tbody');
+
+                                $row.remove();
+                                if (!$tbody.find('tr').size()) {
+                                    $("<tr>").addClass('empty').append(
+                                        $("<td>").html(_l('label.no.data'))
+                                    ).appendTo($tbody);
+                                }
+                                $tbody.closest('table').dataTable('refresh');
+                            }
+                        }
+                    }  else {
+                        $detailView.find('.refresh').click(); // Reload tab
+                    }
                 }
             });
         },
-       
-        
+
+
         /**
          * Convert editable fields to text boxes; clicking again saves data
          *
@@ -442,7 +442,7 @@
             if ($detailView.find('.button.done').size()) return false;
 
             // Convert value TDs
-            var $inputs = $detailView.find('input, select').filter(function() {
+            var $inputs = $detailView.find('input, select, textarea').filter(function() {
                 return !$(this).closest('.tagger').size() && !$(this).attr('type') == 'submit';
             });
             var action = args.actions[args.actionName];
@@ -507,10 +507,17 @@
                             $input.find('option:selected').html()
                         ));
                         $value.data('detail-view-selected-option', _s($input.find('option:selected').val()));
+                    } else if ($input.is('textarea')) {
+                        $value.html(_s(
+                            $input.val()
+                        ));
+                        $value.data('detail-view-editable-textarea', _s($input.find('option:selected').val()));
                     }
                 });
 
-                $token.html(_s(tags_value));
+                if ($token) {
+                    $token.html(_s(tags_value));
+                }
             };
 
             var removeEditForm = function() {
@@ -626,7 +633,7 @@
             };
 
             $editButton.click(function() {
-                var $inputs = $detailView.find('input, select').filter(function() {
+                var $inputs = $detailView.find('input, select, textarea').filter(function() {
                     return !$(this).closest('.tagger').size();
                 });
                 var $form = $detailView.find('form').filter(function() {
@@ -672,6 +679,7 @@
                 // Turn into form field
                 var selectData = $value.data('detail-view-editable-select');
                 var isBoolean = $value.data('detail-view-editable-boolean');
+                var textArea = $value.data('detail-view-editable-textarea');
                 var isTokenInput = $value.data('detail-view-is-token-input');
                 var data = !isBoolean ? cloudStack.sanitizeReverse($value.html()) : $value.data('detail-view-boolean-value');
                 var rules = $value.data('validation-rules') ? $value.data('validation-rules') : {};
@@ -760,6 +768,15 @@
                     $value.append($input);
                     token_value = data;
                     $value.data('value-token').dataProvider(selectArgs);
+                } else if (textArea) {
+                    // Text area
+                    $value.append(
+                        $('<textarea>').attr({
+                            name: name,
+                            value: data
+                        }).css({'min-height': '80px'}).data('original-value', data)
+                    );
+                    $value.css({'width': '100%', 'height': '100%'});
                 } else {
                     // Text input
                     $value.append(
@@ -1059,22 +1076,6 @@
                     isOddRow = true;
                 }
 
-                //???
-                /*
-				 if("pollAgainIfValueIsIn" in value) {
-				 if ((content in value.pollAgainIfValueIsIn) && (value.pollAgainFn != null)) {
-				 //poll again
-				 var intervalKey = setInterval(function() {
-				 var toClearInterval = value.pollAgainFn(context);
-				 if(toClearInterval == true) {
-				 clearInterval(intervalKey);
-				 $('.detail-view .toolbar .button.refresh').click();	 //click Refresh button to refresh detailView
-				 }
-				 }, 2000);
-				 }
-				 }
-				 */
-
                 $name.html(_l(value.label));
                 $value.html(_s(content));
                 $value.attr('title', _s(content));
@@ -1146,6 +1147,8 @@
                 } else if (value.isBoolean) {
                     $value.data('detail-view-editable-boolean', true);
                     $value.data('detail-view-boolean-value', content == 'Yes' ? true : false);
+                } else if (value.textArea) {
+                    $value.data('detail-view-editable-textarea', true);
                 } else {
                     $value.data('detail-view-is-password', value.isPassword);
                 }

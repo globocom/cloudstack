@@ -1,5 +1,6 @@
 package org.apache.cloudstack.globoconfig;
 
+import com.cloud.utils.db.DB;
 import com.cloud.utils.db.GenericDaoBase;
 import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
@@ -10,7 +11,6 @@ import java.sql.SQLException;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
-import javax.ejb.Local;
 import java.util.List;
 import java.util.Map;
 
@@ -18,7 +18,7 @@ import java.util.Map;
  * Created by sinval.neto on 7/15/16.
  */
 @Component
-@Local(value = {GloboResourceConfigurationDao.class})
+@DB()
 public class GloboResourceConfigurationDaoImpl extends GenericDaoBase<GloboResourceConfigurationVO, String> implements GloboResourceConfigurationDao {
     private static final Logger s_logger = Logger.getLogger(GloboResourceConfigurationDaoImpl.class);
 

@@ -27,19 +27,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import javax.ejb.Local;
 import javax.naming.ConfigurationException;
 
-import org.apache.cloudstack.framework.events.Event;
-import org.apache.cloudstack.framework.events.EventBus;
-import org.apache.cloudstack.framework.events.EventBusException;
-import org.apache.cloudstack.framework.events.EventSubscriber;
-import org.apache.cloudstack.framework.events.EventTopic;
-import org.apache.cloudstack.managed.context.ManagedContextRunnable;
+import com.cloud.utils.exception.CloudRuntimeException;
+import com.rabbitmq.client.BlockedListener;
 import org.apache.log4j.Logger;
 
-import com.cloud.utils.Ternary;
-import com.cloud.utils.component.ManagerBase;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.AlreadyClosedException;
 import com.rabbitmq.client.Channel;
@@ -51,7 +44,16 @@ import com.rabbitmq.client.MessageProperties;
 import com.rabbitmq.client.ShutdownListener;
 import com.rabbitmq.client.ShutdownSignalException;
 
-@Local(value = EventBus.class)
+import org.apache.cloudstack.framework.events.Event;
+import org.apache.cloudstack.framework.events.EventBus;
+import org.apache.cloudstack.framework.events.EventBusException;
+import org.apache.cloudstack.framework.events.EventSubscriber;
+import org.apache.cloudstack.framework.events.EventTopic;
+import org.apache.cloudstack.managed.context.ManagedContextRunnable;
+
+import com.cloud.utils.Ternary;
+import com.cloud.utils.component.ManagerBase;
+
 public class RabbitMQEventBus extends ManagerBase implements EventBus {
 
     // details of AMQP server
@@ -91,6 +93,7 @@ public class RabbitMQEventBus extends ManagerBase implements EventBus {
 
     private ExecutorService executorService;
     private static DisconnectHandler disconnectHandler;
+    private static BlockedConnectionHandler blockedConnectionHandler;
     private static final Logger s_logger = Logger.getLogger(RabbitMQEventBus.class);
 
     @Override
@@ -134,27 +137,28 @@ public class RabbitMQEventBus extends ManagerBase implements EventBus {
         s_subscribers = new ConcurrentHashMap<String, Ternary<String, Channel, EventSubscriber>>();
         executorService = Executors.newCachedThreadPool();
         disconnectHandler = new DisconnectHandler();
+        blockedConnectionHandler = new BlockedConnectionHandler();
 
         return true;
     }
 
-    public void setServer(String amqpHost) {
+    public static void setServer(String amqpHost) {
         RabbitMQEventBus.amqpHost = amqpHost;
     }
 
-    public void setUsername(String username) {
+    public static void setUsername(String username) {
         RabbitMQEventBus.username = username;
     }
 
-    public void setPassword(String password) {
+    public static void setPassword(String password) {
         RabbitMQEventBus.password = password;
     }
 
-    public void setPort(Integer port) {
+    public static void setPort(Integer port) {
         RabbitMQEventBus.port = port;
     }
 
-    public void setSecureProtocol(String protocol) {
+    public static void setSecureProtocol(String protocol) {
         RabbitMQEventBus.secureProtocol = protocol;
     }
 
@@ -163,11 +167,11 @@ public class RabbitMQEventBus extends ManagerBase implements EventBus {
         this.name = name;
     }
 
-    public void setExchange(String exchange) {
+    public static void setExchange(String exchange) {
         RabbitMQEventBus.amqpExchangeName = exchange;
     }
 
-    public void setRetryInterval(Integer retryInterval) {
+    public static void setRetryInterval(Integer retryInterval) {
         RabbitMQEventBus.retryInterval = retryInterval;
     }
 
@@ -378,10 +382,11 @@ public class RabbitMQEventBus extends ManagerBase implements EventBus {
             }
 
             if (useSsl != null && !useSsl.isEmpty() && useSsl.equalsIgnoreCase("true")) {
-                factory.useSslProtocol(this.secureProtocol);
+                factory.useSslProtocol(secureProtocol);
             }
             Connection connection = factory.newConnection();
             connection.addShutdownListener(disconnectHandler);
+            connection.addBlockedListener(blockedConnectionHandler);
             s_connection = connection;
             return s_connection;
         } catch (Exception e) {
@@ -505,6 +510,21 @@ public class RabbitMQEventBus extends ManagerBase implements EventBus {
         return true;
     }
 
+    //logic to deal with blocked connection. connections are blocked for example when the rabbitmq server is out of space. https://www.rabbitmq.com/connection-blocked.html
+    private class BlockedConnectionHandler implements BlockedListener {
+
+        @Override
+        public void handleBlocked(String reason) throws IOException {
+            s_logger.error("rabbitmq connection is blocked with reason: " + reason);
+            closeConnection();
+            throw new CloudRuntimeException("unblocking the parent thread as publishing to rabbitmq server is blocked with reason: " + reason);
+        }
+
+        @Override
+        public void handleUnblocked() throws IOException {
+            s_logger.info("rabbitmq connection in unblocked");
+        }
+    }
     // logic to deal with loss of connection to AMQP server
     private class DisconnectHandler implements ShutdownListener {
 

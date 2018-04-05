@@ -21,10 +21,10 @@
 
         // Domain tree
         treeView: {
-		overflowScroll: true,
+        overflowScroll: true,
             // Details
             detailView: {
-                name: 'Domain details',
+                name: 'label.domain.details',
                 viewAll: {
                     label: 'label.accounts',
                     path: 'accounts'
@@ -100,7 +100,7 @@
                             var domainObj;
 
                             var data = {
-                                id: args.context.domains[0].id                                
+                                id: args.context.domains[0].id
                             };
 
                             if (args.data.name != null) { //args.data.name == undefined means name field is not editable (when log in as normal user or domain admin)
@@ -108,22 +108,22 @@
                                     name: args.data.name
                                 });
                             }
-                            
+
                             if (args.data.networkdomain != null) { //args.data.networkdomain == undefined means networkdomain field is not editable (when log in as normal user or domain admin)
                                 $.extend(data, {
-                                	networkdomain: args.data.networkdomain
+                                    networkdomain: args.data.networkdomain
                                 });
                             }
-                           
-                            if('name' in data || 'networkdomain' in data)  {                            
-	                            $.ajax({
-	                                url: createURL("updateDomain"),
-	                                async: false,
-	                                data: data,
-	                                success: function(json) {
-	                                    domainObj = json.updatedomainresponse.domain;
-	                                }
-	                            });
+
+                            if('name' in data || 'networkdomain' in data)  {
+                                $.ajax({
+                                    url: createURL("updateDomain"),
+                                    async: false,
+                                    data: data,
+                                    success: function(json) {
+                                        domainObj = json.updatedomainresponse.domain;
+                                    }
+                                });
                             }
 
                             if (args.data.vmLimit != null) {
@@ -269,6 +269,12 @@
                                 });
                             }
 
+                            if (args.data.domainid != null && args.data.domainid.length > 0) {
+                                $.extend(data, {
+                                    domainid: args.data.domainid
+                                });
+                            }
+
                             $.ajax({
                                 url: createURL('createDomain'),
                                 data: data,
@@ -308,9 +314,119 @@
                                     validation: {
                                         required: false
                                     }
-                                }
+                                },
+                                domainid: {
+                                    label: 'label.domain.id',
+                                    docID: 'helpDomainId',
+                                    validation: {
+                                        required: false
+                                        }
+                                    }
                             }
                         }
+                    },
+
+                    linktoldap: {
+                            label: 'label.link.domain.to.ldap',
+
+                            action: function(args) {
+                                var data = {
+                                    domainid: args.context.domains[0].id,
+                                    type: args.data.type,
+                                    name: args.data.name,
+                                    accounttype: args.data.accounttype
+                                };
+
+                                if (args.data.admin != null && args.data.admin.length > 0) {
+                                    $.extend(data, {
+                                        admin: args.data.admin
+                                    });
+                                }
+
+                                $.ajax({
+                                    url: createURL('linkDomainToLdap'),
+                                    data: data,
+                                    success: function(json) {
+                                        var item = json.linkdomaintoldapresponse.LinkDomainToLdap.domainid;
+                                        args.response.success({
+                                            data: item
+                                        });
+                                    },
+                                    error: function(XMLHttpResponse) {
+                                        var errorMsg = parseXMLHttpResponse(XMLHttpResponse);
+                                        args.response.error(errorMsg);
+                                    }
+                                });
+                            },
+
+                            messages: {
+                                notification: function(args) {
+                                    return 'label.link.domain.to.ldap';
+                                }
+                            },
+
+                            createForm: {
+                                title: 'label.link.domain.to.ldap',
+                                desc: 'message.link.domain.to.ldap',
+                                fields: {
+                                    type: {
+                                        label: 'label.ldap.link.type',
+                                        docID: 'helpLdapGroupType',
+                                        validation: {
+                                            required: true
+                                        },
+                                        select: function(args) {
+                                             var items = [];
+                                             items.push({
+                                                 id: "GROUP",
+                                                 description: "GROUP"
+                                             }); //regular-user
+                                             items.push({
+                                                 id: "OU",
+                                                 description: "OU"
+                                             }); //root-admin
+                                             args.response.success({
+                                                 data: items
+                                             });
+                                        }
+                                    },
+                                    name: {
+                                        label: 'label.name',
+                                        docID: 'helpLdapGroupName',
+                                        validation: {
+                                            required: true
+                                        }
+                                    },
+                                    accounttype: {
+                                        label: 'label.account.type',
+                                        docID: 'helpAccountType',
+                                        validation: {
+                                            required: true
+                                        },
+                                        select: function(args) {
+                                             var items = [];
+                                             items.push({
+                                                 id: 0,
+                                                 description: "Normal User"
+                                             }); //regular-user
+                                             items.push({
+                                                 id: 2,
+                                                 description: "Domain Admin"
+                                             }); //root-admin
+                                             args.response.success({
+                                                 data: items
+                                             });
+                                        }
+                                    },
+                                    admin: {
+                                        label: 'label.domain.admin',
+                                        docID: 'helpLdapLinkDomainAdmin',
+                                        validation: {
+                                            required: false
+                                        }
+                                    }
+                                }
+                            }
                     },
 
                     updateResourceCount: {
@@ -341,6 +457,15 @@
                         }
                     }
                 },
+
+                tabFilter: function(args) {
+                    var hiddenTabs = [];
+                    if(!isAdmin()) {
+                        hiddenTabs.push('settings');
+                    }
+                    return hiddenTabs;
+                },
+
                 tabs: {
                     details: {
                         title: 'label.details',
@@ -366,7 +491,7 @@
                             networkdomain: {
                                 label: 'label.network.domain',
                                 isEditable: function(args) {
-                                    if (isAdmin()) 
+                                    if (isAdmin())
                                         return true;
                                     else
                                         return false;
@@ -522,36 +647,6 @@
                             domainObj["vmTotal"] = totalVMs;
                             domainObj["volumeTotal"] = totalVolumes;
 
-                            /* $.ajax({
-                url: createURL("listVirtualMachines&details=min&domainid=" + domainObj.id),
-                async: false,
-                dataType: "json",
-                success: function(json) {
-                  var items = json.listvirtualmachinesresponse.virtualmachine;
-                  var total;
-                  if (items != null)
-                    total = items.length;
-                  else
-                    total = 0;
-                  domainObj["vmTotal"] = total;
-                }
-              });
-
-              $.ajax({
-                url: createURL("listVolumes&domainid=" + domainObj.id),
-                async: false,
-                dataType: "json",
-                success: function(json) {
-                  var items = json.listvolumesresponse.volume;
-                  var total;
-                  if (items != null)
-                    total = items.length;
-                  else
-                    total = 0;
-                  domainObj["volumeTotal"] = total;
-                }
-              });*/
-
                             $.ajax({
                                 url: createURL("listResourceLimits&domainid=" + domainObj.id),
                                 async: false,
@@ -606,7 +701,58 @@
                                 actionFilter: domainActionfilter
                             });
                         }
+                    },
+                    // Granular settings for domains
+                    settings: {
+                        title: 'label.settings',
+                        custom: cloudStack.uiCustom.granularSettings({
+                            dataProvider: function(args) {
+                                $.ajax({
+                                    url: createURL('listConfigurations&domainid=' + args.context.domains[0].id),
+                                    data: listViewDataProvider(args, {}, { searchBy: 'name' }),
+                                    success: function(json) {
+                                        args.response.success({
+                                            data: json.listconfigurationsresponse.configuration
+                                        });
+
+                                    },
+
+                                    error: function(json) {
+                                        args.response.error(parseXMLHttpResponse(json));
+
+                                    }
+                                });
+
+                            },
+                            actions: {
+                                edit: function(args) {
+                                    // call updateDomainLevelParameters
+                                    var data = {
+                                        name: args.data.jsonObj.name,
+                                        value: args.data.value
+                                    };
+
+                                    $.ajax({
+                                        url: createURL('updateConfiguration&domainid=' + args.context.domains[0].id),
+                                        data: data,
+                                        success: function(json) {
+                                            var item = json.updateconfigurationresponse.configuration;
+                                            args.response.success({
+                                                data: item
+                                            });
+                                        },
+
+                                        error: function(json) {
+                                            args.response.error(parseXMLHttpResponse(json));
+                                        }
+
+                                    });
+
+                                }
+                            }
+                        })
                     }
+
                 }
             },
             labelField: 'name',
@@ -619,6 +765,11 @@
                         async: false,
                         success: function(json) {
                             var domainObjs = json.listdomainsresponse.domain;
+                            if (domainObjs != null && domainObjs.length > 0) {
+                                domainObjs.sort(function(a, b) {
+                                    return a.name.localeCompare(b.name);
+                                });
+                            }
                             args.response.success({
                                 actionFilter: domainActionfilter,
                                 data: domainObjs
@@ -632,6 +783,11 @@
                         async: false,
                         success: function(json) {
                             var domainObjs = json.listdomainchildrenresponse.domain;
+                            if (domainObjs != null && domainObjs.length > 0) {
+                                domainObjs.sort(function(a, b) {
+                                    return a.name.localeCompare(b.name);
+                                });
+                            }
                             args.response.success({
                                 actionFilter: domainActionfilter,
                                 data: domainObjs
@@ -652,10 +808,15 @@
             if (jsonObj.level != 0) { //ROOT domain (whose level is 0) is not allowed to delete
                 allowedActions.push("delete");
             }
-        } else if (isDomainAdmin()) { 
-        	if (args.context.domains[0].id != g_domainid) { 
-        		allowedActions.push("edit"); //merge updateResourceLimit into edit
-        	}
+            if(isLdapEnabled()) {
+                allowedActions.push("linktoldap")
+            }
+        } else if (isDomainAdmin()) {
+            if (args.context.domains[0].id != g_domainid) {
+                allowedActions.push("edit"); //merge updateResourceLimit into edit
+                allowedActions.push("delete");
+            }
+            allowedActions.push("create");
         }
         allowedActions.push("updateResourceCount");
         return allowedActions;

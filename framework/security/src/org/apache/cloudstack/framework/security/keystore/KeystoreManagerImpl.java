@@ -28,9 +28,9 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
+import com.google.common.base.Strings;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -41,7 +41,6 @@ import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.security.CertificateHelper;
 
 @Component
-@Local(value = KeystoreManager.class)
 public class KeystoreManagerImpl extends ManagerBase implements KeystoreManager {
     private static final Logger s_logger = Logger.getLogger(KeystoreManagerImpl.class);
 
@@ -50,7 +49,7 @@ public class KeystoreManagerImpl extends ManagerBase implements KeystoreManager 
 
     @Override
     public boolean validateCertificate(String certificate, String key, String domainSuffix) {
-        if (certificate == null || certificate.isEmpty() || key == null || key.isEmpty() || domainSuffix == null || domainSuffix.isEmpty()) {
+        if (Strings.isNullOrEmpty(certificate) || Strings.isNullOrEmpty(key) || Strings.isNullOrEmpty(domainSuffix)) {
             s_logger.error("Invalid parameter found in (certificate, key, domainSuffix) tuple for domain: " + domainSuffix);
             return false;
         }

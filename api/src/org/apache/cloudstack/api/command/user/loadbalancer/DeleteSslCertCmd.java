@@ -34,10 +34,10 @@ import com.cloud.exception.InsufficientCapacityException;
 import com.cloud.exception.NetworkRuleConflictException;
 import com.cloud.exception.ResourceAllocationException;
 import com.cloud.exception.ResourceUnavailableException;
-import com.cloud.network.lb.CertService;
+import org.apache.cloudstack.network.tls.CertService;
 import com.cloud.utils.exception.CloudRuntimeException;
 
-@APICommand(name = "deleteSslCert", description = "Delete a certificate to cloudstack", responseObject = SuccessResponse.class,
+@APICommand(name = "deleteSslCert", description = "Delete a certificate to CloudStack", responseObject = SuccessResponse.class,
         requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
 public class DeleteSslCertCmd extends BaseCmd {
     public static final Logger s_logger = Logger.getLogger(DeleteSslCertCmd.class.getName());

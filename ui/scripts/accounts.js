@@ -17,14 +17,15 @@
 (function(cloudStack) {
 
     var domainObjs;
-    
+    var roleObjs;
+
     cloudStack.sections.accounts = {
         title: 'label.accounts',
         id: 'accounts',
         sectionSelect: {
             label: 'label.select-view',
             preFilter: function() {
-                return ['accounts'];
+                return ['accounts', 'sshkeypairs'];
             }
         },
         sections: {
@@ -38,11 +39,11 @@
                         name: {
                             label: 'label.name'
                         },
-                        accounttype: {
-                            label: 'label.role',
-                            converter: function(args) {
-                                return cloudStack.converters.toRole(args);
-                            }
+                        rolename: {
+                            label: 'label.role'
+                        },
+                        roletype: {
+                            label: 'label.roletype'
                         },
                         domain: {
                             label: 'label.domain'
@@ -91,9 +92,9 @@
                             }
 
                         },
-                                                
+
                         addLdapAccount: {
-                            label: 'label.add.LDAP.account',
+                            label: 'label.add.ldap.account',
                             isHeader: true,
                             preFilter: function(args) {
                                 //if (isAdmin() && true) { //for testing only
@@ -105,7 +106,7 @@
                             },
                             messages: {
                                 notification: function(args) {
-                                    return 'label.add.LDAP.account';
+                                    return 'label.add.ldap.account';
                                 }
                             },
                             notification: {
@@ -123,7 +124,7 @@
                                 )
                             }
 
-                        }                        
+                        }
                     },
 
                     dataProvider: function(args) {
@@ -134,6 +135,19 @@
                             $.extend(data, {
                                 domainid: args.context.domains[0].id
                             });
+                        }
+
+                        if ("routers" in args.context) {
+                            if ("account" in args.context.routers[0]) {
+                                $.extend(data, {
+                                    name: args.context.routers[0].account
+                                });
+                            }
+                            if ("domainid" in args.context.routers[0]) {
+                                $.extend(data, {
+                                    domainid: args.context.routers[0].domainid
+                                });
+                            }
                         }
 
                         $.ajax({
@@ -162,13 +176,13 @@
                                     }
                                 },
                                 error: function(xhr) {
-                                },
+                                }
                             });
                         }
                     },
 
                     detailView: {
-                        name: 'Account details',
+                        name: 'label.account.details',
                         isMaximized: true,
                         viewAll: {
                             path: 'accounts.users',
@@ -422,59 +436,59 @@
                                         data: data,
                                         async: true,
                                         success: function(json) {
-                                            var resourcecounts= json.updateresourcecountresponse.resourcecount;                                               
+                                            var resourcecounts= json.updateresourcecountresponse.resourcecount;
                                             //pop up API response in a dialog box since only updateResourceCount API returns resourcecount (listResourceLimits API does NOT return resourcecount)
                                             var msg = '';
                                             if (resourcecounts != null) {
-                                            	for (var i = 0; i < resourcecounts.length; i++) {                                            		
-                                            		switch (resourcecounts[i].resourcetype) {
-                                            		case '0':
-                                            			msg += 'Instance'; //vmLimit
-                                            			break;
-                                            		case '1':
-                                            			msg += 'Public IP'; //ipLimit
-                                            			break;
-                                            		case '2':
-                                            			msg += 'Volume'; //volumeLimit
-                                            			break;
-                                            		case '3':
-                                            		    msg += 'Snapshot'; //snapshotLimit
-                                            		    break;
-                                            		case '4':
-                                            			msg += 'Template'; //templateLimit
-                                            			break;
-                                            		case '5':                                            			
-                                            			continue; //resourcetype 5 is not in use. so, skip to next item.                                          			
-                                            			break;
-                                            		case '6':
-                                            			msg += 'Network'; //networkLimit
-                                            			break;
-                                            		case '7':
-                                            			msg += 'VPC'; //vpcLimit
-                                            			break;
-                                            		case '8':
-                                            			msg += 'CPU'; //cpuLimit
-                                            			break;
-                                            		case '9':
-                                            			msg += 'Memory'; //memoryLimit
-                                            			break;
-                                            		case '10':
-                                            			msg += 'Primary Storage'; //primaryStorageLimit
-                                            			break;
-                                            		case '11':
-                                            			msg += 'Secondary Storage'; //secondaryStorageLimit
-                                            			break;      
-                                            		}
-                                            		                                      		
-                                            		msg += ' Count: ' + resourcecounts[i].resourcecount + ' <br> ';
-                                            	}
+                                                for (var i = 0; i < resourcecounts.length; i++) {
+                                                    switch (resourcecounts[i].resourcetype) {
+                                                    case '0':
+                                                        msg += 'Instance'; //vmLimit
+                                                        break;
+                                                    case '1':
+                                                        msg += 'Public IP'; //ipLimit
+                                                        break;
+                                                    case '2':
+                                                        msg += 'Volume'; //volumeLimit
+                                                        break;
+                                                    case '3':
+                                                        msg += 'Snapshot'; //snapshotLimit
+                                                        break;
+                                                    case '4':
+                                                        msg += 'Template'; //templateLimit
+                                                        break;
+                                                    case '5':
+                                                        continue; //resourcetype 5 is not in use. so, skip to next item.
+                                                        break;
+                                                    case '6':
+                                                        msg += 'Network'; //networkLimit
+                                                        break;
+                                                    case '7':
+                                                        msg += 'VPC'; //vpcLimit
+                                                        break;
+                                                    case '8':
+                                                        msg += 'CPU'; //cpuLimit
+                                                        break;
+                                                    case '9':
+                                                        msg += 'Memory'; //memoryLimit
+                                                        break;
+                                                    case '10':
+                                                        msg += 'Primary Storage'; //primaryStorageLimit
+                                                        break;
+                                                    case '11':
+                                                        msg += 'Secondary Storage'; //secondaryStorageLimit
+                                                        break;
+                                                    }
+
+                                                    msg += ' Count: ' + resourcecounts[i].resourcecount + ' <br> ';
+                                                }
                                             }
-                                            
-                                            
+
+
                                             cloudStack.dialog.notice({
-                                            	message: msg
-                                            });                                            
-                                            
+                                                message: msg
+                                            });
+
                                             args.response.success();
                                         },
                                         error: function(json) {
@@ -653,13 +667,13 @@
                             }
 
                         },
-                        
+
                         tabFilter: function(args) {
-                        	var hiddenTabs = [];
-                        	if(!isAdmin()) {
-                        		hiddenTabs.push('settings');
-                        	}                        	
-                        	return hiddenTabs;
+                            var hiddenTabs = [];
+                            if(!isAdmin()) {
+                                hiddenTabs.push('settings');
+                            }
+                            return hiddenTabs;
                         },
 
                         tabs: {
@@ -678,11 +692,11 @@
                                     id: {
                                         label: 'label.id'
                                     },
-                                    accounttype: {
-                                        label: 'label.role',
-                                        converter: function(args) {
-                                            return cloudStack.converters.toRole(args);
-                                        }
+                                    rolename: {
+                                        label: 'label.role'
+                                    },
+                                    roletype: {
+                                        label: 'label.roletype'
                                     },
                                     domain: {
                                         label: 'label.domain'
@@ -894,9 +908,202 @@
                                 }
                             },
 
+                            sslCertificates: {
+                                title: 'label.sslcertificates',
+                                listView: {
+                                    id: 'sslCertificates',
+                                    
+                                    fields: {
+                                        name: {
+                                            label: 'label.name'
+                                        },
+                                        id: {
+                                            label: 'label.certificateid'
+                                        }
+                                    },
+                                    
+                                    dataProvider: function(args) {
+                                        var data = {};
+                                        listViewDataProvider(args, data);
+                                        if (args.context != null) {
+                                            if ("accounts" in args.context) {
+                                                $.extend(data, {
+                                                    accountid: args.context.accounts[0].id
+                                                });
+                                            }
+                                        }
+                                        $.ajax({
+                                            url: createURL('listSslCerts'),
+                                            data: data,
+                                            success: function(json) {
+                                                var items = json.listsslcertsresponse.sslcert;
+                                                args.response.success({
+                                                    data: items
+                                                });
+                                            }
+                                        });
+                                    },
+                                    
+                                    actions: {
+                                        add: {
+                                            label: 'label.add.certificate',
+
+                                            messages: {
+                                                notification: function(args) {
+                                                    return 'label.add.certificate';
+                                                }
+                                            },
+
+                                            createForm: {
+                                                title: 'label.add.certificate',
+                                                fields: {
+                                                    name: {
+                                                        label: 'label.name',
+                                                        validation: {
+                                                            required: true
+                                                        }
+                                                    },
+                                                    certificate: {
+                                                        label: 'label.certificate.name',
+                                                        isTextarea: true,
+                                                        validation: {
+                                                            required: true
+                                                        },
+                                                    },
+                                                    privatekey: {
+                                                        label: 'label.privatekey.name',
+                                                        isTextarea: true,
+                                                        validation: {
+                                                            required: true
+                                                        }
+                                                    },
+                                                    certchain: {
+                                                        label: "label.chain",
+                                                        isTextarea: true,
+                                                        validation: {
+                                                            required: false
+                                                        }
+                                                    },
+                                                    password: {
+                                                        label: "label.privatekey.password",
+                                                        isPassword: true,
+                                                        validation: {
+                                                            required: false
+                                                        }
+                                                    }
+                                                }
+                                            },
+
+                                            action: function(args) {
+                                                var data = {
+                                                    name: args.data.name,
+                                                    certificate: args.data.certificate,
+                                                    privatekey: args.data.privatekey
+                                                };
+
+                                                if (args.data.certchain != null && args.data.certchain.length > 0) {
+                                                    $.extend(data, {
+                                                        certchain: args.data.certchain
+                                                    });
+                                                }
+
+                                                if (args.data.password != null && args.data.password.length > 0) {
+                                                    $.extend(data, {
+                                                        password: args.data.password
+                                                    });
+                                                }
+
+                                                $.ajax({
+                                                    url: createURL('uploadSslCert'),
+                                                    data: data,
+                                                    success: function(json) {
+                                                        var item = json.uploadsslcertresponse.sslcert;
+                                                        args.response.success({
+                                                            data: item
+                                                        });
+                                                    },
+                                                    error: function(json) {
+                                                        args.response.error(parseXMLHttpResponse(json));
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    },
+                                    
+                                    detailView: {
+                                        actions: {
+                                            remove: {
+                                                label: 'label.delete.sslcertificate',
+                                                messages: {
+                                                    confirm: function(args) {
+                                                        return 'message.delete.sslcertificate';
+                                                    },
+                                                    notification: function(args) {
+                                                        return 'label.delete.sslcertificate';
+                                                    }
+                                                },
+                                                action: function(args) {
+                                                    $.ajax({
+                                                        url: createURL('deleteSslCert'),
+                                                        data: {
+                                                            id: args.context.sslCertificates[0].id
+                                                        },
+                                                        success: function(json) {
+                                                            var items = json.deletesslcertresponse.sslcert;
+                                                            args.response.success({
+                                                                data: items
+                                                            });
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        },
+
+                                        tabs: {
+                                            details: {
+                                                title: 'label.certificate.details',
+                                                fields: {
+                                                    name: {
+                                                        label: 'label.name'
+                                                    },
+                                                    certificate: {
+                                                        label: 'label.certificate.name'
+                                                    },
+                                                    certchain: {
+                                                        label: 'label.chain'
+                                                    }
+                                                },
+
+                                                dataProvider: function(args) {
+                                                    var data = {};
+                                                
+                                                    if (args.context != null) {
+                                                        if ("sslCertificates" in args.context) {
+                                                            $.extend(data, {
+                                                                certid: args.context.sslCertificates[0].id
+                                                            });
+                                                        }
+                                                    }
+                                                    $.ajax({
+                                                        url: createURL('listSslCerts'),
+                                                        data: data,
+                                                        success: function(json) {
+                                                            var items = json.listsslcertsresponse.sslcert[0];
+                                                            args.response.success({
+                                                                data: items
+                                                            });
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+
                             // Granular settings for account
                             settings: {
-                                title: 'Settings',
+                                title: 'label.settings',
                                 custom: cloudStack.uiCustom.granularSettings({
                                     dataProvider: function(args) {
                                         $.ajax({
@@ -1221,7 +1428,7 @@
                     },
 
                     detailView: {
-                        name: 'User details',
+                        name: 'label.user.details',
                         isMaximized: true,
                         actions: {
                             edit: {
@@ -1266,9 +1473,8 @@
                                         var complete = args.complete;
                                         var context = args.context;
 
-                                        if (isLdapEnabled()) {
-                                            cloudStack.dialog.notice({ message: _l('error.could.not.change.your.password.because.ldap.is.enabled') });
-                                        } else {
+                                        var userSource = context.users[0].usersource;
+                                        if (userSource == "native") {
                                             cloudStack.dialog.createForm({
                                                 form: {
                                                     title: 'label.action.change.password',
@@ -1315,6 +1521,8 @@
                                                     });
                                                 }
                                             });
+                                        } else {
+                                            cloudStack.dialog.notice({ message: _l('error.could.not.change.your.password.because.non.native.user') });
                                         }
                                     }
                                 }
@@ -1337,7 +1545,7 @@
                                             $.ajax({
                                                 url: createURL('listSamlAuthorization'),
                                                 data: {
-                                                    userid: context.users[0].id,
+                                                    userid: context.users[0].id
                                                 },
                                                 success: function(json) {
                                                     var authorization = json.listsamlauthorizationsresponse.samlauthorization[0];
@@ -1570,11 +1778,11 @@
                                     account: {
                                         label: 'label.account.name'
                                     },
-                                    accounttype: {
-                                        label: 'label.role',
-                                        converter: function(args) {
-                                            return cloudStack.converters.toRole(args);
-                                        }
+                                    rolename: {
+                                        label: 'label.role'
+                                    },
+                                    roletype: {
+                                        label: 'label.roletype'
                                     },
                                     domain: {
                                         label: 'label.domain'
@@ -1637,25 +1845,323 @@
                                 }],
 
                                 dataProvider: function(args) {
-                                    if (isAdmin() || isDomainAdmin()) {
-                                        $.ajax({
-                                            url: createURL('listUsers'),
+                                if (isAdmin() || isDomainAdmin()) {
+                                    $.ajax({
+                                        url: createURL('listUsers'),
                                             data: {
                                                 id: args.context.users[0].id
                                             },
                                             success: function(json) {
-                                                args.response.success({
-                                                    actionFilter: userActionfilter,
-                                                    data: json.listusersresponse.user[0]
-                                                });
-                                            }
-                                        });
-                                    } else { //normal user doesn't have access listUsers API until Bug 14127 is fixed.
+                                                var items = json.listusersresponse.user[0];
+                                                    $.ajax({
+                                                        url: createURL('getUserKeys'),//change
+                                                        data: {
+                                                            id: args.context.users[0].id//change
+                                                        },
+                                                        success: function(json) {
+                                                            $.extend(items, {
+                                                                secretkey: json.getuserkeysresponse.userkeys.secretkey//change
+                                                            });
+                                                        args.response.success({
+                                                            actionFilter: userActionfilter,
+                                                                data: items
+                                                        });
+                                                        }
+                                                    });
+                                                }
+                                            });
+                                        }
+                                    else { //normal user doesn't have access listUsers API until Bug 14127 is fixed.
                                         args.response.success({
                                             actionFilter: userActionfilter,
                                             data: args.context.users[0]
                                         });
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            sshkeypairs: {
+                type: 'select',
+                id: 'sshkeypairs',
+                title: 'label.ssh.key.pairs',
+                listView: {
+                    name: 'sshkeypairs',
+                    fields: {
+                        name: {
+                            label: 'label.name'
+                        },
+                        domain: {
+                           label: 'label.domain'
+                        },
+                        account: {
+                           label: 'label.account'
+                        },
+                        privatekey: {
+                            label: 'label.private.key',
+                            span: false
+                        }
+                    },
+                    dataProvider: function(args) {
+                        var data = {
+//                            domainid: g_domainid,
+//                            account: g_account
+                        };
+
+                        listViewDataProvider(args, data);
+
+                        $.ajax({
+                            url: createURL('listSSHKeyPairs'),
+                            data: data,
+                            success: function(json) {
+                                var items = json.listsshkeypairsresponse.sshkeypair;
+                                args.response.success({
+                                    data: items
+                                });
+                            }
+                        });
+                    },
+                    actions: {
+                        add: {
+                            label: 'label.create.ssh.key.pair',
+
+                            preFilter: function(args) {
+                                return true;
+                            },
+
+                            messages: {
+                                notification: function(args) {
+                                    return _l('message.desc.created.ssh.key.pair');
+                                }
+                            },
+
+                            createForm: {
+                                title: 'label.create.ssh.key.pair',
+                                desc: 'message.desc.create.ssh.key.pair',
+                                fields: {
+                                    name: {
+                                        label: 'label.name',
+                                        validation: {
+                                            required: true
+                                        }
+                                    },
+                                    publickey: {
+                                        label: 'label.public.key'
+                                    },
+                                    domain: {
+                                        label: 'label.domain',
+                                        isHidden: function(args) {
+                                            if (isAdmin() || isDomainAdmin())
+                                                return false;
+                                            else
+                                                return true;
+                                        },
+                                        select: function(args) {
+                                            if (isAdmin() || isDomainAdmin()) {
+                                                $.ajax({
+                                                    url: createURL('listDomains'),
+                                                    data: {
+                                                        listAll: true,
+                                                        details: 'min'
+                                                    },
+                                                    success: function(json) {
+                                                        var items = [];
+                                                        items.push({
+                                                            id: "",
+                                                            description: ""
+                                                        });
+                                                        var domainObjs = json.listdomainsresponse.domain;
+                                                        $(domainObjs).each(function() {
+                                                            items.push({
+                                                                id: this.id,
+                                                                description: this.path
+                                                            });
+                                                        });
+                                                        items.sort(function(a, b) {
+                                                            return a.description.localeCompare(b.description);
+                                                        });
+                                                        args.response.success({
+                                                            data: items
+                                                        });
+                                                    }
+                                                });
+                                                args.$select.change(function() {
+                                                    var $form = $(this).closest('form');
+                                                    if ($(this).val() == "") {
+                                                        $form.find('.form-item[rel=account]').hide();
+                                                    } else {
+                                                        $form.find('.form-item[rel=account]').css('display', 'inline-block');
+                                                    }
+                                                });
+                                            } else {
+                                                var items = [];
+                                                items.push({
+                                                    id: "",
+                                                    description: ""
+                                                });
+                                                args.response.success({
+                                                    data: items
+                                                });
+                                            }
+                                        }
+                                    },
+                                    account: {
+                                        label: 'label.account',
+                                        isHidden: function(args) {
+                                            if (isAdmin() || isDomainAdmin())
+                                                return false;
+                                            else
+                                                return true;
+                                        }
+                                    }
+                                }
+                            },
+
+                            action: function(args) {
+
+                                var data = {
+                                    name: args.data.name
+                                };
+
+                                if (args.data.domain != null && args.data.domain.length > 0) {
+                                    $.extend(data, {
+                                        domainid: args.data.domain
+                                    });
+                                    if (args.data.account != null && args.data.account.length > 0) {
+                                        $.extend(data, {
+                                            account: args.data.account
+                                        });
+                                    }
+                                }
+
+                                if (args.data.publickey != null && args.data.publickey.length > 0) {
+                                    $.extend(data, {
+                                        publickey: args.data.publickey
+                                    });
+                                    $.ajax({
+                                        url: createURL('registerSSHKeyPair'),
+                                        data: data,
+                                        type: "POST",
+                                        success: function(json) {
+                                            var item = json.registersshkeypairresponse.keypair;
+                                            args.response.success({
+                                                data: item
+                                            });
+                                        },
+                                        error: function(XMLHttpResponse) {
+                                            var errorMsg = parseXMLHttpResponse(XMLHttpResponse);
+                                            args.response.error(errorMsg);
+                                        }
+                                    });
+                                } else {
+                                    $.ajax({
+                                        url: createURL('createSSHKeyPair'),
+                                        data: data,
+                                        success: function(json) {
+                                            var item = json.createsshkeypairresponse.keypair;
+                                            args.response.success({
+                                                data: item
+                                            });
+                                        },
+                                        error: function(XMLHttpResponse) {
+                                            var errorMsg = parseXMLHttpResponse(XMLHttpResponse);
+                                            args.response.error(errorMsg);
+                                        }
+                                    });
+                                }
+                            },
+
+                            notification: {
+                                poll: function(args) {
+                                    args.complete();
+                                }
+                            }
+                        }
+                    },
+
+                    detailView: {
+                        name: 'label.ssh.key.pair.details',
+                        isMaximized: true,
+                        viewAll: {
+                            label: 'label.instances',
+                            path: 'instances'
+                        },
+                        actions: {
+                            remove: {
+                                label: 'label.remove.ssh.key.pair',
+                                messages: {
+                                    confirm: function(args) {
+                                        return _l('message.please.confirm.remove.ssh.key.pair');
+                                    },
+                                    notification: function(args) {
+                                        return _l('message.removed.ssh.key.pair');
+                                    }
+                                },
+                                action: function(args) {
+                                    var data = {
+                                        name: args.context.sshkeypairs[0].name
+                                    };
+                                    if (!args.context.projects) {
+                                        $.extend(data, {
+                                            domainid: args.context.sshkeypairs[0].domainid,
+                                            account: args.context.sshkeypairs[0].account
+                                        });
+                                    }
+                                    $.ajax({
+                                        url: createURL('deleteSSHKeyPair'),
+                                        data: data,
+                                        success: function(json) {
+                                            args.response.success();
+                                            $(window).trigger('cloudStack.fullRefresh');
+                                        }
+                                    });
+                                }
+                            }
+                        },
+                        tabs: {
+                            details: {
+                                title: 'label.details',
+
+                                fields: [{
+                                    name: {
+                                        label: 'label.name',
+                                        isEditable: true,
+                                        validation: {
+                                            required: true
+                                        }
+                                    }
+                                }, {
+                                    domain: {
+                                        label: 'label.domain'
+                                    },
+                                    account: {
+                                        label: 'label.account'
+                                    },
+                                    privatekey: {
+                                        label: 'label.private.key',
+                                        span: false
+                                    },
+                                    fingerprint: {
+                                        label: 'label.fingerprint'
+                                    }
+                                }],
+
+                                dataProvider: function(args) {
+                                    var data = {
+                                        name: args.context.sshkeypairs[0].name
+                                    };
+                                    $.ajax({
+                                        url: createURL('listSSHKeyPairs&listAll=true'),
+                                        data: data,
+                                        success: function(json) {
+                                            args.response.success({
+                                                actionFilter: sshkeypairActionfilter,
+                                                data: json.listsshkeypairsresponse.sshkeypair[0]
+                                            });
+                                        }
+                                    });
                                 }
                             }
                         }
@@ -1724,25 +2230,30 @@
                 allowedActions.push("remove");
             }
         } else { //domain-admin, regular-user
-        	if (jsonObj.username == g_username) { //selected user is self
-        		allowedActions.push("changePassword");
+            if (jsonObj.username == g_username) { //selected user is self
+                allowedActions.push("changePassword");
                 allowedActions.push("generateKeys");
-        	} else if (isDomainAdmin()) { //if selected user is not self, and the current login is domain-admin
-        		allowedActions.push("edit");
+            } else if (isDomainAdmin()) { //if selected user is not self, and the current login is domain-admin
+                allowedActions.push("edit");
                 if (jsonObj.state == "enabled")
                     allowedActions.push("disable");
                 if (jsonObj.state == "disabled")
                     allowedActions.push("enable");
                 allowedActions.push("remove");
-                
+
                 allowedActions.push("changePassword");
                 allowedActions.push("generateKeys");
                 if (g_idpList) {
                     allowedActions.push("configureSamlAuthorization");
                 }
-        	}        	
+            }
         }
         return allowedActions;
     }
 
+    var sshkeypairActionfilter = function(args) {
+        var allowedActions = [];
+        allowedActions.push("remove");
+        return allowedActions;
+    }
 })(cloudStack);

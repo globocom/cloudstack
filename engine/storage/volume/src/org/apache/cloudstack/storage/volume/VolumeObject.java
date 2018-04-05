@@ -154,10 +154,6 @@ public class VolumeObject implements VolumeInfo {
         return volumeVO.getMaxIops();
     }
 
-    public void setHypervisorSnapshotReserve(Integer hypervisorSnapshotReserve) {
-        volumeVO.setHypervisorSnapshotReserve(hypervisorSnapshotReserve);
-    }
-
     @Override
     public Integer getHypervisorSnapshotReserve() {
         return volumeVO.getHypervisorSnapshotReserve();
@@ -178,12 +174,14 @@ public class VolumeObject implements VolumeInfo {
     }
 
     @Override
-    public boolean  stateTransit(Volume.Event event) {
+    public boolean stateTransit(Volume.Event event) {
         boolean result = false;
         try {
             volumeVO = volumeDao.findById(volumeVO.getId());
-            result = _volStateMachine.transitTo(volumeVO, event, null, volumeDao);
-            volumeVO = volumeDao.findById(volumeVO.getId());
+            if (volumeVO != null) {
+                result = _volStateMachine.transitTo(volumeVO, event, null, volumeDao);
+                volumeVO = volumeDao.findById(volumeVO.getId());
+            }
         } catch (NoTransitionException e) {
             String errorMessage = "Failed to transit volume: " + getVolumeId() + ", due to: " + e.toString();
             s_logger.debug(errorMessage);
@@ -334,12 +332,12 @@ public class VolumeObject implements VolumeInfo {
             throw new CloudRuntimeException("Failed to update state:" + e.toString());
         } finally {
             // in case of OperationFailed, expunge the entry
+            // state transit call reloads the volume from DB and so check for null as well
             if (event == ObjectInDataStoreStateMachine.Event.OperationFailed &&
-                (volumeVO.getState() != Volume.State.Copying && volumeVO.getState() != Volume.State.Uploaded)) {
+                (volumeVO != null && volumeVO.getState() != Volume.State.Copying && volumeVO.getState() != Volume.State.Uploaded && volumeVO.getState() != Volume.State.UploadError)) {
                 objectInStoreMgr.deleteIfNotReady(this);
             }
         }
-
     }
 
     @Override
@@ -519,7 +517,11 @@ public class VolumeObject implements VolumeInfo {
                     VolumeObjectTO newVol = (VolumeObjectTO)cpyAnswer.getNewData();
                     vol.setPath(newVol.getPath());
                     if (newVol.getSize() != null) {
-                        vol.setSize(newVol.getSize());
+                        // Root disk resize may be requested where the original
+                        // template size is less than the requested root disk size
+                        if (vol.getSize() == null || vol.getSize() < newVol.getSize()) {
+                            vol.setSize(newVol.getSize());
+                        }
                     }
                     if (newVol.getFormat() != null) {
                         vol.setFormat(newVol.getFormat());

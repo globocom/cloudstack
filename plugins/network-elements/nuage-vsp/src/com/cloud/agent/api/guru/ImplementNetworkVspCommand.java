@@ -19,101 +19,35 @@
 
 package com.cloud.agent.api.guru;
 
-import java.util.Collection;
+import java.util.Objects;
+
+import net.nuage.vsp.acs.client.api.model.VspDhcpDomainOption;
+import net.nuage.vsp.acs.client.api.model.VspNetwork;
+
+import org.apache.commons.lang.builder.HashCodeBuilder;
+import org.apache.commons.lang.builder.ToStringBuilder;
 
 import com.cloud.agent.api.Command;
 
 public class ImplementNetworkVspCommand extends Command {
 
-    String _networkDomainName;
-    String _networkDomainPath;
-    String _networkDomainUuid;
-    String _networkAccountName;
-    String _networkAccountUuid;
-    String _networkName;
-    String _networkCidr;
-    String _networkGateway;
-    String _networkUuid;
-    boolean _isL3Network;
-    String _vpcName;
-    String _vpcUuid;
-    boolean _defaultEgressPolicy;
-    Collection<String> _ipAddressRange;
+    private final VspNetwork _network;
+    private final VspDhcpDomainOption _dhcpOption;
+    private final boolean _isVsdManaged;
 
-    public ImplementNetworkVspCommand(String networkDomainName, String networkDomainPath, String networkDomainUuid, String networkAccountName, String networkAccountUuid,
-            String networkName, String networkCidr, String networkGateway, String networkUuid, boolean isL3Network, String vpcName, String vpcUuid, boolean defaultEgressPolicy,
-            Collection<String> ipAddressRange) {
+    public ImplementNetworkVspCommand(VspNetwork network, VspDhcpDomainOption dhcpOption, boolean isVsdManaged) {
         super();
-        this._networkDomainName = networkDomainName;
-        this._networkDomainPath = networkDomainPath;
-        this._networkDomainUuid = networkDomainUuid;
-        this._networkAccountName = networkAccountName;
-        this._networkAccountUuid = networkAccountUuid;
-        this._networkName = networkName;
-        this._networkCidr = networkCidr;
-        this._networkGateway = networkGateway;
-        this._networkUuid = networkUuid;
-        this._isL3Network = isL3Network;
-        this._vpcName = vpcName;
-        this._vpcUuid = vpcUuid;
-        this._defaultEgressPolicy = defaultEgressPolicy;
-        this._ipAddressRange = ipAddressRange;
+        this._network = network;
+        this._dhcpOption = dhcpOption;
+        this._isVsdManaged = isVsdManaged;
     }
 
-    public String getNetworkDomainName() {
-        return _networkDomainName;
+    public VspNetwork getNetwork() {
+        return _network;
     }
 
-    public String getNetworkDomainPath() {
-        return _networkDomainPath;
-    }
-
-    public String getNetworkDomainUuid() {
-        return _networkDomainUuid;
-    }
-
-    public String getNetworkAccountName() {
-        return _networkAccountName;
-    }
-
-    public String getNetworkAccountUuid() {
-        return _networkAccountUuid;
-    }
-
-    public String getNetworkName() {
-        return _networkName;
-    }
-
-    public String getNetworkCidr() {
-        return _networkCidr;
-    }
-
-    public String getNetworkGateway() {
-        return _networkGateway;
-    }
-
-    public String getNetworkUuid() {
-        return _networkUuid;
-    }
-
-    public boolean isL3Network() {
-        return _isL3Network;
-    }
-
-    public String getVpcName() {
-        return _vpcName;
-    }
-
-    public String getVpcUuid() {
-        return _vpcUuid;
-    }
-
-    public boolean isDefaultEgressPolicy() {
-        return _defaultEgressPolicy;
-    }
-
-    public Collection<String> getIpAddressRange() {
-        return _ipAddressRange;
+    public VspDhcpDomainOption getDhcpOption() {
+        return _dhcpOption;
     }
 
     @Override
@@ -121,4 +55,40 @@ public class ImplementNetworkVspCommand extends Command {
         return false;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+
+        if (!(o instanceof ImplementNetworkVspCommand)) {
+            return false;
+        }
+
+        ImplementNetworkVspCommand that = (ImplementNetworkVspCommand) o;
+
+        return super.equals(that)
+            && Objects.equals(_dhcpOption, that._dhcpOption)
+            && Objects.equals(_network, that._network);
+    }
+
+    @Override
+    public int hashCode() {
+        return new HashCodeBuilder()
+                .appendSuper(super.hashCode())
+                .append(_network)
+                .append(_dhcpOption)
+                .toHashCode();
+    }
+
+    public String toDetailString() {
+        return new ToStringBuilder(this)
+                .append("network", _network)
+                .append("dhcpOption", _dhcpOption)
+                .toString();
+    }
+
+    public boolean isVsdManaged() {
+        return _isVsdManaged;
+    }
 }

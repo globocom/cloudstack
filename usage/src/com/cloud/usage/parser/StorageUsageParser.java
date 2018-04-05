@@ -108,6 +108,7 @@ public class StorageUsageParser {
             }
 
             if (storageCreateDate.after(endDate)) {
+                //Ignore records created after endDate
                 continue;
             }
 
@@ -179,9 +180,16 @@ public class StorageUsageParser {
                 usage_type = UsageTypes.SNAPSHOT;
                 usageDesc += "Snapshot ";
                 break;
+            case StorageTypes.VOLUME:
+                usage_type = UsageTypes.VOLUME_SECONDARY;
+                usageDesc += "Volume ";
+                break;
         }
-        // Create the usage record
-        usageDesc += "Id:" + storageId + " Size:" + size + "VirtualSize:" + virtualSize;
+        //Create the usage record
+        usageDesc += "Id:" + storageId + " Size:" + size;
+        if (type != StorageTypes.SNAPSHOT) {
+            usageDesc += " VirtualSize:" + virtualSize;
+        }
 
         //ToDo: get zone id
         UsageVO usageRecord =

@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -55,7 +54,6 @@ import com.cloud.utils.exception.CloudRuntimeException;
 
 //This is the Role Based API access checker that grab's the  account's roles
 //based on the set of roles, access is granted if any of the role has access to the api
-@Local(value=APIChecker.class)
 public class RoleBasedAPIAccessChecker extends AdapterBase implements APIChecker {
 
     protected static final Logger s_logger = Logger.getLogger(RoleBasedAPIAccessChecker.class);
@@ -198,7 +196,7 @@ public class RoleBasedAPIAccessChecker extends AdapterBase implements APIChecker
             try {
                 short cmdPermissions = Short.parseShort(roleMask);
                 for (RoleType roleType : RoleType.values()) {
-                    if ((cmdPermissions & roleType.getValue()) != 0)
+                    if ((cmdPermissions & roleType.getMask()) != 0)
                         commandsPropertiesRoleBasedApisMap.get(roleType).add(apiName);
                 }
             } catch (NumberFormatException nfe) {

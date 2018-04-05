@@ -112,9 +112,9 @@ class Distribution:
             version = file("/etc/redhat-release").readline()
             if version.find("Red Hat Enterprise Linux Server release 6") != -1 or version.find("Scientific Linux release 6") != -1 or version.find("CentOS Linux release 6") != -1 or version.find("CentOS release 6.") != -1:
                 self.distro = "RHEL6"
-            elif version.find("Red Hat Enterprise Linux Server release 7") != -1:
+            elif version.find("Red Hat Enterprise Linux Server release 7") != -1 or version.find("Scientific Linux release 7") != -1 or version.find("CentOS Linux release 7") != -1 or version.find("CentOS release 7.") != -1:
                 self.distro = "RHEL7"
-            elif version.find("CentOS release") != -1:
+            elif version.find("CentOS") != -1:
                 self.distro = "CentOS"
             else:
                 self.distro = "RHEL5"
@@ -216,11 +216,8 @@ class serviceOpsUbuntu(serviceOps):
 class serviceOpsRedhat7(serviceOps):
     def isServiceRunning(self, servicename):
         try:
-            o = bash("systemctl status " + servicename)
-            if "running" in o.getStdout() or "start" in o.getStdout() or "Running" in o.getStdout():
-                return True
-            else:
-                return False
+            o = bash("systemctl is-active " + servicename)
+            return "inactive" not in o.getStdout()
         except:
             return False
 

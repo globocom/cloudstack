@@ -18,11 +18,10 @@ package org.apache.cloudstack.api.command.user.config;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
-
 import org.apache.cloudstack.api.APICommand;
 import org.apache.cloudstack.api.BaseCmd;
 import org.apache.cloudstack.api.response.CapabilitiesResponse;
+import org.apache.log4j.Logger;
 
 import com.cloud.user.Account;
 
@@ -48,6 +47,7 @@ public class ListCapabilitiesCmd extends BaseCmd {
         Map<String, Object> capabilities = _mgr.listCapabilities(this);
         CapabilitiesResponse response = new CapabilitiesResponse();
         response.setSecurityGroupsEnabled((Boolean)capabilities.get("securityGroupsEnabled"));
+        response.setDynamicRolesEnabled(roleService.isEnabled());
         response.setCloudStackVersion((String)capabilities.get("cloudStackVersion"));
         response.setUserPublicTemplateEnabled((Boolean)capabilities.get("userPublicTemplateEnabled"));
         response.setSupportELB((String)capabilities.get("supportELB"));
@@ -57,6 +57,8 @@ public class ListCapabilitiesCmd extends BaseCmd {
         response.setDiskOffMaxSize((Long)capabilities.get("customDiskOffMaxSize"));
         response.setRegionSecondaryEnabled((Boolean)capabilities.get("regionSecondaryEnabled"));
         response.setKVMSnapshotEnabled((Boolean)capabilities.get("KVMSnapshotEnabled"));
+        response.setAllowUserViewDestroyedVM((Boolean)capabilities.get("allowUserViewDestroyedVM"));
+        response.setAllowUserExpungeRecoverVM((Boolean)capabilities.get("allowUserExpungeRecoverVM"));
         if (capabilities.containsKey("apiLimitInterval")) {
             response.setApiLimitInterval((Integer)capabilities.get("apiLimitInterval"));
         }

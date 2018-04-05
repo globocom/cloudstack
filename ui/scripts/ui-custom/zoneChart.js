@@ -262,7 +262,7 @@
                                             if ($.inArray(trafficType.dependsOn, validTrafficTypes) == -1) { //if its dependsOn is not a valid traffic type, either
                                                 return true; //skip this item
                                             }
-                                            //else, if its dependsOn is a valid traffic type, continue to Make list item	(e.g. providers.dependsOn is 'guest')
+                                            //else, if its dependsOn is a valid traffic type, continue to Make list item    (e.g. providers.dependsOn is 'guest')
                                         } else {
                                             return true; //if it doesn't have dependsOn, skip this item
                                         }
@@ -320,7 +320,7 @@
                                         noCompact: true,
                                         tabs: {
                                             network: {
-                                                title: 'Network',
+                                                title: 'label.network',
                                                 custom: function(args) {
                                                     var $chart = $('<div>').addClass('system-chart network');
 
@@ -355,13 +355,13 @@
                 var chartItems = {
                     // The keys are based on the internal type ID associated with each capacity
                     0: {
-                        name: _l('label.memory')
+                        name: _l('label.memory.allocated')
                     },
                     1: {
-                        name: _l('label.cpu')
+                        name: _l('label.cpu.allocated')
                     },
                     2: {
-                        name: _l('label.storage')
+                        name: _l('label.primary.used')
                     },
                     3: {
                         name: _l('label.primary.allocated')
@@ -386,6 +386,9 @@
                     },
                     19: {
                         name: _l('GPU')
+                    },
+                    90: {
+                        name: _l('label.num.cpu.cores')
                     }
                 };
 

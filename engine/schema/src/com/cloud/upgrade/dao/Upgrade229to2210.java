@@ -16,7 +16,7 @@
 // under the License.
 package com.cloud.upgrade.dao;
 
-import java.io.File;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -26,7 +26,6 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.cloud.utils.exception.CloudRuntimeException;
-import com.cloud.utils.script.Script;
 
 public class Upgrade229to2210 implements DbUpgrade {
     final static Logger s_logger = Logger.getLogger(Upgrade229to2210.class);
@@ -47,13 +46,14 @@ public class Upgrade229to2210 implements DbUpgrade {
     }
 
     @Override
-    public File[] getPrepareScripts() {
-        String script = Script.findScript("", "db/schema-229to2210.sql");
+    public InputStream[] getPrepareScripts() {
+        final String scriptFile = "META-INF/db/schema-229to2210.sql";
+        final InputStream script = Thread.currentThread().getContextClassLoader().getResourceAsStream(scriptFile);
         if (script == null) {
-            throw new CloudRuntimeException("Unable to find db/schema-229to2210.sql");
+            throw new CloudRuntimeException("Unable to find " + scriptFile);
         }
 
-        return new File[] {new File(script)};
+        return new InputStream[] {script};
     }
 
     @Override
@@ -63,46 +63,34 @@ public class Upgrade229to2210 implements DbUpgrade {
     }
 
     @Override
-    public File[] getCleanupScripts() {
+    public InputStream[] getCleanupScripts() {
         return null;
     }
 
     private void updateSnapshots(Connection conn) {
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
         long currentSnapshotId = 0;
-        try {
-            pstmt =
-                conn.prepareStatement("select id, prev_snap_id from snapshots where sechost_id is NULL and prev_snap_id is not NULL and status=\"BackedUp\" and removed is NULL order by id");
-            rs = pstmt.executeQuery();
+        try (
+                PreparedStatement pstmt = conn.prepareStatement("select id, prev_snap_id from snapshots where sechost_id is NULL and prev_snap_id is not NULL and status=\"BackedUp\" and removed is NULL order by id");
+                ResultSet rs = pstmt.executeQuery();
+                PreparedStatement pstmt2 = conn.prepareStatement("select sechost_id from snapshots where id=? and sechost_id is not NULL");
+                PreparedStatement updateSnapshotStatement = conn.prepareStatement("update snapshots set sechost_id=? where id=?");
+            ){
             while (rs.next()) {
                 long id = rs.getLong(1);
                 long preSnapId = rs.getLong(2);
                 currentSnapshotId = id;
-                pstmt = conn.prepareStatement("select sechost_id from snapshots where id=? and sechost_id is not NULL");
-                pstmt.setLong(1, preSnapId);
-                ResultSet sechost = pstmt.executeQuery();
-                if (sechost.next()) {
-                    long secHostId = sechost.getLong(1);
-                    pstmt = conn.prepareStatement("update snapshots set sechost_id=? where id=?");
-                    pstmt.setLong(1, secHostId);
-                    pstmt.setLong(2, id);
-                    pstmt.executeUpdate();
+                pstmt2.setLong(1, preSnapId);
+                try (ResultSet sechost = pstmt2.executeQuery();) {
+                    if (sechost.next()) {
+                        long secHostId = sechost.getLong(1);
+                        updateSnapshotStatement.setLong(1, secHostId);
+                        updateSnapshotStatement.setLong(2, id);
+                        updateSnapshotStatement.executeUpdate();
+                    }
                 }
             }
         } catch (SQLException e) {
             throw new CloudRuntimeException("Unable to update snapshots id=" + currentSnapshotId, e);
-        } finally {
-            try {
-                if (rs != null) {
-                    rs.close();
-                }
-
-                if (pstmt != null) {
-                    pstmt.close();
-                }
-            } catch (SQLException e) {
-            }
         }
     }
 
@@ -192,6 +180,7 @@ public class Upgrade229to2210 implements DbUpgrade {
                     pstmt.close();
                 }
             } catch (SQLException e) {
+                s_logger.info("[ignored]",e);
             }
         }
     }

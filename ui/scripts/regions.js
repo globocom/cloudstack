@@ -143,10 +143,10 @@
                         });
                     },
                     detailView: {
-                        name: 'Region details',
+                        name: 'label.region.details',
                         viewAll: [{
                             path: 'regions.GSLB',
-                            label: 'GSLB'
+                            label: 'label.gslb'
                         }, {
                             path: 'network.vpc',
                             label: 'label.regionlevelvpc'
@@ -159,6 +159,9 @@
 
                                 return false;
                             }
+                        }, {
+                            path: 'regions.NCC',
+                            label: 'label.ncc'
                         }],
                         actions: {
                             edit: {
@@ -196,16 +199,6 @@
                                 preAction: function(args) {
                                     var region = args.context.regions[0];
 
-                                    /* e.g.
-                  region.endpoint	== "http://localhost:8080/client/"
-                  document.location.href == "http://localhost:8080/client/#"
-                  */
-                                    /*
-                  if(document.location.href.indexOf(region.endpoint) != -1) {
-                    cloudStack.dialog.notice({ message: _l('You can not remove the region that you are currently in.') });
-                    return false;
-                  }
-                  */
                                     return true;
                                 },
                                 action: function(args) {
@@ -268,10 +261,11 @@
                     }
                 }
             },
+
             GSLB: {
                 id: 'GSLB',
                 type: 'select',
-                title: 'GSLB',
+                title: 'label.gslb',
                 listView: {
                     id: 'GSLB',
                     label: 'label.gslb',
@@ -344,6 +338,9 @@
                                             }, {
                                                 id: 'udp',
                                                 description: 'udp'
+                                            }, {
+                                                id: 'http',
+                                                description: 'http'
                                             }];
                                             args.response.success({
                                                 data: array1
@@ -481,33 +478,33 @@
                             path: 'regions.lbUnderGSLB',
                             label: 'label.gslb.assigned.lb'
                         },
-                        actions: {                            
-                        	edit: {
+                        actions: {
+                            edit: {
                                 label: 'label.edit',
-                                action: function(args) {                                	
+                                action: function(args) {
                                     var data = {
-                                    	id: args.context.GSLB[0].id,
-                                    	description: args.data.description,
-                                    	gslblbmethod: args.data.gslblbmethod
-                                    };                                    
+                                        id: args.context.GSLB[0].id,
+                                        description: args.data.description,
+                                        gslblbmethod: args.data.gslblbmethod
+                                    };
                                     $.ajax({
                                         url: createURL('updateGlobalLoadBalancerRule'),
                                         data: data,
-                                        success: function(json) {                                        	
-                                            var jid = json.updategloballoadbalancerruleresponse.jobid;                                           
+                                        success: function(json) {
+                                            var jid = json.updategloballoadbalancerruleresponse.jobid;
                                             args.response.success({
                                                 _custom: {
                                                     jobId: jid
                                                 }
-                                            });                                            
+                                            });
                                         }
                                     });
-                                },                                
+                                },
                                 notification: {
                                     poll: pollAsyncJobResult
                                 }
-                            },                        	
-                        	remove: {
+                            },
+                            remove: {
                                 label: 'label.gslb.delete',
                                 messages: {
                                     confirm: function(args) {
@@ -956,8 +953,8 @@
                                     $.ajax({
                                         url: createURL('removeFromGlobalLoadBalancerRule'),
                                         data: {
-                                        	id: args.context.GSLB[0].id,
-                                        	loadbalancerrulelist: args.context.lbUnderGSLB[0].id
+                                            id: args.context.GSLB[0].id,
+                                            loadbalancerrulelist: args.context.lbUnderGSLB[0].id
                                         },
                                         success: function(json) {
                                             var jid = json.removefromloadbalancerruleresponse.jobid;
@@ -1018,6 +1015,224 @@
                                         },
                                         success: function(json) {
                                             var item = json.listloadbalancerrulesresponse.loadbalancerrule[0];
+                                            args.response.success({
+                                                data: item
+                                            });
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+
+            NCC: {
+                id: 'NCC',
+                type: 'select',
+                title: 'NCC',
+                listView: {
+                    id: 'NCC',
+                    label: 'label.ncc',
+
+                    fields: {
+                        uuid: {
+                            label: 'label.id'
+                        },
+                        ipaddress: {
+                            label: 'label.ipaddress'
+                        },
+                        numretries: {
+                            label: 'label.numretries'
+                        }
+                    },
+
+                    actions: {
+                        add: {
+                            label: 'label.action.register.ncc',
+
+                            preFilter: function(args) {
+                                var isRegisterButtonShown = false;
+
+                                $.ajax({
+                                    url: createURL('listNetscalerControlCenter'),
+                                    async: false,
+                                    success: function(json) {
+                                        isRegisterButtonShown = json.listNetscalerControlCenter.netscalercontrolcenter ? false : true;
+                                    }
+                                });
+
+                                return isRegisterButtonShown;
+                            },
+
+                            messages: {
+                                confirm: function(args) {
+                                    return 'label.action.register.ncc';
+                                },
+                                notification: function(args) {
+                                    return 'label.action.register.ncc';
+                                }
+                            },
+
+                            createForm: {
+                                title: 'label.action.register.ncc',
+                                fields: {
+                                    ipaddress: {
+                                        label: 'label.ipaddress',
+                                        validation: {
+                                            required: true
+                                        }
+                                    },
+                                    username: {
+                                        label: 'label.username',
+                                        validation : {
+                                            required: true
+                                        }
+                                    },
+                                    password: {
+                                        label: 'label.password',
+                                        isPassword: true,
+                                        validation : {
+                                            required: true,
+                                        }
+                                    },
+                                    numretries: {
+                                        label: 'label.numretries',
+                                        defaultValue: '2',
+                                        validation : {
+                                            required: true,
+                                        }
+                                    }
+                                }
+                            },
+
+                            action: function(args) {
+                                var $loading = $('<div>').addClass('loading-overlay');
+                                $('.system-dashboard-view:visible').prepend($loading);
+
+                                var data = {
+                                    ipaddress: args.data.ipaddress,
+                                    username: args.data.username,
+                                    password: args.data.password,
+                                    numretries: args.data.numretries
+                                };
+
+                                $.ajax({
+                                    url: createURL('registerNetscalerControlCenter'),
+                                    data: data,
+                                    dataType: 'json',
+                                    type: "POST",
+                                    success: function(json) {
+                                        var jid = json.registernetscalercontrolcenterresponse.jobid;
+                                        var registerNetscalerControlCenterIntervalID = setInterval(function() {
+                                            $.ajax({
+                                                url: createURL("queryAsyncJobResult&jobId=" + jid),
+                                                dataType: "json",
+                                                success: function(json) {
+                                                    var result = json.queryasyncjobresultresponse;
+                                                    if (result.jobstatus == 0) {
+                                                        return; //Job has not completed
+                                                    } else {
+                                                        clearInterval(registerNetscalerControlCenterIntervalID);
+                                                        if (result.jobstatus == 1) {
+                                                            cloudStack.dialog.notice({
+                                                                message: 'message.register.succeeded'
+                                                            });
+                                                            $loading.remove();
+                                                        } else if (result.jobstatus == 2) {
+                                                            cloudStack.dialog.notice({
+                                                                message: _l('message.register.failed') + ' ' + _s(result.jobresult.errortext)
+                                                            });
+                                                            $loading.remove();
+                                                        }
+                                                    }
+                                                },
+                                                error: function(XMLHttpResponse) {
+                                                    cloudStack.dialog.notice({
+                                                        message: _l('message.register.failed') + ' ' + parseXMLHttpResponse(XMLHttpResponse)
+                                                    });
+                                                    $loading.remove();
+                                                }
+                                            });
+                                        }, g_queryAsyncJobResultInterval);
+                                    },
+                                    error: function(XMLHttpResponse) {
+                                        cloudStack.dialog.notice({
+                                            message: _l('message.register.failed') + ' ' + parseXMLHttpResponse(XMLHttpResponse)
+                                        });
+                                        $loading.remove();
+                                    }
+                                });
+                            },
+
+                            notification: {
+                                poll: pollAsyncJobResult
+                            }
+                        }
+                    },
+
+                    dataProvider: function(args) {
+                        $.ajax({
+                            url: createURL('listNetscalerControlCenter'),
+                            success: function(json) {
+                                var item = json.listNetscalerControlCenter.netscalercontrolcenter ? json.listNetscalerControlCenter.netscalercontrolcenter : null;
+                                args.response.success({
+                                    data: item
+                                });
+                            }
+                        });
+                    },
+
+                    detailView: {
+                        name: 'label.ncc.details',
+                        actions: {
+                            remove: {
+                                label: 'label.ncc.delete',
+                                messages: {
+                                    confirm: function(args) {
+                                        return 'message.ncc.delete.confirm';
+                                    },
+                                    notification: function(args) {
+                                        return 'label.ncc.delete';
+                                    }
+                                },
+                                action: function(args) {
+                                    var data = {
+                                        id: args.context.NCC[0].uuid
+                                    };
+                                    $.ajax({
+                                        url: createURL("deleteNetscalerControlCenter"),
+                                        data: data,
+                                        success: function(json) {
+                                            var status = json.deleteNetscalerControlCenter ? json.deleteNetscalerControlCenter.success : null;
+                                            args.response.success({
+                                                data: status
+                                            });
+                                        }
+                                    });
+                                },
+                            }
+                        },
+                        tabs: {
+                            details: {
+                                title: 'label.details',
+                                fields: [{
+                                    uuid: {
+                                        label: 'label.id'
+                                    }
+                                }, {
+                                    ipaddress: {
+                                        label: 'label.ipaddress'
+                                    },
+                                    numretries: {
+                                        label: 'label.numretries',
+                                    },
+                                }],
+                                dataProvider: function(args) {
+                                    $.ajax({
+                                        url: createURL('listNetscalerControlCenter'),
+                                        success: function(json) {
+                                            var item = json.listNetscalerControlCenter.netscalercontrolcenter ? json.listNetscalerControlCenter.netscalercontrolcenter[0] : null;
                                             args.response.success({
                                                 data: item
                                             });

@@ -46,11 +46,11 @@
                             label: 'label.type',
                             truncate: true
                         },
-                        domain: {
-                            label: 'label.domain'
-                        },
                         account: {
                             label: 'label.account'
+                        },
+                        domain: {
+                            label: 'label.domain'
                         },
                         created: {
                             label: 'label.date',
@@ -75,7 +75,7 @@
                             },
                             action: function(args) {
                                 var events = args.context.events;
-                                
+
                                 $.ajax({
                                     url: createURL("deleteEvents"),
                                     data: {
@@ -90,7 +90,7 @@
                                     error:function(data) {
                                         args.response.error(parseXMLHttpResponse(data));
                                     }
-                                }); 
+                                });
                             }
                         },
 
@@ -154,7 +154,7 @@
                                 });
                             }
                         },
-                        
+
                         archive: {
                             label: 'label.archive.events',
                             isHeader: true,
@@ -215,7 +215,7 @@
 
                             }
                         },
-                        
+
                         // Archive multiple events
                         archiveMulti: {
                             label: 'label.archive.events',
@@ -232,7 +232,7 @@
                             },
                             action: function(args) {
                                 var events = args.context.events;
-                                
+
                                 $.ajax({
                                     url: createURL("archiveEvents"),
                                     data: {
@@ -247,7 +247,7 @@
                                     error:function(data) {
                                         args.response.error(parseXMLHttpResponse(data));
                                     }
-                                }); 
+                                });
                             }
                         }
 
@@ -338,6 +338,14 @@
                         var data = {};
                         listViewDataProvider(args, data);
 
+                        if ("events" in args.context) {
+                            var startId = args.context.events[0].parentid;
+                            if (!startId) {
+                                startId = args.context.events[0].id;
+                            }
+                            data.startid = startId;
+                        }
+
                         $.ajax({
                             url: createURL('listEvents'),
                             data: data,
@@ -346,13 +354,23 @@
                                 args.response.success({
                                     data: items
                                 });
-                            }
+                            },
+                            error: function(XMLHttpResponse) {
+                                cloudStack.dialog.notice({
+                                    message: parseXMLHttpResponse(XMLHttpResponse)
+                                });
+                                args.response.error();
+                             }
                         });
                     },
                     detailView: {
                         name: 'label.details',
-                        actions: {
+                        viewAll: {
+                            path: 'events',
+                            label: 'label.event.timeline',
+                        },
 
+                        actions: {
                             // Remove single event
                             remove: {
                                 label: 'label.delete',
@@ -488,7 +506,7 @@
                             },
                             action: function(args) {
                                 var events = args.context.alerts;
-                                
+
                                 $.ajax({
                                     url: createURL("deleteAlerts"),
                                     data: {
@@ -503,10 +521,10 @@
                                     error:function(data) {
                                         args.response.error(parseXMLHttpResponse(data));
                                     }
-                                }); 
+                                });
                             }
                         },
-                        
+
                         remove: {
                             label: 'label.delete.alerts',
                             isHeader: true,
@@ -587,7 +605,7 @@
                             },
                             action: function(args) {
                                 var events = args.context.alerts;
-                                
+
                                 $.ajax({
                                     url: createURL("archiveAlerts"),
                                     data: {
@@ -602,10 +620,10 @@
                                     error:function(data) {
                                         args.response.error(parseXMLHttpResponse(data));
                                     }
-                                }); 
+                                });
                             }
                         },
-                        
+
                         archive: {
                             label: 'label.archive.alerts',
                             isHeader: true,

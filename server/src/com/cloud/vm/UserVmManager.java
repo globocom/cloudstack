@@ -24,7 +24,9 @@ import org.apache.cloudstack.api.BaseCmd.HTTPMethod;
 import org.apache.cloudstack.framework.config.ConfigKey;
 
 import com.cloud.agent.api.VmDiskStatsEntry;
+import com.cloud.agent.api.VmNetworkStatsEntry;
 import com.cloud.agent.api.VmStatsEntry;
+import com.cloud.agent.api.VolumeStatsEntry;
 import com.cloud.exception.ConcurrentOperationException;
 import com.cloud.exception.InsufficientCapacityException;
 import com.cloud.exception.ManagementServerException;
@@ -32,6 +34,7 @@ import com.cloud.exception.ResourceUnavailableException;
 import com.cloud.exception.VirtualMachineMigrationException;
 import com.cloud.offering.ServiceOffering;
 import com.cloud.service.ServiceOfferingVO;
+import com.cloud.storage.Storage.StoragePoolType;
 import com.cloud.user.Account;
 import com.cloud.uservm.UserVm;
 import com.cloud.utils.Pair;
@@ -42,8 +45,11 @@ import com.cloud.utils.Pair;
  */
 public interface UserVmManager extends UserVmService {
     static final String EnableDynamicallyScaleVmCK = "enable.dynamic.scale.vm";
+    static final String AllowUserExpungeRecoverVmCK ="allow.user.expunge.recover.vm";
     static final ConfigKey<Boolean> EnableDynamicallyScaleVm = new ConfigKey<Boolean>("Advanced", Boolean.class, EnableDynamicallyScaleVmCK, "false",
         "Enables/Disables dynamically scaling a vm", true, ConfigKey.Scope.Zone);
+    static final ConfigKey<Boolean> AllowUserExpungeRecoverVm = new ConfigKey<Boolean>("Advanced", Boolean.class, AllowUserExpungeRecoverVmCK, "false",
+        "Determines whether users can expunge or recover their vm", true, ConfigKey.Scope.Account);
 
     static final int MAX_USER_DATA_LENGTH_BYTES = 2048;
 
@@ -78,6 +84,8 @@ public interface UserVmManager extends UserVmService {
 
     HashMap<Long, List<VmDiskStatsEntry>> getVmDiskStatistics(long hostId, String hostName, List<Long> vmIds);
 
+    HashMap<String, VolumeStatsEntry> getVolumeStatistics(long clusterId, String poolUuid, StoragePoolType poolType, List<String> volumeLocator, int timout);
+
     boolean deleteVmGroup(long groupId);
 
     boolean addInstanceToGroup(long userVmId, String group);
@@ -97,10 +105,8 @@ public interface UserVmManager extends UserVmService {
 
     boolean setupVmForPvlan(boolean add, Long hostId, NicProfile nic);
 
-    void collectVmDiskStatistics(UserVmVO userVm);
-
     UserVm updateVirtualMachine(long id, String displayName, String group, Boolean ha, Boolean isDisplayVmEnabled, Long osTypeId, String userData,
-                                Boolean isDynamicallyScalable, HTTPMethod httpMethod, String customId, String hostName, String instanceName) throws ResourceUnavailableException, InsufficientCapacityException;
+                                Boolean isDynamicallyScalable, HTTPMethod httpMethod, String customId, String hostName, String instanceName, List<Long> securityGroupIdList, Map<String, Map<Integer, String>> extraDhcpOptionsMap) throws ResourceUnavailableException, InsufficientCapacityException;
 
     //the validateCustomParameters, save and remove CustomOfferingDetils functions can be removed from the interface once we can
     //find a common place for all the scaling and upgrading code of both user and systemvms.
@@ -115,4 +121,8 @@ public interface UserVmManager extends UserVmService {
     public UserVm updateVMdata(long userVmId) throws InsufficientCapacityException, ResourceUnavailableException;
 
     public void updateVMData(long userVmId, Map<String, String> vmData) throws InsufficientCapacityException, ResourceUnavailableException;
+
+    void persistDeviceBusInfo(UserVmVO paramUserVmVO, String paramString);
+
+    HashMap<Long, List<VmNetworkStatsEntry>> getVmNetworkStatistics(long hostId, String hostName, List<Long> vmIds);
 }

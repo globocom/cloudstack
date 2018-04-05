@@ -16,8 +16,6 @@
 */
 package com.globo.globodns.cloudstack.dao;
 
-import javax.ejb.Local;
-
 import org.springframework.stereotype.Component;
 
 import com.cloud.utils.db.DB;
@@ -28,7 +26,6 @@ import com.cloud.utils.db.SearchCriteria.Op;
 import com.globo.globodns.cloudstack.GloboDnsNetworkVO;
 
 @Component
-@Local(value = GloboDnsNetworkDao.class)
 @DB
 public class GloboDnsNetworkDaoImpl extends GenericDaoBase<GloboDnsNetworkVO, Long> implements GloboDnsNetworkDao {
 

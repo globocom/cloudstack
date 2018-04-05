@@ -18,7 +18,6 @@ package com.cloud.network.vpc.dao;
 
 import java.util.List;
 
-import javax.ejb.Local;
 
 import org.springframework.stereotype.Component;
 
@@ -30,7 +29,6 @@ import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
 
 @Component
-@Local(value = VpcGatewayDao.class)
 @DB()
 public class VpcGatewayDaoImpl extends GenericDaoBase<VpcGatewayVO, Long> implements VpcGatewayDao {
     protected final SearchBuilder<VpcGatewayVO> AllFieldsSearch;
@@ -82,6 +80,13 @@ public class VpcGatewayDaoImpl extends GenericDaoBase<VpcGatewayVO, Long> implem
         SearchCriteria<VpcGatewayVO> sc = AllFieldsSearch.create();
         sc.setParameters("aclId", aclId);
         sc.setParameters("type", type);
+        return listBy(sc);
+    }
+
+    @Override
+    public List<VpcGatewayVO> listByVpcId(long vpcId) {
+        SearchCriteria<VpcGatewayVO> sc = AllFieldsSearch.create();
+        sc.setParameters("vpcId", vpcId);
         return listBy(sc);
     }
 }

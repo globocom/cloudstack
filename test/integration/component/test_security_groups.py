@@ -20,22 +20,27 @@
 # Import Local Modules
 from nose.plugins.attrib import attr
 from marvin.cloudstackTestCase import cloudstackTestCase
-from marvin.lib.utils import cleanup_resources
+from marvin.lib.utils import cleanup_resources, validateList
+from marvin.cloudstackAPI import authorizeSecurityGroupIngress, revokeSecurityGroupIngress
 from marvin.lib.base import (Account,
                              ServiceOffering,
                              VirtualMachine,
                              SecurityGroup,
                              Router,
-                             Host)
+                             Host,
+                             Network)
 from marvin.lib.common import (get_domain,
                                get_zone,
                                get_template,
                                get_process_status)
 from marvin.sshClient import SshClient
+from marvin.codes import PASS
 
 # Import System modules
 import time
 import subprocess
+import socket
+import platform
 
 
 class TestDefaultSecurityGroup(cloudstackTestCase):
@@ -110,7 +115,7 @@ class TestDefaultSecurityGroup(cloudstackTestCase):
 
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_01_deployVM_InDefaultSecurityGroup(self):
         """Test deploy VM in default security group
         """
@@ -188,7 +193,7 @@ class TestDefaultSecurityGroup(cloudstackTestCase):
         )
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_02_listSecurityGroups(self):
         """Test list security groups for admin account
         """
@@ -223,7 +228,7 @@ class TestDefaultSecurityGroup(cloudstackTestCase):
         )
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_03_accessInDefaultSecurityGroup(self):
         """Test access in default security group
         """
@@ -384,7 +389,7 @@ class TestAuthorizeIngressRule(cloudstackTestCase):
 
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_01_authorizeIngressRule(self):
         """Test authorize ingress rule
         """
@@ -524,7 +529,13 @@ class TestRevokeIngressRule(cloudstackTestCase):
 
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    def revokeSGRule(self, sgid):
+        cmd = revokeSecurityGroupIngress.revokeSecurityGroupIngressCmd()
+        cmd.id = sgid
+        self.apiclient.revokeSecurityGroupIngress(cmd)
+        return
+
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_01_revokeIngressRule(self):
         """Test revoke ingress rule
         """
@@ -601,11 +612,21 @@ class TestRevokeIngressRule(cloudstackTestCase):
 
         self.debug("Revoking ingress rule for sec group ID: %s for ssh access"
                    % security_group.id)
-        # Revoke Security group to SSH to VM
-        security_group.revoke(
+        security_groups = SecurityGroup.list(
             self.apiclient,
-            id=ssh_rule["ruleid"]
+            account=self.account.name,
+            domainid=self.account.domainid,
+            listall=True
         )
+        self.assertEqual(
+            validateList(security_groups)[0],
+            PASS,
+            "Security groups list validation failed"
+        )
+        for sg in security_groups:
+            if not sg.ingressrule:
+                continue
+            self.revokeSGRule(sg.ingressrule[0].ruleid)
 
         # SSH Attempt to VM should fail
         with self.assertRaises(Exception):
@@ -613,7 +634,8 @@ class TestRevokeIngressRule(cloudstackTestCase):
             SshClient(self.virtual_machine.ssh_ip,
                       self.virtual_machine.ssh_port,
                       self.virtual_machine.username,
-                      self.virtual_machine.password
+                      self.virtual_machine.password,
+                      retries=5
                       )
         return
 
@@ -695,7 +717,7 @@ class TestDhcpOnlyRouter(cloudstackTestCase):
 
         return
 
-    @attr(tags=["sg", "eip", "basic"], required_hardware="true")
+    @attr(tags=["sg", "basic", "eip", "basic"], required_hardware="true")
     def test_01_dhcpOnlyRouter(self):
         """Test router services for user account
         """
@@ -745,13 +767,13 @@ class TestDhcpOnlyRouter(cloudstackTestCase):
             self.testdata['configurableData']['host']["username"],
             self.testdata['configurableData']['host']["password"],
             router.linklocalip,
-            "service dnsmasq status"
+            "systemctl is-active dnsmasq"
         )
         res = str(result)
         self.debug("Dnsmasq process status: %s" % res)
 
         self.assertEqual(
-            res.count("running"),
+            res.count("active"),
             1,
             "Check dnsmasq service is running or not"
         )
@@ -829,7 +851,7 @@ class TestdeployVMWithUserData(cloudstackTestCase):
 
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_01_deployVMWithUserData(self):
         """Test Deploy VM with User data"""
 
@@ -1007,7 +1029,7 @@ class TestDeleteSecurityGroup(cloudstackTestCase):
 
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_01_delete_security_grp_running_vm(self):
         """Test delete security group with running VM"""
 
@@ -1091,7 +1113,7 @@ class TestDeleteSecurityGroup(cloudstackTestCase):
         )
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_02_delete_security_grp_withoout_running_vm(self):
         """Test delete security group without running VM"""
 
@@ -1238,7 +1260,7 @@ class TestIngressRule(cloudstackTestCase):
 
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_01_authorizeIngressRule_AfterDeployVM(self):
         """Test delete security group with running VM"""
 
@@ -1335,9 +1357,13 @@ class TestIngressRule(cloudstackTestCase):
         # User should be able to ping VM
         try:
             self.debug("Trying to ping VM %s" % self.virtual_machine.ssh_ip)
-            result = subprocess.call(
-                ['ping', '-c 1', self.virtual_machine.ssh_ip])
-
+            platform_type = platform.system().lower()
+            if platform_type == 'windows':
+                result = subprocess.call(
+                    ['ping', '-n', '1', self.virtual_machine.ssh_ip])
+            else:
+                result = subprocess.call(
+                    ['ping', '-c 1', self.virtual_machine.ssh_ip])
             self.debug("Ping result: %s" % result)
             # if ping successful, then result should be 0
             self.assertEqual(
@@ -1351,7 +1377,7 @@ class TestIngressRule(cloudstackTestCase):
                       % (ingress_rule_2["id"], e))
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_02_revokeIngressRule_AfterDeployVM(self):
         """Test Revoke ingress rule after deploy VM"""
 
@@ -1459,9 +1485,13 @@ class TestIngressRule(cloudstackTestCase):
         # User should be able to ping VM
         try:
             self.debug("Trying to ping VM %s" % self.virtual_machine.ssh_ip)
-            result = subprocess.call(
-                ['ping', '-c 1', self.virtual_machine.ssh_ip])
-
+            platform_type = platform.system().lower()
+            if platform_type == 'windows':
+                result = subprocess.call(
+                    ['ping', '-n', '1', self.virtual_machine.ssh_ip])
+            else:
+                result = subprocess.call(
+                    ['ping', '-c 1', self.virtual_machine.ssh_ip])
             self.debug("Ping result: %s" % result)
             # if ping successful, then result should be 0
             self.assertEqual(
@@ -1469,45 +1499,57 @@ class TestIngressRule(cloudstackTestCase):
                 0,
                 "Check if ping is successful or not"
             )
-
         except Exception as e:
             self.fail("Ping failed for ingress rule ID: %s, %s"
                       % (icmp_rule["ruleid"], e))
-
         self.debug(
             "Revoke Ingress Rule for Security Group %s for account: %s"
             % (
                 security_group.id,
                 self.account.name
             ))
-
-        result = security_group.revoke(
+        #skip revoke and ping tests in case of EIP/ELB zone
+        vm_res = VirtualMachine.list(
             self.apiclient,
-            id=icmp_rule["ruleid"]
+            id=self.virtual_machine.id
         )
-        self.debug("Revoke ingress rule result: %s" % result)
-
-        time.sleep(self.testdata["sleep"])
-        # User should not be able to ping VM
-        try:
-            self.debug("Trying to ping VM %s" % self.virtual_machine.ssh_ip)
-            result = subprocess.call(
-                ['ping', '-c 1', self.virtual_machine.ssh_ip])
-
-            self.debug("Ping result: %s" % result)
-            # if ping successful, then result should be 0
-            self.assertNotEqual(
-                result,
-                0,
-                "Check if ping is successful or not"
+        self.assertEqual(validateList(vm_res)[0], PASS, "invalid vm response")
+        vm_nw = Network.list(
+            self.apiclient,
+            id=vm_res[0].nic[0].networkid
+        )
+        self.assertEqual(validateList(vm_nw)[0], PASS, "invalid network response")
+        vm_nw_off = vm_nw[0].networkofferingname
+        if vm_nw_off != "DefaultSharedNetscalerEIPandELBNetworkOffering":
+            result = security_group.revoke(
+                self.apiclient,
+                id=icmp_rule["ruleid"]
             )
+            self.debug("Revoke ingress rule result: %s" % result)
+            time.sleep(self.testdata["sleep"])
+            # User should not be able to ping VM
+            try:
+                self.debug("Trying to ping VM %s" % self.virtual_machine.ssh_ip)
+                if platform_type == 'windows':
+                    result = subprocess.call(
+                        ['ping', '-n', '1', self.virtual_machine.ssh_ip])
+                else:
+                    result = subprocess.call(
+                        ['ping', '-c 1', self.virtual_machine.ssh_ip])
 
-        except Exception as e:
-            self.fail("Ping failed for ingress rule ID: %s, %s"
-                      % (icmp_rule["ruleid"], e))
+                self.debug("Ping result: %s" % result)
+                # if ping successful, then result should be 0
+                self.assertNotEqual(
+                    result,
+                    0,
+                    "Check if ping is successful or not"
+                )
+            except Exception as e:
+                self.fail("Ping failed for ingress rule ID: %s, %s"
+                          % (icmp_rule["ruleid"], e))
         return
 
-    @attr(tags=["sg", "eip", "advancedsg"])
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
     def test_03_stopStartVM_verifyIngressAccess(self):
         """Test Start/Stop VM and Verify ingress rule"""
 
@@ -1605,4 +1647,532 @@ class TestIngressRule(cloudstackTestCase):
             self.fail("SSH access failed for ingress rule ID: %s"
                       % ingress_rule["id"]
                       )
+        return
+
+class TestIngressRuleSpecificIpSet(cloudstackTestCase):
+
+    def setUp(self):
+
+        self.apiclient = self.testClient.getApiClient()
+        self.dbclient = self.testClient.getDbConnection()
+        self.cleanup = []
+        return
+
+    def tearDown(self):
+        try:
+            # Clean up, terminate the created templates
+            cleanup_resources(self.apiclient, self.cleanup)
+        except Exception as e:
+            raise Exception("Warning: Exception during cleanup : %s" % e)
+        return
+
+    @classmethod
+    def setUpClass(cls):
+        cls.testClient = super(
+            TestIngressRuleSpecificIpSet,
+            cls).getClsTestClient()
+        cls.api_client = cls.testClient.getApiClient()
+
+        # Fill testdata from the external config file
+        cls.testdata = cls.testClient.getParsedTestDataConfig()
+        # Get Zone, Domain and templates
+        cls.domain = get_domain(cls.api_client)
+        cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
+        cls.testdata['mode'] = cls.zone.networktype
+
+        cls.mgtSvrDetails = cls.config.__dict__["mgtSvr"][0].__dict__
+
+        template = get_template(
+            cls.api_client,
+            cls.zone.id,
+            cls.testdata["ostype"]
+        )
+        cls.testdata["domainid"] = cls.domain.id
+        cls.testdata["virtual_machine"]["zoneid"] = cls.zone.id
+        cls.testdata["virtual_machine"]["template"] = template.id
+
+        cls.service_offering = ServiceOffering.create(
+            cls.api_client,
+            cls.testdata["service_offering"]
+        )
+        cls.account = Account.create(
+            cls.api_client,
+            cls.testdata["account"],
+            admin=True,
+            domainid=cls.domain.id
+        )
+
+        cls._cleanup = [
+            cls.account,
+            cls.service_offering
+        ]
+        return
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            # Cleanup resources used
+            cleanup_resources(cls.api_client, cls._cleanup)
+        except Exception as e:
+            raise Exception("Warning: Exception during cleanup : %s" % e)
+
+        return
+
+    def getLocalMachineIpAddress(self):
+        """ Get IP address of the machine on which test case is running """
+        socket_ = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        socket_.connect(('8.8.8.8', 0))
+        return socket_.getsockname()[0]
+
+    def setHostConfiguration(self):
+        """ Set necessary configuration on hosts for correct functioning of
+        ingress rules """
+
+        hosts = Host.list(self.apiclient,
+                type="Routing",
+                listall=True)
+
+        for host in hosts:
+            sshClient = SshClient(
+                host.ipaddress,
+                self.testdata["configurableData"]["host"]["publicport"],
+                self.testdata["configurableData"]["host"]["username"],
+                self.testdata["configurableData"]["host"]["password"]
+            )
+
+            qresultset = self.dbclient.execute(
+                        "select guid from host where uuid = '%s';" %
+                            host.id, db="cloud")
+            self.assertNotEqual(
+                        len(qresultset),
+                            0,
+                                "Check DB Query result set"
+                                )
+            hostguid = qresultset[-1][0]
+
+            commands = ["echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables",
+                        "echo 1 > /proc/sys/net/bridge/bridge-nf-call-arptables",
+                        "sysctl -w net.bridge.bridge-nf-call-iptables=1",
+                        "sysctl -w net.bridge.bridge-nf-call-arptables=1",
+                        "xe host-param-clear param-name=tags uuid=%s" % hostguid
+                        ]
+
+            for command in commands:
+                response = sshClient.execute(command)
+                self.debug(response)
+
+            Host.reconnect(self.apiclient, id=host.id)
+
+            retriesCount = 10
+            while retriesCount >= 0:
+                hostsList = Host.list(self.apiclient,
+                                      id=host.id)
+                if hostsList[0].state.lower() == "up":
+                    break
+                time.sleep(60)
+                retriesCount -= 1
+                if retriesCount == 0:
+                    raise Exception("Host failed to come in up state")
+
+            sshClient = SshClient(
+                host.ipaddress,
+                self.testdata["configurableData"]["host"]["publicport"],
+                self.testdata["configurableData"]["host"]["username"],
+                self.testdata["configurableData"]["host"]["password"]
+            )
+
+            response = sshClient.execute("service xapi restart")
+            self.debug(response)
+        return
+
+    def revokeSGRule(self, sgid):
+        cmd = revokeSecurityGroupIngress.revokeSecurityGroupIngressCmd()
+        cmd.id = sgid
+        self.apiclient.revokeSecurityGroupIngress(cmd)
+        return
+
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
+    def test_ingress_rules_specific_IP_set(self):
+        """Test ingress rules for specific IP set
+
+        # Validate the following:
+        # 1. Create an account and add ingress rule
+             (CIDR 0.0.0.0/0) in default security group
+        # 2. Deploy 2 VMs in the default sec group
+        # 3. Check if SSH works for the VMs from test machine, should work
+        # 4. Check if SSH works for the VM from different machine (
+             for instance, management server), should work
+        # 5. Revoke the ingress rule and add ingress rule for specific IP
+             set (including test machine)
+        # 6. Add new Vm to default sec group
+        # 7. Verify that SSH works to VM from test machine
+        # 8. Verify that SSH does not work to VM from different machine which
+             is outside specified IP set
+        """
+
+        # Default Security group should not have any ingress rule
+        security_groups = SecurityGroup.list(
+            self.apiclient,
+            account=self.account.name,
+            domainid=self.account.domainid,
+            listall=True
+        )
+        self.assertEqual(
+            validateList(security_groups)[0],
+            PASS,
+            "Security groups list validation failed"
+        )
+
+        defaultSecurityGroup = security_groups[0]
+
+        # Authorize Security group to SSH to VM
+        cmd = authorizeSecurityGroupIngress.authorizeSecurityGroupIngressCmd()
+        cmd.securitygroupid = defaultSecurityGroup.id
+        cmd.protocol = 'TCP'
+        cmd.startport = 22
+        cmd.endport = 22
+        cmd.cidrlist = '0.0.0.0/0'
+        ingress_rule = self.apiclient.authorizeSecurityGroupIngress(cmd)
+
+        virtual_machine_1 = VirtualMachine.create(
+            self.apiclient,
+            self.testdata["virtual_machine"],
+            accountid=self.account.name,
+            domainid=self.account.domainid,
+            serviceofferingid=self.service_offering.id,
+            securitygroupids=[defaultSecurityGroup.id],
+            mode=self.testdata['mode']
+        )
+        self.cleanup.append(virtual_machine_1)
+        virtual_machine_2 = VirtualMachine.create(
+            self.apiclient,
+            self.testdata["virtual_machine"],
+            accountid=self.account.name,
+            domainid=self.account.domainid,
+            serviceofferingid=self.service_offering.id,
+            securitygroupids=[defaultSecurityGroup.id],
+            mode=self.testdata['mode']
+        )
+        self.cleanup.append(virtual_machine_2)
+        try:
+            SshClient(
+                virtual_machine_1.ssh_ip,
+                virtual_machine_1.ssh_port,
+                virtual_machine_1.username,
+                virtual_machine_1.password
+            )
+        except Exception as e:
+            self.revokeSGRule(ingress_rule.ingressrule[0].ruleid)
+            self.fail("SSH Access failed for %s: %s" %
+                      (virtual_machine_1.ipaddress, e)
+            )
+
+        try:
+            SshClient(
+                virtual_machine_2.ssh_ip,
+                virtual_machine_2.ssh_port,
+                virtual_machine_2.username,
+                virtual_machine_2.password
+            )
+        except Exception as e:
+            self.revokeSGRule(ingress_rule.ingressrule[0].ruleid)
+            self.fail("SSH Access failed for %s: %s" %
+                      (virtual_machine_2.ipaddress, e)
+            )
+        try:
+            sshClient = SshClient(
+                self.mgtSvrDetails["mgtSvrIp"],
+                22,
+                self.mgtSvrDetails["user"],
+                self.mgtSvrDetails["passwd"]
+            )
+        except Exception as e:
+            self.revokeSGRule(ingress_rule.ingressrule[0].ruleid)
+            self.fail("SSH Access failed for %s: %s" %
+                      (self.mgtSvrDetails["mgtSvrIp"], e)
+            )
+        response = sshClient.execute("ssh %s@%s -v" %
+                                     (virtual_machine_1.username,
+                                      virtual_machine_1.ssh_ip))
+        self.debug("Response is :%s" % response)
+
+        self.assertTrue("connection established" in str(response).lower(),
+                        "SSH to VM at %s failed from external machine ip %s other than test machine" %
+                        (virtual_machine_1.ssh_ip,
+                         self.mgtSvrDetails["mgtSvrIp"]))
+
+        response = sshClient.execute("ssh %s@%s -v" %
+                                     (virtual_machine_2.username,
+                                      virtual_machine_2.ssh_ip))
+        self.debug("Response is :%s" % response)
+
+        self.assertTrue("connection established" in str(response).lower(),
+                        "SSH to VM at %s failed from external machine ip %s other than test machine" %
+                        (virtual_machine_2.ssh_ip,
+                         self.mgtSvrDetails["mgtSvrIp"]))
+        virtual_machine_3 = VirtualMachine.create(
+            self.apiclient,
+            self.testdata["virtual_machine"],
+            accountid=self.account.name,
+            domainid=self.account.domainid,
+            serviceofferingid=self.service_offering.id,
+            securitygroupids=[defaultSecurityGroup.id],
+            mode=self.testdata['mode']
+        )
+        self.cleanup.append(virtual_machine_3)
+        security_groups = SecurityGroup.list(
+            self.apiclient,
+            account=self.account.name,
+            domainid=self.account.domainid,
+            listall=True
+        )
+        self.assertEqual(
+            validateList(security_groups)[0],
+            PASS,
+            "Security groups list validation failed"
+        )
+        for sg in security_groups:
+            if not sg.ingressrule:
+                continue
+            self.revokeSGRule(sg.ingressrule[0].ruleid)
+        localMachineIpAddress = self.getLocalMachineIpAddress()
+        cidr = localMachineIpAddress + "/32"
+
+        # Authorize Security group to SSH to VM
+        cmd = authorizeSecurityGroupIngress.authorizeSecurityGroupIngressCmd()
+        cmd.securitygroupid = defaultSecurityGroup.id
+        cmd.protocol = 'TCP'
+        cmd.startport = 22
+        cmd.endport = 22
+        cmd.cidrlist = cidr
+        ingress_rule = self.apiclient.authorizeSecurityGroupIngress(cmd)
+        if self.testdata["configurableData"]["setHostConfigurationForIngressRule"]:
+            self.setHostConfiguration()
+            time.sleep(180)
+
+        virtual_machine_3.stop(self.apiclient)
+        virtual_machine_3.start(self.apiclient)
+
+        try:
+            sshClient = SshClient(
+                virtual_machine_3.ssh_ip,
+                virtual_machine_3.ssh_port,
+                virtual_machine_3.username,
+                virtual_machine_3.password
+            )
+        except Exception as e:
+            self.fail("SSH Access failed for %s: %s" %
+                      (virtual_machine_3.ssh_ip, e)
+            )
+
+        sshClient = SshClient(
+            self.mgtSvrDetails["mgtSvrIp"],
+            22,
+            self.mgtSvrDetails["user"],
+            self.mgtSvrDetails["passwd"]
+        )
+
+        response = sshClient.execute("ssh %s@%s -v" %
+                                     (virtual_machine_3.username,
+                                      virtual_machine_3.ssh_ip))
+        self.debug("Response is :%s" % response)
+
+        self.assertFalse("connection established" in str(response).lower(),
+                         "SSH to VM at %s succeeded from external machine ip %s other than test machine" %
+                         (virtual_machine_3.ssh_ip,
+                          self.mgtSvrDetails["mgtSvrIp"]))
+        return
+
+    @attr(tags=["sg", "basic", "eip", "advancedsg"])
+    def test_ingress_rules_specific_IP_set_non_def_sec_group(self):
+        """Test ingress rules for specific IP set and non default security group
+
+        # Validate the following:
+        # 1. Create an account and add ingress rule
+             (CIDR 0.0.0.0/0) in default security group
+        # 2. Deploy 2 VMs in the default sec group
+        # 3. Check if SSH works for the VMs from test machine, should work
+        # 4. Check if SSH works for the VM from different machine (
+             for instance, management server), should work
+        # 5. Add new security group to the account and add ingress rule for
+             specific IP set (including test machine)
+        # 6. Add new Vm to new sec group
+        # 7. Verify that SSH works to VM from test machine
+        # 8. Verify that SSH does not work to VM from different machine which
+             is outside specified IP set
+        """
+
+        # Default Security group should not have any ingress rule
+        security_groups = SecurityGroup.list(
+            self.apiclient,
+            account=self.account.name,
+            domainid=self.account.domainid,
+            listall=True
+        )
+        self.assertEqual(
+            validateList(security_groups)[0],
+            PASS,
+            "Security groups list validation failed"
+        )
+
+        defaultSecurityGroup = security_groups[0]
+
+        # Authorize Security group to SSH to VM
+        cmd = authorizeSecurityGroupIngress.authorizeSecurityGroupIngressCmd()
+        cmd.securitygroupid = defaultSecurityGroup.id
+        cmd.protocol = 'TCP'
+        cmd.startport = 22
+        cmd.endport = 22
+        cmd.cidrlist = '0.0.0.0/0'
+        self.apiclient.authorizeSecurityGroupIngress(cmd)
+
+        virtual_machine_1 = VirtualMachine.create(
+            self.apiclient,
+            self.testdata["virtual_machine"],
+            accountid=self.account.name,
+            domainid=self.account.domainid,
+            serviceofferingid=self.service_offering.id,
+            securitygroupids=[defaultSecurityGroup.id],
+            mode=self.testdata['mode']
+        )
+        self.cleanup.append(virtual_machine_1)
+        virtual_machine_2 = VirtualMachine.create(
+            self.apiclient,
+            self.testdata["virtual_machine"],
+            accountid=self.account.name,
+            domainid=self.account.domainid,
+            serviceofferingid=self.service_offering.id,
+            securitygroupids=[defaultSecurityGroup.id],
+            mode=self.testdata['mode']
+        )
+        self.cleanup.append(virtual_machine_2)
+        try:
+            SshClient(
+                virtual_machine_1.ssh_ip,
+                virtual_machine_1.ssh_port,
+                virtual_machine_1.username,
+                virtual_machine_1.password
+            )
+        except Exception as e:
+            self.fail("SSH Access failed for %s: %s" %
+                      (virtual_machine_1.ipaddress, e)
+                      )
+
+        try:
+            SshClient(
+                virtual_machine_2.ssh_ip,
+                virtual_machine_2.ssh_port,
+                virtual_machine_2.username,
+                virtual_machine_2.password
+            )
+        except Exception as e:
+            self.fail("SSH Access failed for %s: %s" %
+                      (virtual_machine_2.ipaddress, e)
+                      )
+
+        sshClient = SshClient(
+               self.mgtSvrDetails["mgtSvrIp"],
+               22,
+               self.mgtSvrDetails["user"],
+               self.mgtSvrDetails["passwd"]
+        )
+
+        response = sshClient.execute("ssh %s@%s -v" %
+                    (virtual_machine_1.username,
+                        virtual_machine_1.ssh_ip))
+        self.debug("Response is :%s" % response)
+
+        self.assertTrue("connection established" in str(response).lower(),
+                    "SSH to VM at %s failed from external machine ip %s other than test machine" %
+                    (virtual_machine_1.ssh_ip,
+                        self.mgtSvrDetails["mgtSvrIp"]))
+
+        response = sshClient.execute("ssh %s@%s -v" %
+                    (virtual_machine_2.username,
+                        virtual_machine_2.ssh_ip))
+        self.debug("Response is :%s" % response)
+
+        self.assertTrue("connection established" in str(response).lower(),
+                    "SSH to VM at %s failed from external machine ip %s other than test machine" %
+                    (virtual_machine_2.ssh_ip,
+                        self.mgtSvrDetails["mgtSvrIp"]))
+
+        localMachineIpAddress = self.getLocalMachineIpAddress()
+        cidr = localMachineIpAddress + "/32"
+
+        security_group = SecurityGroup.create(
+            self.apiclient,
+            self.testdata["security_group"],
+            account=self.account.name,
+            domainid=self.account.domainid
+        )
+
+        # Authorize Security group to SSH to VM
+        cmd = authorizeSecurityGroupIngress.authorizeSecurityGroupIngressCmd()
+        cmd.securitygroupid = security_group.id
+        cmd.protocol = 'TCP'
+        cmd.startport = 22
+        cmd.endport = 22
+        cmd.cidrlist = cidr
+        self.apiclient.authorizeSecurityGroupIngress(cmd)
+
+        virtual_machine_3 = VirtualMachine.create(
+            self.apiclient,
+            self.testdata["virtual_machine"],
+            accountid=self.account.name,
+            domainid=self.account.domainid,
+            serviceofferingid=self.service_offering.id,
+            securitygroupids=[security_group.id],
+            mode=self.testdata['mode']
+        )
+        self.cleanup.append(virtual_machine_3)
+        if self.testdata["configurableData"]["setHostConfigurationForIngressRule"]:
+            self.setHostConfiguration()
+            time.sleep(180)
+
+        virtual_machine_3.stop(self.apiclient)
+        virtual_machine_3.start(self.apiclient)
+
+        try:
+            sshClient = SshClient(
+                virtual_machine_3.ssh_ip,
+                virtual_machine_3.ssh_port,
+                virtual_machine_3.username,
+                virtual_machine_3.password
+        )
+        except Exception as e:
+            self.fail("SSH Access failed for %s: %s" %
+                      (virtual_machine_3.ssh_ip, e)
+                      )
+        security_groups = SecurityGroup.list(
+            self.apiclient,
+            account=self.account.name,
+            domainid=self.account.domainid,
+            listall=True
+        )
+        self.assertEqual(
+            validateList(security_groups)[0],
+            PASS,
+            "Security groups list validation failed"
+        )
+        for sg in security_groups:
+            if sg.id == security_group.id or not sg.ingressrule:
+                continue
+            self.revokeSGRule(sg.ingressrule[0].ruleid)
+        sshClient = SshClient(
+               self.mgtSvrDetails["mgtSvrIp"],
+               22,
+               self.mgtSvrDetails["user"],
+               self.mgtSvrDetails["passwd"]
+        )
+
+        response = sshClient.execute("ssh %s@%s -v" %
+                    (virtual_machine_3.username,
+                        virtual_machine_3.ssh_ip))
+        self.debug("Response is :%s" % response)
+
+        self.assertFalse("connection established" in str(response).lower(),
+                    "SSH to VM at %s succeeded from external machine ip %s other than test machine" %
+                    (virtual_machine_3.ssh_ip,
+                        self.mgtSvrDetails["mgtSvrIp"]))
         return
