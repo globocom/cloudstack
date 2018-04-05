@@ -151,7 +151,7 @@ def getResultObj(returnObj, responsecls=None):
 
     if result.count is not None:
         for key in result.__dict__.iterkeys():
-            if key == "count":
+            if key == "count" or key == "context":
                 continue
             else:
                 return getattr(result, key)
