@@ -7894,8 +7894,13 @@
                                     label: 'label.public',
                                     converter: function (args) {
                                         if (args == null)
-                                        return "Yes"; else
-                                        return "No";
+                                            return "Yes";
+                                        else
+                                            return "No";
+                                    }
+                                }
+                            }
+                        }
                     },
 
                     ConfigDrive: {
@@ -8013,7 +8018,7 @@
                     }
                 }
             }
-        },
+        }),
         physicalResourceSection: {
             sections: {
                 physicalResources: {

@@ -3919,6 +3919,8 @@
 		                                                    			}
 		                                                    		}
 	                                                    		}
+	                                                    	}
+	                                                    });
                                                     } else { //from VPC section
                                                         var lbProviderIsNetscaler;
                                                         var services = args.context.vpc[0].service;
