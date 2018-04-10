@@ -2684,14 +2684,15 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
             throw new CloudRuntimeException("UserVm " + userVmId + " do not exists!");
         }
 
-        VmDataUpdater vmDataUpdater = new VmDataUpdater(){
-
-            @Override
-            public boolean execute(Network network, NicProfile nic, VirtualMachineProfile vmProfile, UserDataServiceProvider element) throws ResourceUnavailableException {
-                return element.saveUserVMData(network, nic, vmProfile, vmData);
-            }
-        };
-         vmDataUpdater.run(vm);
+        //TODO fix find out how to send vmdata to virtual router
+//        VmDataUpdater vmDataUpdater = new VmDataUpdater(){
+//
+//            @Override
+//            public boolean execute(Network network, NicProfile nic, VirtualMachineProfile vmProfile, UserDataServiceProvider element) throws ResourceUnavailableException {
+//                return element.saveUserVMData(network, nic, vmProfile, vmData);
+//            }
+//        };
+//         vmDataUpdater.run(vm);
     }
 
 

@@ -22,6 +22,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.cloud.uservm.UserVm;
+import com.cloud.vm.VirtualMachine.State;
+import com.cloud.utils.exception.CloudRuntimeException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -53,26 +56,8 @@ import com.cloud.vm.dao.NicIpAliasDao;
 import com.cloud.vm.dao.NicSecondaryIpDao;
 import com.cloud.vm.dao.UserVmDaoImpl;
 import junit.framework.TestCase;
-import org.apache.log4j.Logger;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Matchers;
 
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
-
-
-
-import junit.framework.TestCase;
 
 /**
  * NetworkManagerImpl implements NetworkManager.
@@ -219,7 +204,7 @@ public class NetworkOrchestratorTest extends TestCase {
     public UserVm newUserVm(Long id, String name, State state, final  Date removedTemp) {
         UserVmVO vm = new UserVmVO(id, name, null, 0l, null,
                      0l, false, false, 0l, 0l,
-                     0l, null, null, 0l) {
+                     0l, 1l, null, null, 0l) {
             public Date getRemoved() {
                 return removedTemp;
             }

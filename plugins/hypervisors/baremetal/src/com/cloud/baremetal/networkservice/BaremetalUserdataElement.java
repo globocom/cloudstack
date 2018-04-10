@@ -89,11 +89,6 @@ public class BaremetalUserdataElement extends AdapterBase implements NetworkElem
     }
 
     @Override
-    public boolean saveUserVMData(Network network, NicProfile nicProfile, VirtualMachineProfile vmProfile, Map<String, String> vmData)  throws ResourceUnavailableException {
-        return false;
-    }
-
-    @Override
     public Map<Service, Map<Capability, String>> getCapabilities() {
         return capabilities;
     }

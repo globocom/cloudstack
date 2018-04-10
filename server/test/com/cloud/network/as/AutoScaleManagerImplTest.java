@@ -508,7 +508,7 @@ public class AutoScaleManagerImplTest {
                 eq(Arrays.asList(1L)), eq(owner), eq("instanceName"), eq("instanceName"), isNull(Long.class),
                 isNull(Long.class), isNull(String.class), eq(Hypervisor.HypervisorType.XenServer),
                 eq(BaseCmd.HTTPMethod.POST), eq(USER_DATA), isNull(String.class), isNull(Map.class),
-                any(Network.IpAddresses.class), eq(true), isNull(String.class), isNull(List.class), isNull(Map.class), isNull(String.class))).
+                any(Network.IpAddresses.class), eq(true), isNull(String.class), isNull(List.class), isNull(Map.class), isNull(String.class), null, null)).
                 thenThrow(new InsufficientNetworkCapacityException("Network error", Networks.class, 1L));
         autoScaleManager._userVmService = userVmService;
 
@@ -548,7 +548,7 @@ public class AutoScaleManagerImplTest {
     }
 
     private UserVmVO createVM() {
-        return new UserVmVO(1L, "instanceName", "instanceName", 1L, Hypervisor.HypervisorType.XenServer, 1L, true, true, 1L, 1L, 1L, null, "instanceName", 1L);
+        return new UserVmVO(1L, "instanceName", "instanceName", 1L, Hypervisor.HypervisorType.XenServer, 1L, true, true, 1L, 1L, 1L,  1,null, "instanceName", 1L);
     }
 
     private DataCenterVO createZone() {
@@ -557,7 +557,7 @@ public class AutoScaleManagerImplTest {
 
     private UserVmService mockCreateUserVm(AccountVO owner, DataCenterVO zone, ServiceOfferingVO serviceOffering, VirtualMachineTemplate template, UserVmVO userVm, List<Long> networkIds) throws InsufficientCapacityException, ResourceUnavailableException, ResourceAllocationException {
         UserVmService userVmService = mock(UserVmService.class);
-        when(userVmService.createAdvancedVirtualMachine(eq(zone), eq(serviceOffering), eq(template), eq(networkIds), eq(owner), eq("instanceName"), eq("instanceName"), isNull(Long.class), isNull(Long.class), isNull(String.class), eq(Hypervisor.HypervisorType.XenServer), eq(BaseCmd.HTTPMethod.POST), eq(USER_DATA), isNull(String.class), isNull(Map.class), any(Network.IpAddresses.class), eq(true), isNull(String.class), isNull(List.class), isNull(Map.class), isNull(String.class))).thenReturn(userVm);
+        when(userVmService.createAdvancedVirtualMachine(eq(zone), eq(serviceOffering), eq(template), eq(networkIds), eq(owner), eq("instanceName"), eq("instanceName"), isNull(Long.class), isNull(Long.class), isNull(String.class), eq(Hypervisor.HypervisorType.XenServer), eq(BaseCmd.HTTPMethod.POST), eq(USER_DATA), isNull(String.class), isNull(Map.class), any(Network.IpAddresses.class), eq(true), isNull(String.class), isNull(List.class), isNull(Map.class), isNull(String.class), null, null)).thenReturn(userVm);
         autoScaleManager._userVmService = userVmService;
         return userVmService;
     }
@@ -578,7 +578,8 @@ public class AutoScaleManagerImplTest {
     }
 
     private NetworkVO createNetwork() {
-        return new NetworkVO(1L, Networks.TrafficType.Guest, Networks.Mode.Dhcp, Networks.BroadcastDomainType.LinkLocal, 1L, 1L, 1L, 1L, "network", "", "", Network.GuestType.Shared, 1L, 1L, ControlledEntity.ACLType.Domain, false, 1L);
+        return new NetworkVO(1L,
+                Networks.TrafficType.Guest, Networks.Mode.Dhcp, Networks.BroadcastDomainType.LinkLocal, 1L, 1L, 1L, 1L, "network", "", "", Network.GuestType.Shared, 1L, 1L, ControlledEntity.ACLType.Domain, false, 1L, false);
     }
 
     private AutoScaleVmProfileNetworkMapDao mockListProfileNetworkMap(AutoScaleVmProfileVO autoScaleVmProfile, List<Long> networkIds) {
@@ -655,7 +656,7 @@ public class AutoScaleManagerImplTest {
     }
 
     private UserVmVO createUserVm(Long id) {
-        return new UserVmVO(id, "test", "test", 1L, Hypervisor.HypervisorType.Any, 1L, false, false, 1L, 1L, 5L, "test", "test", 1L);
+        return new UserVmVO(id, "test", "test", 1L, Hypervisor.HypervisorType.Any, 1L, false, false, 1L, 1L, 5L,  1,"test", "test", 1L);
     }
 
     private AutoScaleManagerImpl createMockedScaleDownAutoScaleManager() {
@@ -810,6 +811,26 @@ public class AutoScaleManagerImplTest {
         @Override
         public boolean isDynamicallyScalable() {
             return false;
+        }
+
+        @Override
+        public Long getParentTemplateId() {
+            return null;
+        }
+
+        @Override
+        public long getUpdatedCount() {
+            return 0;
+        }
+
+        @Override
+        public void incrUpdatedCount() {
+
+        }
+
+        @Override
+        public Date getUpdated() {
+            return null;
         }
 
         @Override

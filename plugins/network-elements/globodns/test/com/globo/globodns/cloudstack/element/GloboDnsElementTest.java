@@ -25,10 +25,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
-
-import javax.inject.Inject;
-
 import org.apache.cloudstack.context.CallContext;
 import org.apache.cloudstack.globoconfig.GloboResourceConfigurationDaoImpl;
 import org.apache.cloudstack.globoconfig.GloboResourceConfigurationVO;
@@ -143,7 +139,7 @@ public class GloboDnsElementTest {
         when(network.getId()).thenReturn(1l);
         NicProfile nic = new NicProfile();
         nic.setUuid("123123");
-        nic.setIp4Address("10.11.12.13");
+        nic.setIPv4Address("10.11.12.13");
         VirtualMachineProfile vm = mock(VirtualMachineProfile.class);
         when(vm.getHostName()).thenReturn("vm-name");
         when(vm.getType()).thenReturn(VirtualMachine.Type.User);

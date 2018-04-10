@@ -739,22 +739,22 @@ NetworkMigrationResponder, AggregatedCommandExecutor, RedundantResource, DnsServ
         return result;
     }
 
-    @Override
-    public boolean saveUserVMData(Network network, NicProfile nic, VirtualMachineProfile vm,
-                                  Map<String, String> vmData)  throws ResourceUnavailableException {
-        if (!canHandle(network, null)) {
-            return false;
-        }
-        List<DomainRouterVO> routers = _routerDao.listByNetworkAndRole(network.getId(), Role.VIRTUAL_ROUTER);
-        if (routers == null || routers.isEmpty()) {
-            s_logger.debug("Can't find virtual router element in network " + network.getId());
-            return true;
-        }
-
-        VirtualMachineProfile uservm = vm;
-
-        return _routerMgr.saveVmMetadataToRouter(network, nic, uservm, routers, vmData);
-    }
+//    @Override
+//    public boolean saveUserVMData(Network network, NicProfile nic, VirtualMachineProfile vm,
+//                                  Map<String, String> vmData)  throws ResourceUnavailableException {
+//        if (!canHandle(network, null)) {
+//            return false;
+//        }
+//        List<DomainRouterVO> routers = _routerDao.listByNetworkAndRole(network.getId(), Role.VIRTUAL_ROUTER);
+//        if (routers == null || routers.isEmpty()) {
+//            s_logger.debug("Can't find virtual router element in network " + network.getId());
+//            return true;
+//        }
+//
+//        VirtualMachineProfile uservm = vm;
+//
+//        return _routerMgr.saveVmMetadataToRouter(network, nic, uservm, routers, vmData);
+//    }
 
     @Override
     public boolean saveUserData(final Network network, final NicProfile nic, final VirtualMachineProfile vm) throws ResourceUnavailableException {
@@ -780,21 +780,21 @@ NetworkMigrationResponder, AggregatedCommandExecutor, RedundantResource, DnsServ
     }
 
 
-    public boolean saveMetadataToRouter(Network network, NicProfile nic, VirtualMachineProfile vm, Map<String, String> metadata) throws ResourceUnavailableException {
-        if (!canHandle(network, null)) {
-            return false;
-        }
-        List<DomainRouterVO> routers = _routerDao.listByNetworkAndRole(network.getId(), Role.VIRTUAL_ROUTER);
-        if (routers == null || routers.isEmpty()) {
-            s_logger.debug("Can't find virtual router element in network " + network.getId());
-            return true;
-        }
-
-        @SuppressWarnings("unchecked")
-        VirtualMachineProfile uservm = vm;
-
-        return _routerMgr.saveVmMetadataToRouter(network, nic, uservm, routers, metadata);
-    }
+//    public boolean saveMetadataToRouter(Network network, NicProfile nic, VirtualMachineProfile vm, Map<String, String> metadata) throws ResourceUnavailableException {
+//        if (!canHandle(network, null)) {
+//            return false;
+//        }
+//        List<DomainRouterVO> routers = _routerDao.listByNetworkAndRole(network.getId(), Role.VIRTUAL_ROUTER);
+//        if (routers == null || routers.isEmpty()) {
+//            s_logger.debug("Can't find virtual router element in network " + network.getId());
+//            return true;
+//        }
+//
+//        @SuppressWarnings("unchecked")
+//        VirtualMachineProfile uservm = vm;
+//
+//        return _routerMgr.saveVmMetadataToRouter(network, nic, uservm, routers, metadata);
+//    }
 
     @Override
     public List<Class<?>> getCommands() {

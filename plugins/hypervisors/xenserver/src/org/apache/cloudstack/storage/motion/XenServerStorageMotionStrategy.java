@@ -311,19 +311,28 @@ public class XenServerStorageMotionStrategy implements DataMotionStrategy {
         // Initiate migration of a virtual machine with its volumes.
 
         try {
-            List<Pair<VolumeTO, StorageFilerTO>> volumeToFilerTO = new ArrayList<Pair<VolumeTO, StorageFilerTO>>();
+            List<Pair<VolumeTO, String>> volumeToStorageUuid = new ArrayList<>();
+
             for (Map.Entry<VolumeInfo, DataStore> entry : volumeToPool.entrySet()) {
-                VolumeInfo volume = entry.getKey();
-                VolumeTO volumeTo = new VolumeTO(volume, storagePoolDao.findById(volume.getPoolId()));
-                StorageFilerTO filerTo = new StorageFilerTO((StoragePool)entry.getValue());
-                volumeToFilerTO.add(new Pair<>(volumeTo, filerTo));
+                VolumeInfo volumeInfo = entry.getKey();
+                StoragePool storagePool = storagePoolDao.findById(volumeInfo.getPoolId());
+                VolumeTO volumeTo = new VolumeTO(volumeInfo, storagePool);
+
+                if (storagePool.isManaged()) {
+                    String iqn = handleManagedVolumePreMigration(volumeInfo, storagePool, destHost);
+
+                    volumeToStorageUuid.add(new Pair<>(volumeTo, iqn));
+                }
+                else {
+                    volumeToStorageUuid.add(new Pair<>(volumeTo, ((StoragePool)entry.getValue()).getPath()));
+                }
             }
 
             // Migration across cluster needs to be done in three phases.
             // 1. Send a migrate receive command to the destination host so that it is ready to receive a vm.
             // 2. Send a migrate send command to the source host. This actually migrates the vm to the destination.
             // 3. Complete the process. Update the volume details.
-            MigrateWithStorageReceiveCommand receiveCmd = new MigrateWithStorageReceiveCommand(to, volumeToFilerTO);
+            MigrateWithStorageReceiveCommand receiveCmd = new MigrateWithStorageReceiveCommand(to, volumeToStorageUuid);
             MigrateWithStorageReceiveAnswer receiveAnswer = (MigrateWithStorageReceiveAnswer)agentMgr.send(destHost.getId(), receiveCmd);
 
             if (receiveAnswer == null) {

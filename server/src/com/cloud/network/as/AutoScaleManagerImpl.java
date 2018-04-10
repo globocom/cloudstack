@@ -1578,13 +1578,13 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
             if (zone.getNetworkType() == NetworkType.Basic) {
                 vm = _userVmService.createBasicSecurityGroupVirtualMachine(zone, serviceOffering, template, null, owner, instanceName,
                         instanceName, null, null, null, HypervisorType.XenServer, HTTPMethod.GET, null, null, null,
-                    null, true, null, null, null, null);
+                    null, true, null, null, null, null, null, null);
             } else {
                 if (zone.isSecurityGroupEnabled()) {
                     vm = _userVmService.createAdvancedSecurityGroupVirtualMachine(zone, serviceOffering, template, null, null,
                         owner, instanceName,
                             instanceName, null, null, null, HypervisorType.XenServer, HTTPMethod.GET, null, null,
-                        null, null, true, null, null, null, null);
+                        null, null, true, null, null, null, null, null, null);
 
                 } else {
                     List<Long> networkIds = new ArrayList<>();
@@ -1593,7 +1593,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
                     networkIds.add(mainNetworkId);
                     networkIds.addAll(getAdditionalNetWorkIds(profileVo, zone));
                     vm = _userVmService.createAdvancedVirtualMachine(zone, serviceOffering, template, networkIds, owner, instanceName, instanceName,
-                        null, null, null, template.getHypervisorType(), HTTPMethod.POST, profileVo.getUserData(), null, null, addrs, true, null, null, null, null);
+                        null, null, null, template.getHypervisorType(), HTTPMethod.POST, profileVo.getUserData(), null, null, addrs, true, null, null, null, null, null, null);
 
                 }
             }
@@ -1929,7 +1929,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
 
     private boolean destroyVM(long vmId) {
         try {
-            _userVmManager.destroyVm(vmId);
+            _userVmManager.destroyVm(vmId, true);
             return true;
         } catch (ResourceUnavailableException | ConcurrentOperationException e) {
             s_logger.error("It was not possible to destroy VM id: " + vmId, e);

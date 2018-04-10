@@ -560,10 +560,6 @@ public class MockConfigurationManagerImpl extends ManagerBase implements Configu
     }
 
     @Override
-    public boolean deletePortableIpRange(Long rangeId) {
-        return false;// TODO Auto-generated method stub
-    }
-    @Override
     public PortableIpRangeVO createPortableIpRange(Integer regionId, String startIP, String endIP, String gateway, String netmask, String vlanId) {
         return null;// TODO Auto-generated method stub
     }

@@ -163,8 +163,8 @@ public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter
             throw new InvalidParameterValueException("VM name should contain only lower case letters and digits: " + vmName + " - " + vm);
         }
 
-        boolean isIpv6 = nic.getIp6Address() != null;
-        String ipAddress = isIpv6 ? nic.getIp6Address() : nic.getIp4Address();
+        boolean isIpv6 = nic.getIPv6Address() != null;
+        String ipAddress = isIpv6 ? nic.getIPv6Address() : nic.getIPv4Address();
 
 
         GloboResourceConfigurationVO forceConfig = _globoResourceConfigDao.getFirst(GloboResourceType.VM_NIC, nic.getUuid(), GloboResourceKey.skipDnsError);
@@ -207,10 +207,10 @@ public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter
         }
 
 
-        boolean isIpv6 = nic.getIp6Address() != null;
-        String ipAddress = isIpv6 ? nic.getIp6Address() : nic.getIp4Address();
+        boolean isIpv6 = nic.getIPv6Address() != null;
+        String ipAddress = isIpv6 ? nic.getIPv6Address() : nic.getIPv4Address();
 
-        RemoveRecordCommand cmd = new RemoveRecordCommand(hostNameOfVirtualMachine(vm), nic.getIPv4Address(), network.getNetworkDomain(), GloboDNSOverride.value());
+        RemoveRecordCommand cmd = new RemoveRecordCommand(hostNameOfVirtualMachine(vm), ipAddress, network.getNetworkDomain(), GloboDNSOverride.value());
 
         callCommand(cmd, zoneId);
 
@@ -225,6 +225,10 @@ public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter
     @Override
     public boolean shutdown(Network network, ReservationContext context, boolean cleanup) throws ConcurrentOperationException, ResourceUnavailableException {
         return true;
+    }
+
+    protected String hostNameOfVirtualMachine(VirtualMachineProfile vm) {
+        return vm.getHostName().toLowerCase();
     }
 
     @Override

@@ -260,6 +260,4 @@ public interface ConfigurationManager {
     AllocationState findPodAllocationState(HostPodVO pod);
 
     AllocationState findClusterAllocationState(ClusterVO cluster);
-
-    boolean deletePortableIpRange(Long portableIp);
 }
