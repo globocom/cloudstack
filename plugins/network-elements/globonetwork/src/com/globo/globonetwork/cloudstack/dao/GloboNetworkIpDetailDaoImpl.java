@@ -18,8 +18,6 @@ package com.globo.globonetwork.cloudstack.dao;
 
 import java.util.List;
 
-import javax.ejb.Local;
-
 import org.springframework.stereotype.Component;
 
 import com.cloud.utils.db.DB;
@@ -30,7 +28,6 @@ import com.cloud.utils.db.SearchCriteria.Op;
 import com.globo.globonetwork.cloudstack.GloboNetworkIpDetailVO;
 
 @Component
-@Local(value = GloboNetworkIpDetailDao.class)
 @DB
 public class GloboNetworkIpDetailDaoImpl extends GenericDaoBase<GloboNetworkIpDetailVO, Long> implements GloboNetworkIpDetailDao {
 

@@ -89,6 +89,7 @@
     <module>user-authenticators/md5</module>
     <module>user-authenticators/pbkdf2</module>
     <module>user-authenticators/plain-text</module>
+    <module>user-authenticators/oauth2</module>
     <module>user-authenticators/saml2</module>
     <module>user-authenticators/sha256salted</module>
     <module>network-elements/dns-notifier</module>
@@ -106,6 +107,8 @@
     <module>network-elements/internal-loadbalancer</module>
     <module>network-elements/vxlan</module>
     <module>network-elements/globodns</module>
+    <module>network-elements/globonetwork</module>
+    <module>network-elements/globoaclapi</module>
     <module>database/quota</module>
     <module>integrations/cloudian</module>
     <module>integrations/prometheus</module>

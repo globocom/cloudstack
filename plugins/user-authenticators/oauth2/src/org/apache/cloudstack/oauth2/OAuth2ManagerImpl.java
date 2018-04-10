@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.cloudstack.api.auth.PluggableAPIAuthenticator;
@@ -58,7 +57,6 @@ import com.cloud.utils.component.AdapterBase;
 import com.cloud.utils.exception.CloudRuntimeException;
 
 @Component
-@Local
 public class OAuth2ManagerImpl extends AdapterBase implements OAuth2Manager, PluggableAPIAuthenticator, Configurable {
 
     public static final Logger s_logger = Logger.getLogger(OAuth2ManagerImpl.class);
@@ -255,7 +253,8 @@ public class OAuth2ManagerImpl extends AdapterBase implements OAuth2Manager, Plu
             }
             String email = username.contains("@") ? username : "";
             s_logger.info("Creating new user/account with username=" + username + ", email=" + email + " in domain " + domain.getId());
-            userAcc = _accManager.createUserAccount(username, UUID.randomUUID().toString(), username, username, username, null, username, Account.ACCOUNT_TYPE_NORMAL, domain.getId(), null, null, null, null);
+            userAcc = _accManager.createUserAccount(username, UUID.randomUUID().toString(), username, username, username, null, username,
+                                                    Account.ACCOUNT_TYPE_NORMAL, null, domain.getId(), null, null, null, null);
             // if there are any conflict of username/account name raises an error and administrator take care, to avoid security problems.
             if (userAcc == null) {
                 throw new CloudAuthenticationException("Unable to create new account " + username + ". Contact the administrator.");

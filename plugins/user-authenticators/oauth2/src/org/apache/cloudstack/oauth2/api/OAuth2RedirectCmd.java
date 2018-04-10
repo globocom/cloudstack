@@ -16,6 +16,7 @@
 // under the License.
 package org.apache.cloudstack.oauth2.api;
 
+import java.net.InetAddress;
 import java.util.List;
 import java.util.Map;
 
@@ -62,14 +63,9 @@ public class OAuth2RedirectCmd extends BaseCmd implements APIAuthenticator {
     }
 
     @Override
-    public String authenticate(String command,
-                               Map<String, Object[]> params,
-                               HttpSession session,
-                               String remoteAddress,
-                               String responseType,
-                               StringBuilder auditTrailSb,
-                               HttpServletRequest req,
-                               HttpServletResponse resp) throws ServerApiException {
+    public String authenticate(String command, Map<String, Object[]> params,
+                               HttpSession session, InetAddress remoteAddress, String responseType,
+                               StringBuilder auditTrailSb, final HttpServletRequest req, final HttpServletResponse resp) throws ServerApiException {
         // build redirect url
         Object[] redirectUriObj = params.get("redirect_uri");
         String redirectUri = null;

@@ -1026,7 +1026,7 @@ public class GloboNetworkManagerTest {
 
     @Test
     public void testGetReals(){
-        VMInstanceVO vm = new VMInstanceVO(1, 1, "vm-01", "vm-01", VirtualMachine.Type.Instance, 1L, Hypervisor.HypervisorType.Simulator, 1, 1, 1, false, true, 1L);
+        VMInstanceVO vm = new VMInstanceVO(1, 1, "vm-01", "vm-01", VirtualMachine.Type.Instance, 1L, Hypervisor.HypervisorType.Simulator, 1, 1, 1, 1, false, true, 1L);
         when(_vmDao.findById(1L)).thenReturn(vm);
         GloboNetworkNetworkVO network = new GloboNetworkNetworkVO(1L, 2L, 3L);
         when(_globoNetworkNetworkDao.findByNetworkId(1L)).thenReturn(network);
@@ -1055,7 +1055,8 @@ public class GloboNetworkManagerTest {
 
     @Test(expected = InvalidParameterValueException.class)
     public void testGetRealsGivenNetworkNotFound(){
-        VMInstanceVO vm = new VMInstanceVO(1, 1, "vm-01", "vm-01", VirtualMachine.Type.Instance, 1L, Hypervisor.HypervisorType.Simulator, 1, 1, 1, false, true, 1L);
+        VMInstanceVO vm = new VMInstanceVO(1, 1, "vm-01", "vm-01", VirtualMachine.Type.Instance, 1L, Hypervisor.HypervisorType.Simulator,
+                1, 1, 1, 1,false, true, 1L);
         when(_vmDao.findById(1L)).thenReturn(vm);
         when(_globoNetworkNetworkDao.findByNetworkId(1L)).thenReturn(null);
 

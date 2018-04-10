@@ -16,6 +16,7 @@
 // under the License.
 package org.apache.cloudstack.oauth2.api;
 
+import java.net.InetAddress;
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.Map;
@@ -134,14 +135,9 @@ public class OAuth2LoginCmd extends BaseCmd implements APIAuthenticator {
     }
 
     @Override
-    public String authenticate(String command,
-                               Map<String, Object[]> params,
-                               HttpSession session,
-                               String remoteAddress,
-                               String responseType,
-                               StringBuilder auditTrailSb,
-                               HttpServletRequest req,
-                               HttpServletResponse resp) throws ServerApiException {
+    public String authenticate(String command, Map<String, Object[]> params,
+                               HttpSession session, InetAddress remoteAddress, String responseType,
+                               StringBuilder auditTrailSb, final HttpServletRequest req, final HttpServletResponse resp) throws ServerApiException {
         // FIXME Put string constants in ApiConstants
         if (params.containsKey("code") && params.containsKey("redirect_uri")) {
             String code = String.valueOf(params.get("code")[0]);
@@ -149,7 +145,7 @@ public class OAuth2LoginCmd extends BaseCmd implements APIAuthenticator {
             try {
                 UserAccount userAcc = _oauth2Manager.authenticate(code, redirectUri);
                 if (_apiServer.verifyUser(userAcc.getId())) {
-                    return ApiResponseSerializer.toSerializedString(loginUser(session, userAcc, userAcc.getDomainId(), remoteAddress, params), responseType);
+                    return ApiResponseSerializer.toSerializedString(loginUser(session, userAcc, userAcc.getDomainId(), remoteAddress.getHostAddress(), params), responseType);
                 }
                 throw new ServerApiException(ApiErrorCode.PARAM_ERROR, "Unable to authenticate or retrieve user while performing OAuth2 based SSO");
             } catch (final CloudAuthenticationException ex) {

@@ -33,14 +33,12 @@ import org.apache.cloudstack.globoconfig.GloboResourceType;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 @Component
-@Local({GloboLoadBalancerService.class, PluggableService.class})
 public class GloboLoadBalancerManager implements GloboLoadBalancerService, PluggableService {
 
     private static final Logger s_logger = Logger.getLogger(GloboLoadBalancerManager.class);

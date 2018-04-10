@@ -17,6 +17,7 @@
 
 package com.globo.globodns.cloudstack.element;
 
+import com.cloud.network.element.DnsServiceProvider;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -59,7 +60,6 @@ import com.cloud.network.Network.Service;
 import com.cloud.network.PhysicalNetwork;
 import com.cloud.network.PhysicalNetworkServiceProvider;
 import com.cloud.network.dao.PhysicalNetworkDao;
-import com.cloud.network.element.NetworkElement;
 import com.cloud.offering.NetworkOffering;
 import com.cloud.resource.ResourceManager;
 import com.cloud.resource.ResourceStateAdapter;
@@ -86,7 +86,7 @@ import com.globo.globodns.cloudstack.commands.ValidateLbRecordCommand;
 import com.globo.globodns.cloudstack.resource.GloboDnsResource;
 
 @Component
-public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter, NetworkElement, GloboDnsElementService, Configurable {
+public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter, DnsServiceProvider, GloboDnsElementService, Configurable {
 
     private static final Logger s_logger = Logger.getLogger(GloboDnsElement.class);
 
@@ -567,5 +567,20 @@ public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter
         }
 
         return answer;
+    }
+
+    @Override
+    public boolean addDnsEntry(Network network, NicProfile nic, VirtualMachineProfile vm, DeployDestination dest, ReservationContext context) throws ConcurrentOperationException, InsufficientCapacityException, ResourceUnavailableException {
+        return true;
+    }
+
+    @Override
+    public boolean configDnsSupportForSubnet(Network network, NicProfile nic, VirtualMachineProfile vm, DeployDestination dest, ReservationContext context) throws ConcurrentOperationException, InsufficientCapacityException, ResourceUnavailableException {
+        return true;
+    }
+
+    @Override
+    public boolean removeDnsSupportForSubnet(Network network) throws ResourceUnavailableException {
+        return true;
     }
 }
