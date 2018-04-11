@@ -75,7 +75,6 @@ public class DynamicRoleBasedAPIAccessChecker extends AdapterBase implements API
         if (accountRole == null || accountRole.getId() < 1L) {
             denyApiAccess(commandName);
         }
-
         // Allow all APIs for root admins
         if (accountRole.getRoleType() == RoleType.Admin && accountRole.getId() == RoleType.Admin.getId()) {
             return true;

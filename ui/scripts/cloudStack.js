@@ -73,7 +73,6 @@
         /**
          * Generic error handling
          */
-
         $.ajaxSetup({
             url: clientApiUrl,
             async: true,
@@ -220,107 +219,6 @@
             },
 
             // Actual login process, via form
-            processLogin: function(loginresponse) {
-                var success;
-                g_mySession = $.cookie('JSESSIONID');
-                g_sessionKey = encodeURIComponent(loginresponse.sessionkey);
-                g_role = loginresponse.type;
-                g_username = loginresponse.username;
-                g_userid = loginresponse.userid;
-                g_account = loginresponse.account;
-                g_domainid = loginresponse.domainid;
-                g_timezone = loginresponse.timezone;
-                g_timezoneoffset = loginresponse.timezoneoffset;
-                g_userfullname = loginresponse.firstname + ' ' + loginresponse.lastname;
-
-                $.cookie('sessionKey', g_sessionKey, {
-                    expires: 1
-                });
-                $.cookie('username', g_username, {
-                    expires: 1
-                });
-                $.cookie('account', g_account, {
-                    expires: 1
-                });
-                $.cookie('domainid', g_domainid, {
-                    expires: 1
-                });
-                $.cookie('role', g_role, {
-                    expires: 1
-                });
-                $.cookie('timezoneoffset', g_timezoneoffset, {
-                    expires: 1
-                });
-                $.cookie('timezone', g_timezone, {
-                    expires: 1
-                });
-                $.cookie('userfullname', g_userfullname, {
-                    expires: 1
-                });
-                $.cookie('userid', g_userid, {
-                    expires: 1
-                });
-
-                $.ajax({
-                    url: createURL("listCapabilities"),
-                    dataType: "json",
-                    async: false,
-                    success: function(json) {
-                        success = true;
-                        g_capabilities = json.listcapabilitiesresponse.capability;
-                        $.cookie('capabilities', g_capabilities, {
-                            expires: 1
-                        });
-
-                        g_supportELB = json.listcapabilitiesresponse.capability.supportELB.toString(); //convert boolean to string if it's boolean
-                        $.cookie('supportELB', g_supportELB, {
-                            expires: 1
-                        });
-
-                        g_kvmsnapshotenabled = json.listcapabilitiesresponse.capability.kvmsnapshotenabled; //boolean
-                        $.cookie('kvmsnapshotenabled', g_kvmsnapshotenabled, {
-                            expires: 1
-                        });   
-                        
-                        g_regionsecondaryenabled = json.listcapabilitiesresponse.capability.regionsecondaryenabled; //boolean
-                        $.cookie('regionsecondaryenabled', g_regionsecondaryenabled, {
-                            expires: 1
-                        }); 
-                        
-                        if (json.listcapabilitiesresponse.capability.userpublictemplateenabled != null) {
-                            g_userPublicTemplateEnabled = json.listcapabilitiesresponse.capability.userpublictemplateenabled.toString(); //convert boolean to string if it's boolean
-                            $.cookie('userpublictemplateenabled', g_userPublicTemplateEnabled, {
-                                expires: 1
-                            });
-                        }
-
-                        g_userProjectsEnabled = json.listcapabilitiesresponse.capability.allowusercreateprojects;
-                        $.cookie('userProjectsEnabled', g_userProjectsEnabled, {
-                            expires: 1
-                        });
-
-                        g_cloudstackversion = json.listcapabilitiesresponse.capability.cloudstackversion;
-
-                        if (json.listcapabilitiesresponse.capability.apilimitinterval != null && json.listcapabilitiesresponse.capability.apilimitmax != null) {
-                            var intervalLimit = ((json.listcapabilitiesresponse.capability.apilimitinterval * 1000) / json.listcapabilitiesresponse.capability.apilimitmax) * 3; //multiply 3 to be on safe side
-                            //intervalLimit = 8888; //this line is for testing only, comment it before check in
-                            if (intervalLimit > g_queryAsyncJobResultInterval)
-                                g_queryAsyncJobResultInterval = intervalLimit;
-                        }
-                    },
-                    error: function(xmlHTTP) {
-                        success = false;
-                    }
-                });
-               
-                // Get project configuration
-                // TEMPORARY -- replace w/ output of capability response, etc., once implemented
-                window.g_projectsInviteRequired = false;
-                return success;
-
-            },
-
-            // Actual login process, via form
             loginAction: function(args) {
                 var array1 = [];
                 array1.push("&username=" + encodeURIComponent(args.data.username));
@@ -352,22 +250,6 @@
                     async: false,
                     success: function(json) {
                         var loginresponse = json.loginresponse;
-
-
-                        if (!loginArgs.processLogin(loginresponse)) {
-                            args.response.error();
-                            return;
-                        }
-
-                        args.response.success({
-                            data: {
-                                user: $.extend(true, {}, loginresponse, {
-                                    name: loginresponse.firstname + ' ' + loginresponse.lastname,
-                                    role: loginresponse.type == 1 ? 'admin' : 'user',
-                                    type: loginresponse.type
-                                })
-                            }
-                        });
 
                         // sessionkey is recevied as a HttpOnly cookie
                         // therefore reset any g_sessionKey value, an explicit
@@ -608,7 +490,6 @@
         document.title = _l('label.app.name');
 
         var stopLogin = false;
-
         if ($.urlParam("direct") !== "true") {
             // try OAuth2 login
             stopLogin = !!cloudStack.OAuth2.login(loginArgs);

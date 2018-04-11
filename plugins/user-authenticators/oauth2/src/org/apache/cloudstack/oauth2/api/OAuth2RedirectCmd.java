@@ -42,7 +42,7 @@ import com.cloud.api.response.ApiResponseSerializer;
 import com.cloud.user.Account;
 import com.cloud.utils.HttpUtils;
 
-@APICommand(name = "oauthRedirect", description = "Return redirect url for OAuth2 SSO", responseObject = OAuth2UrlResponse.class, since = "4.5.0")
+@APICommand(name = "oauthRedirect", description = "Return redirect url for OAuth2 SSO", requestHasSensitiveInfo = false, responseHasSensitiveInfo = false, responseObject = OAuth2UrlResponse.class, since = "4.5.0")
 public class OAuth2RedirectCmd extends BaseCmd implements APIAuthenticator {
     public static final Logger s_logger = Logger.getLogger(OAuth2RedirectCmd.class.getName());
 
@@ -106,7 +106,7 @@ public class OAuth2RedirectCmd extends BaseCmd implements APIAuthenticator {
             }
         }
         if (_oauth2Manager == null) {
-            s_logger.error("No suitable Pluggable Authentication Manager found for SAML2 Login Cmd");
+            s_logger.error("No suitable Pluggable Authentication Manager found for OAuth2 Login Cmd");
         }
     }
 
