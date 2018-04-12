@@ -195,7 +195,12 @@ known_categories = {
     'CA': 'Certificate',
     'listElastistorInterface': 'Misc',
     'cloudian': 'Cloudian',
-    'Sioc' : 'Sioc'
+    'Sioc' : 'Sioc',
+    'listBusinessService': 'Globo Dictionary',
+    'listClients': 'Globo Dictionary',
+    'listComponents': 'Globo Dictionary',
+    'listSubComponents': 'Globo Dictionary',
+    'listProducts': 'Globo Dictionary'
     }
 
 
