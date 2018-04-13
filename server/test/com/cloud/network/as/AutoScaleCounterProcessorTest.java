@@ -26,6 +26,7 @@ import org.mockito.MockitoAnnotations;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -138,7 +139,7 @@ public class AutoScaleCounterProcessorTest {
     }
 
     private Map<String, Double> createMetricsResult(List<String> metricNames, List<String> metricValues){
-        Map<String, Double> metrics = new HashMap<>();
+        Map<String, Double> metrics = new LinkedHashMap<>();
         for (int i = 0; i < metricNames.size(); i++) {
             metrics.put(metricNames.get(i), Double.parseDouble(metricValues.get(i)));
         }

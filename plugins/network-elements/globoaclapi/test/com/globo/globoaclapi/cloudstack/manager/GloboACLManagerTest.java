@@ -343,7 +343,7 @@ public class GloboACLManagerTest {
                 FirewallRule.Purpose.Firewall, null, Arrays.asList(destination), icmpCode, icmpType, null,
                 FirewallRule.TrafficType.Egress, FirewallRule.FirewallRuleType.User
         );
-
+        rule.setSourceCidrList(Arrays.asList(destination));
         return rule;
     }
 
