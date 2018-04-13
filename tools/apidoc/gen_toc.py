@@ -200,7 +200,9 @@ known_categories = {
     'listClients': 'Globo Dictionary',
     'listComponents': 'Globo Dictionary',
     'listSubComponents': 'Globo Dictionary',
-    'listProducts': 'Globo Dictionary'
+    'listProducts': 'Globo Dictionary',
+    'oAuth2Login': 'Oauth2 Login',
+    'oauthRedirect': 'Oauth2 Redirect'
     }
 
 
