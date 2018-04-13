@@ -2293,5 +2293,18 @@ var dictionary = {
     "state.detached": "Desanexado",
     "title.upload.volume": "Upload Volume",
     "ui.listView.filters.all": "Todos",
-    "ui.listView.filters.mine": "Meus"
+    "ui.listView.filters.mine": "Meus",
+    "label.lb.algorithm.leastconn": "Least connections",
+    "label.lb.algorithm.roundrobin": "Round-robin",
+    "label.lb.algorithm.source": "Origem",
+    "label.max.hosts.supported": "M\u00E1ximo de hosts suportados",
+    "label.project.businessservice": "Servi\u00e7o de Neg\u00f3cio",
+    "label.project.client": "Cliente",
+    "label.project.component": "Componente",
+    "label.project.detailedusage": "Consumo detalhado",
+    "label.project.product": "Produto",
+    "label.project.subcomponent": "Sub-componente",
+    "label.scale.logicaloperator": "Operador L\u00f3gico",
+    "label.scaledown.step": "Passo do scale down",
+    "label.scaleup.step": "Passo do scale up"
 };
