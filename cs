@@ -18,7 +18,7 @@ export PATH=${PATH}:${M2_HOME}/bin
 
 gen_version(){
     #ddcs_version=$(mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep '^[0-9]\.')
-    cs_version="4.5.2"
+    cs_version="4.11.0.0"
     tag_version=$(date +%Y%m%d%H%M)
     echo "${cs_version}-${tag_version}"
 }
