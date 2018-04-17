@@ -17,6 +17,7 @@
 package com.cloud.tags;
 
 import com.cloud.network.as.AutoScaleManager;
+import com.cloud.network.router.NetworkHelper;
 import com.cloud.vm.UserVmManager;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -96,6 +97,8 @@ import org.apache.commons.collections.MapUtils;
 
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 public class TaggedResourceManagerImpl extends ManagerBase implements TaggedResourceService {
     public static final Logger s_logger = Logger.getLogger(TaggedResourceManagerImpl.class);
@@ -155,6 +158,11 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
     UserVmManager _userVmManager;
     @Inject
     AutoScaleManager _autoscaleManager;
+
+    @Autowired
+    @Qualifier("networkHelper")
+    NetworkHelper _networkHelper;
+
 
     @Override
     public boolean configure(String name, Map<String, Object> params) throws ConfigurationException {
@@ -454,7 +462,7 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
                 tagsR.put(TagKeysBuilder.TAGKEYS_METADATA_KEY, TagKeysBuilder.buildTagKeys(tags));
 
                 s_logger.debug("[TAG_METADATA] Update userVm metadata with tags and values: " + tagsR.toString());
-                _userVmManager.updateVMData(userVmId, tagsR);
+                _networkHelper.updateVMMetadaInVrouter(userVmId, tagsR);
             }catch (Exception e ) {
                 //catch exception because it should try to update other resources
                 s_logger.error("[TAG_METADATA] Error try to update VmMetaData removing tags. userVmId:  " +  userVmId, e);

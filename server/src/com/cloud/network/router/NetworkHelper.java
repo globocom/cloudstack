@@ -92,4 +92,6 @@ public interface NetworkHelper {
             throws ConcurrentOperationException, InsufficientAddressCapacityException;
 
     public boolean validateHAProxyLBRule(final LoadBalancingRule rule);
+
+    public boolean updateVMMetadaInVrouter(long userVmId, Map<String, String> vmData) throws InsufficientCapacityException, ResourceUnavailableException;
 }
