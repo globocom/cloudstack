@@ -408,14 +408,19 @@
                                 }
                             }
                         }
+
+                        var data = {
+                            domainid: g_domainid,
+                            listAll: true
+                        }
+                        if (cloudStack.context && cloudStack.context.projects == null){
+                            data.account = g_account
+                        }
+
                         //Ajax call to check if VPN is enabled.
                         $.ajax({
                             url: createURL('listRemoteAccessVpns'),
-                            data: {
-                                account: g_account,
-                                domainid: g_domainid,
-                                listAll: true
-                            },
+                            data: data,
                             async: false,
                             success: function(vpnResponse) {
                                 var isVPNEnabled = vpnResponse.listremoteaccessvpnsresponse.count;
