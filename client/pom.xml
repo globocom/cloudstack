@@ -746,7 +746,6 @@
                   <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
                   <exclude>org.bouncycastle:bcpkix-jdk15on</exclude>
                   <exclude>mysql:mysql-connector-java</exclude>
-                  <exclude>xpp3:xpp3</exclude>
                 </excludes>
               </artifactSet>
               <transformers>
