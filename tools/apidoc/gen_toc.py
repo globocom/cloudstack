@@ -202,7 +202,11 @@ known_categories = {
     'listSubComponents': 'Globo Dictionary',
     'listProducts': 'Globo Dictionary',
     'oAuth2Login': 'Oauth2 Login',
-    'oauthRedirect': 'Oauth2 Redirect'
+    'oauthRedirect': 'Oauth2 Redirect',
+    'removeGloboACLRule': 'Remove Globo ACL rule',
+    'listGloboACLRules': 'List Globo ACL rules',
+    'createGloboACLRule': 'Create Globo ACL rule',
+    'addGloboAclApiHost': 'Add Globo Acl ApiHost'
     }
 
 
