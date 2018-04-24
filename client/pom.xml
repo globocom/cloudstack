@@ -465,6 +465,11 @@
       <artifactId>cloud-plugin-integrations-prometheus-exporter</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-shade-plugin</artifactId>
+      <version>3.0.0</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -745,6 +750,9 @@
                 </excludes>
               </artifactSet>
               <transformers>
+                <transformer implementation="org.apache.cloudstack.maven.plugins.ServicesResourceTransformerCustom">
+                  <resource>META-INF/services/org.xmlpull.v1.XmlPullParserFactory</resource>
+                </transformer>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer" />
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
@@ -774,6 +782,13 @@
             </configuration>
           </execution>
         </executions>
+        <dependencies>
+          <dependency>
+            <groupId>org.apache.cloudstack</groupId>
+            <artifactId>cloud-client-ui</artifactId>
+            <version>${project.version}</version>
+          </dependency>
+        </dependencies>
       </plugin>
     </plugins>
   </build>
