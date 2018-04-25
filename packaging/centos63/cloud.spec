@@ -225,9 +225,9 @@ else
       mvn -Psystemvm,developer -Dsimulator clean package
    else
       echo "Executing mvn default packaging without simulator ..."
-      echo `mvn -version`
-      echo `java -version`
-      echo `javac -version`
+      mvn -version
+      java -version
+      javac -version
       mvn -Psystemvm,developer -DskipTests clean package
    fi
 fi 
