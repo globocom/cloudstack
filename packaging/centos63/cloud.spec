@@ -225,6 +225,7 @@ else
       mvn -Psystemvm,developer -Dsimulator clean package
    else
       echo "Executing mvn default packaging without simulator ..."
+      echo $(mvn -version)
       mvn -Psystemvm,developer -DskipTests clean package
    fi
 fi 
