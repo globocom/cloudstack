@@ -911,7 +911,7 @@
                         },
                         async: false,
                         success: function(json) {
-                            if (json.listusersresponse.user[0].apikey != null && json.listusersresponse.user[0].secretkey != null) {
+                            if (json.listusersresponse.user[0].apikey != null) {
                                 havingApiKeyAndSecretKey = true;
                             }
                         }
