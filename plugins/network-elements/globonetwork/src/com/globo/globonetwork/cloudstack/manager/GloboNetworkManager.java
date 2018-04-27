@@ -660,7 +660,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                 // if (caller.getType() == Account.ACCOUNT_TYPE_ADMIN || caller.getType() == Account.ACCOUNT_TYPE_DOMAIN_ADMIN) {
                 // Create vlan ip range
                 _configMgr.createVlanAndPublicIpRange(pNtwk.getDataCenterId(), network.getId(), physicalNetworkId, false, false, (Long)null, startIP, endIP, gateway, netmask,
-                        vlanNum.toString(), false, domain, owner, startIPv6, endIPv6, ip6Gateway, ip6Cidr);
+                        vlanNum.toString(), false, domain, null, startIPv6, endIPv6, ip6Gateway, ip6Cidr);
                 // }
                 return network;
             }
