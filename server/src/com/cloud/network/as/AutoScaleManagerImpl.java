@@ -1574,6 +1574,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
             UserVm vm = null;
             IpAddresses addrs = new IpAddresses(null, null);
             String instanceName = createInstanceName(asGroup);
+            Map<String, String> customParameters = new HashMap<>();
 
             if (zone.getNetworkType() == NetworkType.Basic) {
                 vm = _userVmService.createBasicSecurityGroupVirtualMachine(zone, serviceOffering, template, null, owner, instanceName,
@@ -1584,7 +1585,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
                     vm = _userVmService.createAdvancedSecurityGroupVirtualMachine(zone, serviceOffering, template, null, null,
                         owner, instanceName,
                             instanceName, null, null, null, HypervisorType.XenServer, HTTPMethod.GET, null, null,
-                        null, null, true, null, null, null, null, null, null);
+                        null, null, true, null, null, customParameters, null, null, null);
 
                 } else {
                     List<Long> networkIds = new ArrayList<>();
@@ -1593,7 +1594,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
                     networkIds.add(mainNetworkId);
                     networkIds.addAll(getAdditionalNetWorkIds(profileVo, zone));
                     vm = _userVmService.createAdvancedVirtualMachine(zone, serviceOffering, template, networkIds, owner, instanceName, instanceName,
-                        null, null, null, template.getHypervisorType(), HTTPMethod.POST, profileVo.getUserData(), null, null, addrs, true, null, null, null, null, null, null);
+                        null, null, null, template.getHypervisorType(), HTTPMethod.POST, profileVo.getUserData(), null, null, addrs, true, null, null, customParameters, null, null, null);
 
                 }
             }
