@@ -210,7 +210,7 @@ public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter
         boolean isIpv6 = nic.getIPv6Address() != null;
         String ipAddress = isIpv6 ? nic.getIPv6Address() : nic.getIPv4Address();
 
-        RemoveRecordCommand cmd = new RemoveRecordCommand(hostNameOfVirtualMachine(vm), ipAddress, network.getNetworkDomain(), GloboDNSOverride.value());
+        RemoveRecordCommand cmd = new RemoveRecordCommand(hostNameOfVirtualMachine(vm), ipAddress, network.getNetworkDomain(), isIpv6);
 
         callCommand(cmd, zoneId);
 
