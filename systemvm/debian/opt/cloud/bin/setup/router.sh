@@ -66,7 +66,12 @@ setup_router() {
 
   setup_aesni
   setup_dnsmasq
-  setup_apache2 $ETH0_IP
+  #
+  # Patch to work with IPV6
+  #
+  # setup_apache2 $ETH0_IP
+  [ -n $ETH0_IP ] && setup_apache2 $ETH0_IP
+  [ -z $ETH0_IP ] && [ -n $ETH0_IP6 ] && setup_apache2 $ETH0_IP6
 
   sed -i /$NAME/d /etc/hosts
   echo "$ETH0_IP $NAME" >> /etc/hosts
