@@ -656,6 +656,8 @@ parse_cmd_line() {
             ;;
         ip6gateway)
             export IP6GW=$VALUE
+            echo -en ${COMMA} >> ${CHEF_TMP_FILE}
+            echo -n \"gateway\"': '\"${VALUE}\" >> ${CHEF_TMP_FILE}
             ;;
         eth0mask)
             export ETH0_MASK=$VALUE
@@ -668,9 +670,13 @@ parse_cmd_line() {
             ;;
         eth0ip6)
             export ETH0_IP6=$VALUE
+            echo -en ${COMMA} >> ${CHEF_TMP_FILE}
+            echo -n \"eth0ip\"': '\"${VALUE}\" >> ${CHEF_TMP_FILE}
             ;;
         eth0ip6prelen)
             export ETH0_IP6_PRELEN=$VALUE
+            echo -en ${COMMA} >> ${CHEF_TMP_FILE}
+            echo -n \"eth0mask\"': '\"${VALUE}\" >> ${CHEF_TMP_FILE}
             ;;
         internaldns1)
             export internalNS1=$VALUE
