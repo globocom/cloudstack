@@ -235,8 +235,9 @@ public class ServerDaemon implements Daemon {
         }
 
         // Request log handler
-        final RequestLogHandler log = new RequestLogHandler();
-        log.setRequestLog(createRequestLog());
+        // Removed because it's not necessary. Nginx already does.
+        //final RequestLogHandler log = new RequestLogHandler();
+        //log.setRequestLog(createRequestLog());
 
         // Redirect root context handler
         MovedContextHandler rootRedirect = new MovedContextHandler();
@@ -245,7 +246,7 @@ public class ServerDaemon implements Daemon {
         rootRedirect.setPermanent(true);
 
         // Put rootRedirect at the end!
-        return new HandlerCollection(log, gzipHandler, rootRedirect);
+        return new HandlerCollection(/*log, */gzipHandler, rootRedirect);
     }
 
     private RequestLog createRequestLog() {
