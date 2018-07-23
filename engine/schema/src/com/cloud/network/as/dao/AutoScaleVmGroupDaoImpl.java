@@ -16,16 +16,15 @@
 // under the License.
 package com.cloud.network.as.dao;
 
-import java.util.List;
-
-
-import org.springframework.stereotype.Component;
-
 import com.cloud.network.as.AutoScaleVmGroupVO;
 import com.cloud.utils.db.GenericDaoBase;
 import com.cloud.utils.db.GenericSearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.SearchCriteria.Func;
+import org.springframework.stereotype.Component;
+
+import java.util.Date;
+import java.util.List;
 
 @Component
 public class AutoScaleVmGroupDaoImpl extends GenericDaoBase<AutoScaleVmGroupVO, Long> implements AutoScaleVmGroupDao {
@@ -46,7 +45,8 @@ public class AutoScaleVmGroupDaoImpl extends GenericDaoBase<AutoScaleVmGroupVO, 
     @Override
     public List<AutoScaleVmGroupVO> listAllNotLocked() {
         SearchCriteria<AutoScaleVmGroupVO> sc = createSearchCriteria();
-        sc.addAnd("locked", SearchCriteria.Op.EQ, false);
+        sc.addAnd("lock_expiration_date", SearchCriteria.Op.NNULL);
+        sc.addAnd("lock_expiration_date", SearchCriteria.Op.GTEQ, new Date());
         return listBy(sc);
     }
 

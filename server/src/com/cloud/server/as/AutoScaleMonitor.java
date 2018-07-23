@@ -189,12 +189,12 @@ public class AutoScaleMonitor extends ManagedContextRunnable implements Configur
     }
 
     private void lockAutoScaleGroup(AutoScaleVmGroupVO autoScaleVmGroup){
-        autoScaleVmGroup.setLocked(true);
+        autoScaleVmGroup.lock();
         _asGroupDao.persist(autoScaleVmGroup);
     }
 
     private void unlockAutoScaleGroup(AutoScaleVmGroupVO autoScaleVmGroup){
-        autoScaleVmGroup.setLocked(false);
+        autoScaleVmGroup.unlock();
         _asGroupDao.persist(autoScaleVmGroup);
     }
 

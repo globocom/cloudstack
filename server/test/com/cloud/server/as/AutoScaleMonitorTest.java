@@ -312,7 +312,7 @@ public class AutoScaleMonitorTest {
     @Test
     public void testAutoScaleGroupLocked(){
         AutoScaleVmGroupVO asGroup = asGroups.get(0);
-        asGroup.setLocked(true);
+        asGroup.lock();
         mockAutoScaleGroupDao();
 
         AutoScaleManager asManager = mock(AutoScaleManager.class);
