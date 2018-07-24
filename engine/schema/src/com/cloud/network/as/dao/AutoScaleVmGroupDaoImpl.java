@@ -45,8 +45,8 @@ public class AutoScaleVmGroupDaoImpl extends GenericDaoBase<AutoScaleVmGroupVO, 
     @Override
     public List<AutoScaleVmGroupVO> listAllNotLocked() {
         SearchCriteria<AutoScaleVmGroupVO> sc = createSearchCriteria();
-        sc.addAnd("lock_expiration_date", SearchCriteria.Op.NNULL);
-        sc.addAnd("lock_expiration_date", SearchCriteria.Op.GTEQ, new Date());
+        sc.addAnd("lockExpirationDate", SearchCriteria.Op.NNULL);
+        sc.addAnd("lockExpirationDate", SearchCriteria.Op.GTEQ, new Date());
         return listBy(sc);
     }
 
