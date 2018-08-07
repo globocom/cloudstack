@@ -1021,6 +1021,7 @@ public class CommandSetupHelper {
         cmd.addVmData("metadata", "availability-zone", StringUtils.unicodeEscape(zoneName));
         cmd.addVmData("metadata", "local-ipv4", guestIpAddress);
         cmd.addVmData("metadata", "local-hostname", StringUtils.unicodeEscape(vmName));
+        cmd.addVmData("metadata", "TAG_XICANO", StringUtils.unicodeEscape("Matheus"));
         if (dcVo.getNetworkType() == NetworkType.Basic) {
             cmd.addVmData("metadata", "public-ipv4", guestIpAddress);
             cmd.addVmData("metadata", "public-hostname", StringUtils.unicodeEscape(vmName));
