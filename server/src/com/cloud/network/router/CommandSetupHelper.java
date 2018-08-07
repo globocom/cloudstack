@@ -26,6 +26,8 @@ import java.util.Map;
 
 import javax.inject.Inject;
 
+import com.cloud.server.ResourceTag;
+import com.cloud.tags.dao.ResourceTagDao;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -173,6 +175,9 @@ public class CommandSetupHelper {
     private VlanDao _vlanDao;
     @Inject
     private IPAddressDao _ipAddressDao;
+    @Inject
+    private ResourceTagDao _resourceTagDao;
+
 
     @Inject
     private RouterControlHelper _routerControlHelper;
@@ -1004,6 +1009,15 @@ public class CommandSetupHelper {
         return setupCmd;
     }
 
+    private void generateTagCommands(VmDataCommand cmd,long vmId){
+        List<ResourceTag> tags = (List<ResourceTag>)_resourceTagDao.listBy(vmId, ResourceTag.ResourceObjectType.UserVm);
+        if ( tags != null ){
+            for(ResourceTag tag : tags) {
+                cmd.addVmData("metadata", tag.getKey(), StringUtils.unicodeEscape(tag.getValue()));
+            }
+        }
+    }
+
     private VmDataCommand generateVmDataCommand(final VirtualRouter router, final String vmPrivateIpAddress, final String userData, final String serviceOffering,
             final String zoneName, final String guestIpAddress, final String vmName, final String vmInstanceName, final long vmId, final String vmUuid, final String publicKey,
             final long guestNetworkId) {
@@ -1021,7 +1035,7 @@ public class CommandSetupHelper {
         cmd.addVmData("metadata", "availability-zone", StringUtils.unicodeEscape(zoneName));
         cmd.addVmData("metadata", "local-ipv4", guestIpAddress);
         cmd.addVmData("metadata", "local-hostname", StringUtils.unicodeEscape(vmName));
-        cmd.addVmData("metadata", "TAG_XICANO", StringUtils.unicodeEscape("Matheus"));
+        generateTagCommands(cmd,vmId);
         if (dcVo.getNetworkType() == NetworkType.Basic) {
             cmd.addVmData("metadata", "public-ipv4", guestIpAddress);
             cmd.addVmData("metadata", "public-hostname", StringUtils.unicodeEscape(vmName));
