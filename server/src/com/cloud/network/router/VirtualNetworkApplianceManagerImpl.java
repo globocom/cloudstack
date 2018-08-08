@@ -716,7 +716,7 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
             setVmInstanceId(vmUuid, cmd);
         }
 
-        buildTagMetadata(cmd, vmId);
+        CommandSetupHelper.buildTagMetadata(cmd, vmId,_resourceTagDao);
         cmd.addVmData("metadata", "public-keys", publicKey);
 
         String cloudIdentifier = _configDao.getValue("cloud.identifier");
@@ -730,23 +730,7 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
         return cmd;
     }
 
-    protected void buildTagMetadata(VmDataCommand cmd, long vmId) {
-        List<? extends ResourceTag> resourceTags = _resourceTagDao.listBy(vmId, ResourceTag.ResourceObjectType.UserVm);
 
-        TagKeysBuilder tagKeysBuilder = new TagKeysBuilder();
-        for (ResourceTag resourceTag : resourceTags) {
-            String key = resourceTag.getKey();
-            if (key != null && !key.isEmpty()){
-                String value = resourceTag.getValue() != null ? resourceTag.getValue() : "";
-
-                String metadataKey = TagKeysBuilder.getKeyMetadata(key);
-                cmd.addVmData("metadata", metadataKey, value);
-
-            }
-        }
-
-        cmd.addVmData("metadata", TagKeysBuilder.TAGKEYS_METADATA_KEY, tagKeysBuilder.buildTagKeys((List<ResourceTag>)resourceTags));
-    }
 
     private void setVmInstanceId(final String vmUuid, final VmDataCommand cmd) {
         cmd.addVmData("metadata", "instance-id", vmUuid);

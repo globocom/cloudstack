@@ -1010,15 +1010,21 @@ public class CommandSetupHelper {
         return setupCmd;
     }
 
-    private void generateTagCommands(VmDataCommand cmd,long vmId){
+    public static void buildTagMetadata(VmDataCommand cmd, long vmId,ResourceTagDao resourceTagDao) {
+        List<? extends ResourceTag> resourceTags = resourceTagDao.listBy(vmId, ResourceTag.ResourceObjectType.UserVm);
 
-        List<ResourceTag> tags = (List<ResourceTag>)_resourceTagDao.listBy(vmId, ResourceTag.ResourceObjectType.UserVm);
-        if ( tags != null ){
-            for(ResourceTag tag : tags) {
-                cmd.addVmData("metadata", tag.getKey(), StringUtils.unicodeEscape(tag.getValue()));
+        TagKeysBuilder tagKeysBuilder = new TagKeysBuilder();
+        for (ResourceTag resourceTag : resourceTags) {
+            String key = resourceTag.getKey();
+            if (key != null && !key.isEmpty()){
+                String value = resourceTag.getValue() != null ? resourceTag.getValue() : "";
+                String metadataKey = TagKeysBuilder.getKeyMetadata(key);
+                cmd.addVmData("metadata", metadataKey, value);
+
             }
-            cmd.addVmData("metadata", TagKeysBuilder.TAGKEYS_METADATA_KEY, TagKeysBuilder.buildTagKeys(tags));
         }
+
+        cmd.addVmData("metadata", TagKeysBuilder.TAGKEYS_METADATA_KEY, tagKeysBuilder.buildTagKeys((List<ResourceTag>)resourceTags));
     }
 
     private VmDataCommand generateVmDataCommand(final VirtualRouter router, final String vmPrivateIpAddress, final String userData, final String serviceOffering,
@@ -1038,7 +1044,7 @@ public class CommandSetupHelper {
         cmd.addVmData("metadata", "availability-zone", StringUtils.unicodeEscape(zoneName));
         cmd.addVmData("metadata", "local-ipv4", guestIpAddress);
         cmd.addVmData("metadata", "local-hostname", StringUtils.unicodeEscape(vmName));
-        generateTagCommands(cmd,vmId);
+        buildTagMetadata(cmd,vmId,_resourceTagDao);
         if (dcVo.getNetworkType() == NetworkType.Basic) {
             cmd.addVmData("metadata", "public-ipv4", guestIpAddress);
             cmd.addVmData("metadata", "public-hostname", StringUtils.unicodeEscape(vmName));
