@@ -27,6 +27,7 @@ import java.util.Map;
 import javax.inject.Inject;
 
 import com.cloud.server.ResourceTag;
+import com.cloud.tags.TagKeysBuilder;
 import com.cloud.tags.dao.ResourceTagDao;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 import org.apache.log4j.Logger;
@@ -1010,11 +1011,13 @@ public class CommandSetupHelper {
     }
 
     private void generateTagCommands(VmDataCommand cmd,long vmId){
+
         List<ResourceTag> tags = (List<ResourceTag>)_resourceTagDao.listBy(vmId, ResourceTag.ResourceObjectType.UserVm);
         if ( tags != null ){
             for(ResourceTag tag : tags) {
                 cmd.addVmData("metadata", tag.getKey(), StringUtils.unicodeEscape(tag.getValue()));
             }
+            cmd.addVmData("metadata", TagKeysBuilder.TAGKEYS_METADATA_KEY, TagKeysBuilder.buildTagKeys(tags));
         }
     }
 
