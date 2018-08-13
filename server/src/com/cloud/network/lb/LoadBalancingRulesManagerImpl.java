@@ -2311,7 +2311,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         String dstIp = null;
         for (LoadBalancerVMMapVO lbVmMap : lbVmMaps) {
             UserVm vm = _vmDao.findById(lbVmMap.getInstanceId());
-            Nic nic = _nicDao.findByInstanceIdAndNetworkIdIncludingRemoved(lb.getNetworkId(), vm.getId());
+            Nic nic = getLbInstanceNic(lbId, lbVmMap.getInstanceId());
             dstIp = lbVmMap.getInstanceIp() == null ? nic.getIPv4Address(): lbVmMap.getInstanceIp();
             LbDestination lbDst = new LbDestination(lb.getDefaultPortStart(), lb.getDefaultPortEnd(), dstIp, nic.getNetworkId(), lbVmMap.getInstanceId(), lbVmMap.isRevoke());
             dstList.add(lbDst);
