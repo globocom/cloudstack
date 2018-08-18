@@ -111,7 +111,7 @@ INSERT IGNORE INTO `cloud`.`guest_os_hypervisor` (uuid, hypervisor_type, hypervi
 INSERT IGNORE INTO `cloud`.`guest_os_hypervisor` (uuid, hypervisor_type, hypervisor_version, guest_os_name, guest_os_id, created, is_user_defined) VALUES (UUID(), 'KVM', 'default', 'CentOS 7.2', 274, now(), 0);
 INSERT IGNORE INTO `cloud`.`guest_os_hypervisor` (uuid, hypervisor_type, hypervisor_version, guest_os_name, guest_os_id, created, is_user_defined) VALUES (UUID(), 'KVM', 'default', 'Other PV Virtio-SCSI (64-bit)', 275, now(), 0);
 
-CREATE TABLE `cloud`.`vlan_details` (
+CREATE TABLE IF NOT EXISTS `cloud`.`vlan_details` (
   `id` bigint unsigned NOT NULL auto_increment,
   `vlan_id` bigint unsigned NOT NULL COMMENT 'vlan id',
   `name` varchar(255) NOT NULL,
@@ -137,7 +137,7 @@ INSERT INTO `cloud`.`role_permissions` (`uuid`, `role_id`, `rule`, `permission`,
 INSERT INTO `cloud`.`role_permissions` (`uuid`, `role_id`, `rule`, `permission`, `sort_order`) values (UUID(), 4, 'createSnapshotFromVMSnapshot', 'ALLOW', 260) ON DUPLICATE KEY UPDATE rule=rule;
 
 -- Create table storage_pool_tags
-CREATE TABLE `cloud`.`storage_pool_tags` (
+CREATE TABLE IF NOT EXISTS `cloud`.`storage_pool_tags` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `pool_id` bigint(20) unsigned NOT NULL COMMENT "pool id",
   `tag` varchar(255) NOT NULL,
@@ -235,7 +235,7 @@ WHERE (o.cpu is null AND o.speed IS NULL AND o.ram_size IS NULL) AND
 -- CLOUDSTACK-9827: Storage tags stored in multiple places
 DROP VIEW IF EXISTS `cloud`.`storage_tag_view`;
 
-CREATE TABLE `cloud`.`guest_os_details` (
+CREATE TABLE IF NOT EXISTS `cloud`.`guest_os_details` (
   `id` bigint unsigned NOT NULL auto_increment,
   `guest_os_id` bigint unsigned NOT NULL COMMENT 'VPC gateway id',
   `name` varchar(255) NOT NULL,
@@ -246,7 +246,7 @@ CREATE TABLE `cloud`.`guest_os_details` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 ALTER TABLE `user_ip_address` ADD COLUMN `rule_state` VARCHAR(32) COMMENT 'static  rule state while removing';
-CREATE TABLE `cloud`.`firewall_rules_dcidrs`(
+CREATE TABLE IF NOT EXISTS `cloud`.`firewall_rules_dcidrs`(
   `id` BIGINT(20) unsigned NOT NULL AUTO_INCREMENT,
   `firewall_rule_id` BIGINT(20) unsigned NOT NULL,
   `destination_cidr` VARCHAR(18) DEFAULT NULL,
@@ -255,26 +255,3 @@ CREATE TABLE `cloud`.`firewall_rules_dcidrs`(
   KEY `fk_firewall_dcidrs_firewall_rules` (`firewall_rule_id`),
   CONSTRAINT `fk_firewall_dcidrs_firewall_rules` FOREIGN KEY (`firewall_rule_id`) REFERENCES `firewall_rules` (`id`) ON DELETE CASCADE
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-DROP TABLE IF EXISTS `cloud`.`netscaler_servicepackages`;
-CREATE TABLE `cloud`.`netscaler_servicepackages` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'id',
-  `uuid` varchar(255) UNIQUE,
-  `name` varchar(255) UNIQUE COMMENT 'name of the service package',
-  `description` varchar(255) COMMENT 'description of the service package',
-  PRIMARY KEY  (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-DROP TABLE IF EXISTS `cloud`.`external_netscaler_controlcenter`;
-CREATE TABLE `cloud`.`external_netscaler_controlcenter` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'id',
-  `uuid` varchar(255) UNIQUE,
-  `username` varchar(255) COMMENT 'username of the NCC',
-  `password` varchar(255) COMMENT 'password of NCC',
-  `ncc_ip` varchar(255) COMMENT 'IP of NCC Manager',
-  `num_retries` bigint unsigned NOT NULL default 2 COMMENT 'Number of retries in ncc for command failure',
-  PRIMARY KEY  (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-ALTER TABLE `cloud`.`sslcerts` ADD COLUMN `name` varchar(255) NULL default NULL COMMENT 'Name of the Certificate';
-ALTER TABLE `cloud`.`network_offerings` ADD COLUMN `service_package_id` varchar(255) NULL default NULL COMMENT 'Netscaler ControlCenter Service Package';

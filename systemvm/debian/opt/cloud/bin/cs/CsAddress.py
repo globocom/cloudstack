@@ -297,9 +297,7 @@ class CsIP:
 
             interfaces = [CsInterface(address, self.config)]
             CsHelper.reconfigure_interfaces(self.cl, interfaces)
-            if not self.config.is_vpc() and (self.get_type() in ['public']):
-                self.set_mark()
-            if self.config.is_vpc() and (self.get_type() in ['public']):
+            if self.get_type() in ['public']:
                 self.set_mark()
 
             if 'gateway' in self.address:
@@ -363,6 +361,7 @@ class CsIP:
     def fw_router(self):
         if self.config.is_vpc():
             return
+
         self.fw.append(["mangle", "front", "-A PREROUTING " +
                         "-m state --state RELATED,ESTABLISHED " +
                         "-j CONNMARK --restore-mark --nfmask 0xffffffff --ctmask 0xffffffff"])
@@ -388,7 +387,7 @@ class CsIP:
             self.fw.append(["mangle", "",
                             "-A VPN_%s -j RETURN" % self.address['public_ip']])
             self.fw.append(["nat", "",
-                            "-A POSTROUTING -o eth2 -j SNAT --to-source %s" % self.address['public_ip']])
+                            "-A POSTROUTING -o %s -j SNAT --to-source %s" % (self.dev, self.cl.get_eth2_ip())])
             self.fw.append(["mangle", "",
                             "-A PREROUTING -i %s -m state --state NEW " % self.dev +
                             "-j CONNMARK --set-xmark %s/0xffffffff" % self.dnum])
@@ -477,9 +476,10 @@ class CsIP:
             self.fw.append(["", "front", "-A NETWORK_STATS_%s -o %s -s %s" %
                             ("eth1", "eth1", guestNetworkCidr)])
 
-            self.fw.append(["nat", "front",
-                            "-A POSTROUTING -s %s -o %s -j SNAT --to-source %s" %
-                            (guestNetworkCidr, self.dev, self.address['public_ip'])])
+            if self.address["source_nat"]:
+                self.fw.append(["nat", "front",
+                                "-A POSTROUTING -o %s -j SNAT --to-source %s" %
+                                (self.dev, self.address['public_ip'])])
 
         if self.get_type() in ["public"]:
             self.fw.append(
@@ -534,6 +534,13 @@ class CsIP:
             if self.config.is_vpc():
                 if self.get_type() in ["public"] and "gateway" in self.address and self.address["gateway"] != "None":
                     route.add_route(self.dev, self.address["gateway"])
+                    for inf, addresses in self.config.address().dbag.iteritems():
+                        if not inf.startswith("eth"):
+                            continue
+                        for address in addresses:
+                            if "nw_type" in address and address["nw_type"] == "guest":
+                                route.add_network_route(self.dev, str(address["network"]))
+
                 route.add_network_route(self.dev, str(self.address["network"]))
 
             CsHelper.execute("sudo ip route flush cache")
@@ -622,7 +629,9 @@ class CsIP:
     def arpPing(self):
         cmd = "arping -c 1 -I %s -A -U -s %s %s" % (
             self.dev, self.address['public_ip'], self.address['gateway'])
-        CsHelper.execute(cmd)
+        if not self.cl.is_redundant() and (not self.address['gateway'] or self.address['gateway'] == "None"):
+            cmd = "arping -c 1 -I %s -A -U %s" % (self.dev, self.address['public_ip'])
+        CsHelper.execute2(cmd, False)
 
     # Delete any ips that are configured but not in the bag
     def compare(self, bag):

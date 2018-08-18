@@ -71,7 +71,7 @@ public interface NetworkService {
 
     boolean deleteNetwork(long networkId, boolean forced);
 
-    boolean restartNetwork(RestartNetworkCmd cmd, boolean cleanup) throws ConcurrentOperationException, ResourceUnavailableException, InsufficientCapacityException;
+    boolean restartNetwork(RestartNetworkCmd cmd, boolean cleanup, boolean makeRedundant) throws ConcurrentOperationException, ResourceUnavailableException, InsufficientCapacityException;
 
     int getActiveNicsInNetwork(long networkId);
 

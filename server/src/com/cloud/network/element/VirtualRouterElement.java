@@ -216,6 +216,10 @@ NetworkMigrationResponder, AggregatedCommandExecutor, RedundantResource, DnsServ
         final Map<VirtualMachineProfile.Param, Object> params = new HashMap<VirtualMachineProfile.Param, Object>(1);
         params.put(VirtualMachineProfile.Param.ReProgramGuestNetworks, true);
 
+        if (network.isRollingRestart()) {
+            params.put(VirtualMachineProfile.Param.RollingRestart, true);
+        }
+
         final RouterDeploymentDefinition routerDeploymentDefinition =
                 routerDeploymentDefinitionBuilder.create()
                 .setGuestNetwork(network)
@@ -226,11 +230,11 @@ NetworkMigrationResponder, AggregatedCommandExecutor, RedundantResource, DnsServ
 
         final List<DomainRouterVO> routers = routerDeploymentDefinition.deployVirtualRouter();
 
-        int routerCounts = 1;
-        if (offering.getRedundantRouter()) {
-            routerCounts = 2;
+        int expectedRouters = 1;
+        if (offering.getRedundantRouter() || network.isRollingRestart()) {
+            expectedRouters = 2;
         }
-        if (routers == null || routers.size() < routerCounts) {
+        if (routers == null || routers.size() < expectedRouters) {
             //we might have a router which is already deployed and running.
             //so check the no of routers in network currently.
             List<DomainRouterVO> current_routers = _routerDao.listByNetworkAndRole(network.getId(), Role.VIRTUAL_ROUTER);

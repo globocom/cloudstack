@@ -26,7 +26,7 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack</artifactId>
-    <version>4.11.0.0</version>
+    <version>4.11.1.0</version>
   </parent>
 
   <build>
@@ -112,6 +112,7 @@
     <module>database/quota</module>
     <module>integrations/cloudian</module>
     <module>integrations/prometheus</module>
+    <module>affinity-group-processors/host-affinity</module>
   </modules>
 
   <dependencies>

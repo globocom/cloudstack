@@ -1442,7 +1442,7 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
                 if (dest.getHost().getHypervisorType() == HypervisorType.VMware || dest.getHost().getHypervisorType() == HypervisorType.Hyperv) {
                     s_logger.info("Check if we need to add management server explicit route to DomR. pod cidr: " + dest.getPod().getCidrAddress() + "/"
                             + dest.getPod().getCidrSize() + ", pod gateway: " + dest.getPod().getGateway() + ", management host: "
-                            + ApiServiceConfiguration.ManagementHostIPAdr.value());
+                            + ApiServiceConfiguration.ManagementServerAddresses.value());
 
                     if (s_logger.isInfoEnabled()) {
                         s_logger.info("Add management server explicit route to DomR.");
@@ -1553,7 +1553,7 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
             } else {
                 buf.append(String.format(" baremetalnotificationsecuritykey=%s", user.getSecretKey()));
                 buf.append(String.format(" baremetalnotificationapikey=%s", user.getApiKey()));
-                buf.append(" host=").append(ApiServiceConfiguration.ManagementHostIPAdr.value());
+                buf.append(" host=").append(ApiServiceConfiguration.ManagementServerAddresses.value());
                 buf.append(" port=").append(_configDao.getValue(Config.BaremetalProvisionDoneNotificationPort.key()));
             }
         }

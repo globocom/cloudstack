@@ -283,6 +283,11 @@ public abstract class CitrixResourceBase implements ServerResource, HypervisorRe
 
     protected StorageSubsystemCommandHandler storageHandler;
 
+    private static final String XENSTORE_DATA_IP = "vm-data/ip";
+    private static final String XENSTORE_DATA_GATEWAY = "vm-data/gateway";
+    private static final String XENSTORE_DATA_NETMASK = "vm-data/netmask";
+    private static final String XENSTORE_DATA_CS_INIT = "vm-data/cloudstack/init";
+
     public CitrixResourceBase() {
     }
 
@@ -1050,9 +1055,13 @@ public abstract class CitrixResourceBase implements ServerResource, HypervisorRe
     public VBD createPatchVbd(final Connection conn, final String vmName, final VM vm) throws XmlRpcException, XenAPIException {
 
         if (_host.getSystemvmisouuid() == null) {
-            final Set<SR> srs = SR.getByNameLabel(conn, "XenServer Tools");
+            Set<SR> srs = SR.getByNameLabel(conn, "XenServer Tools");
             if (srs.size() != 1) {
-                throw new CloudRuntimeException("There are " + srs.size() + " SRs with name XenServer Tools");
+                s_logger.debug("Failed to find SR by name 'XenServer Tools', will try to find 'XCP-ng Tools' SR");
+                srs = SR.getByNameLabel(conn, "XCP-ng Tools");
+                if (srs.size() != 1) {
+                    throw new CloudRuntimeException("There are " + srs.size() + " SRs with name XenServer Tools");
+                }
             }
             final SR sr = srs.iterator().next();
             sr.scan(conn);
@@ -1286,10 +1295,7 @@ public abstract class CitrixResourceBase implements ServerResource, HypervisorRe
             if(guestOsDetails.containsKey("xenserver.dynamicMax")){
                 recommendedMemoryMax = Long.valueOf(guestOsDetails.get("xenserver.dynamicMax")).longValue();
             }
-
         }
-
-
 
         if (isDmcEnabled(conn, host) && vmSpec.isEnableDynamicallyScaleVm()) {
             // scaling is allowed
@@ -1312,7 +1318,6 @@ public abstract class CitrixResourceBase implements ServerResource, HypervisorRe
             vmr.memoryStaticMin = vmSpec.getMinRam();
             vmr.memoryStaticMax = vmSpec.getMaxRam();
             vmr.memoryDynamicMin = vmSpec.getMinRam();
-            ;
             vmr.memoryDynamicMax = vmSpec.getMaxRam();
 
             vmr.VCPUsMax = (long) vmSpec.getCpus();
@@ -1326,17 +1331,15 @@ public abstract class CitrixResourceBase implements ServerResource, HypervisorRe
             NicTO mgmtNic = vmSpec.getNics()[0];
             if(mgmtNic != null ) {
                 Map<String, String> xenstoreData = new HashMap<String, String>(3);
-                xenstoreData.put("vm-data/ip", mgmtNic.getIp().toString().trim());
-                xenstoreData.put("vm-data/gateway", mgmtNic.getGateway().toString().trim());
-                xenstoreData.put("vm-data/netmask", mgmtNic.getNetmask().toString().trim());
+                xenstoreData.put(XENSTORE_DATA_IP, mgmtNic.getIp().toString().trim());
+                xenstoreData.put(XENSTORE_DATA_GATEWAY, mgmtNic.getGateway().toString().trim());
+                xenstoreData.put(XENSTORE_DATA_NETMASK, mgmtNic.getNetmask().toString().trim());
                 vmr.xenstoreData = xenstoreData;
             }
         }
 
         final VM vm = VM.create(conn, vmr);
-        if (s_logger.isDebugEnabled()) {
-            s_logger.debug("Created VM " + vm.getUuid(conn) + " for " + vmSpec.getName());
-        }
+        s_logger.debug("Created VM " + vm.getUuid(conn) + " for " + vmSpec.getName());
 
         final Map<String, String> vcpuParams = new HashMap<String, String>();
 
@@ -1368,12 +1371,18 @@ public abstract class CitrixResourceBase implements ServerResource, HypervisorRe
 
         final String bootArgs = vmSpec.getBootArgs();
         if (bootArgs != null && bootArgs.length() > 0) {
+            // send boot args for PV instances
             String pvargs = vm.getPVArgs(conn);
             pvargs = pvargs + vmSpec.getBootArgs().replaceAll(" ", "%");
-            if (s_logger.isDebugEnabled()) {
-                s_logger.debug("PV args are " + pvargs);
-            }
             vm.setPVArgs(conn, pvargs);
+            s_logger.debug("PV args are " + pvargs);
+
+            // send boot args into xenstore-data for HVM instances
+            Map<String, String> xenstoreData = new HashMap<>();
+
+            xenstoreData.put(XENSTORE_DATA_CS_INIT, bootArgs);
+            vm.setXenstoreData(conn, xenstoreData);
+            s_logger.debug("HVM args are " + bootArgs);
         }
 
         if (!(guestOsTypeName.startsWith("Windows") || guestOsTypeName.startsWith("Citrix") || guestOsTypeName.startsWith("Other"))) {
@@ -2640,7 +2649,7 @@ public abstract class CitrixResourceBase implements ServerResource, HypervisorRe
         final String[] items = xenVersion.split("\\.");
 
         // guest-tools.iso for XenServer version 7.0+
-        if (xenBrand.equals("XenServer") && Integer.parseInt(items[0]) >= 7) {
+        if ((xenBrand.equals("XenServer") || xenBrand.equals("XCP-ng")) && Integer.parseInt(items[0]) >= 7) {
             return "guest-tools.iso";
         }
 

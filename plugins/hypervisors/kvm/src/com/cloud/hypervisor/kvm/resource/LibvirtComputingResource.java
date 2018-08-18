@@ -41,11 +41,20 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import javax.naming.ConfigurationException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import com.cloud.resource.RequestWrapper;
+import org.apache.cloudstack.storage.to.PrimaryDataStoreTO;
+import org.apache.cloudstack.storage.to.VolumeObjectTO;
+import org.apache.cloudstack.utils.hypervisor.HypervisorUtils;
+import org.apache.cloudstack.utils.linux.CPUStat;
+import org.apache.cloudstack.utils.linux.MemStat;
+import org.apache.cloudstack.utils.qemu.QemuImg.PhysicalDiskFormat;
+import org.apache.cloudstack.utils.security.KeyStoreUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
@@ -68,14 +77,6 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
-import com.google.common.base.Strings;
-
-import org.apache.cloudstack.storage.to.PrimaryDataStoreTO;
-import org.apache.cloudstack.storage.to.VolumeObjectTO;
-import org.apache.cloudstack.utils.hypervisor.HypervisorUtils;
-import org.apache.cloudstack.utils.linux.CPUStat;
-import org.apache.cloudstack.utils.linux.MemStat;
-import org.apache.cloudstack.utils.qemu.QemuImg.PhysicalDiskFormat;
 
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.Command;
@@ -168,6 +169,7 @@ import com.cloud.utils.ssh.SshHelper;
 import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachine.PowerState;
 import com.cloud.vm.VmDetailConstants;
+import com.google.common.base.Strings;
 
 /**
  * LibvirtComputingResource execute requests on the computing/routing host using
@@ -239,6 +241,7 @@ public class LibvirtComputingResource extends ServerResourceBase implements Serv
     protected long _hypervisorLibvirtVersion;
     protected long _hypervisorQemuVersion;
     protected String _hypervisorPath;
+    protected String _hostDistro;
     protected String _networkDirectSourceMode;
     protected String _networkDirectDevice;
     protected String _sysvmISOPath;
@@ -1430,13 +1433,21 @@ public class LibvirtComputingResource extends ServerResourceBase implements Serv
         return true;
     }
 
+    /**
+     * This finds a command wrapper to handle the command and executes it.
+     * If no wrapper is found an {@see UnsupportedAnswer} is sent back.
+     * Any other exceptions are to be caught and wrapped in an generic {@see Answer}, marked as failed.
+     *
+     * @param cmd the instance of a {@see Command} to execute.
+     * @return the for the {@see Command} appropriate {@see Answer} or {@see UnsupportedAnswer}
+     */
     @Override
     public Answer executeRequest(final Command cmd) {
 
         final LibvirtRequestWrapper wrapper = LibvirtRequestWrapper.getInstance();
         try {
             return wrapper.execute(cmd, this);
-        } catch (final Exception e) {
+        } catch (final RequestWrapper.CommandNotSupported cmde) {
             return Answer.createUnsupportedCommandAnswer(cmd);
         }
     }
@@ -1984,6 +1995,31 @@ public class LibvirtComputingResource extends ServerResourceBase implements Serv
         return uuid;
     }
 
+    /**
+     * Set quota and period tags on 'ctd' when CPU limit use is set
+     */
+    protected void setQuotaAndPeriod(VirtualMachineTO vmTO, CpuTuneDef ctd) {
+        if (vmTO.getLimitCpuUse() && vmTO.getCpuQuotaPercentage() != null) {
+            Double cpuQuotaPercentage = vmTO.getCpuQuotaPercentage();
+            int period = CpuTuneDef.DEFAULT_PERIOD;
+            int quota = (int) (period * cpuQuotaPercentage);
+            if (quota < CpuTuneDef.MIN_QUOTA) {
+                s_logger.info("Calculated quota (" + quota + ") below the minimum (" + CpuTuneDef.MIN_QUOTA + ") for VM domain " + vmTO.getUuid() + ", setting it to minimum " +
+                        "and calculating period instead of using the default");
+                quota = CpuTuneDef.MIN_QUOTA;
+                period = (int) ((double) quota / cpuQuotaPercentage);
+                if (period > CpuTuneDef.MAX_PERIOD) {
+                    s_logger.info("Calculated period (" + period + ") exceeds the maximum (" + CpuTuneDef.MAX_PERIOD +
+                            "), setting it to the maximum");
+                    period = CpuTuneDef.MAX_PERIOD;
+                }
+            }
+            ctd.setQuota(quota);
+            ctd.setPeriod(period);
+            s_logger.info("Setting quota=" + quota + ", period=" + period + " to VM domain " + vmTO.getUuid());
+        }
+    }
+
     public LibvirtVMDef createVMFromSpec(final VirtualMachineTO vmTO) {
         final LibvirtVMDef vm = new LibvirtVMDef();
         vm.setDomainName(vmTO.getName());
@@ -2059,6 +2095,9 @@ public class LibvirtComputingResource extends ServerResourceBase implements Serv
             } else {
                 ctd.setShares(vmTO.getCpus() * vmTO.getSpeed());
             }
+
+            setQuotaAndPeriod(vmTO, ctd);
+
             vm.addComp(ctd);
         }
 
@@ -2170,9 +2209,8 @@ public class LibvirtComputingResource extends ServerResourceBase implements Serv
         final DataTO data = volume.getData();
         final DataStoreTO store = data.getDataStore();
 
-        if (volume.getType() == Volume.Type.ISO && data.getPath() != null) {
-            final NfsTO nfsStore = (NfsTO)store;
-            final String isoPath = nfsStore.getUrl() + File.separator + data.getPath();
+        if (volume.getType() == Volume.Type.ISO && data.getPath() != null && (store instanceof NfsTO || store instanceof PrimaryDataStoreTO)) {
+            final String isoPath = store.getUrl().split("\\?")[0] + File.separator + data.getPath();
             final int index = isoPath.lastIndexOf("/");
             final String path = isoPath.substring(0, index);
             final String name = isoPath.substring(index + 1);
@@ -2571,10 +2609,15 @@ public class LibvirtComputingResource extends ServerResourceBase implements Serv
         fillNetworkInformation(cmd);
         _privateIp = cmd.getPrivateIpAddress();
         cmd.getHostDetails().putAll(getVersionStrings());
+        cmd.getHostDetails().put(KeyStoreUtils.SECURED, String.valueOf(isHostSecured()).toLowerCase());
         cmd.setPool(_pool);
         cmd.setCluster(_clusterId);
         cmd.setGatewayIpAddress(_localGateway);
         cmd.setIqn(getIqn());
+
+        if (cmd.getHostDetails().containsKey("Host.OS")) {
+            _hostDistro = cmd.getHostDetails().get("Host.OS");
+        }
 
         StartupStorageCommand sscmd = null;
         try {
@@ -3748,5 +3791,25 @@ public class LibvirtComputingResource extends ServerResourceBase implements Serv
 
     public long getTotalMemory() {
         return _totalMemory;
+    }
+
+    public String getHostDistro() {
+        return _hostDistro;
+    }
+
+    public boolean isHostSecured() {
+        // Test for host certificates
+        final File confFile = PropertiesUtil.findConfigFile(KeyStoreUtils.AGENT_PROPSFILE);
+        if (confFile == null || !confFile.exists() || !new File(confFile.getParent() + "/" + KeyStoreUtils.CERT_FILENAME).exists()) {
+            return false;
+        }
+
+        // Test for libvirt TLS configuration
+        try {
+            new Connect(String.format("qemu+tls://%s/system", _privateIp));
+        } catch (final LibvirtException ignored) {
+            return false;
+        }
+        return true;
     }
 }

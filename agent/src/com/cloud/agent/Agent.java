@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
@@ -38,12 +40,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.naming.ConfigurationException;
 
 import org.apache.cloudstack.agent.directdownload.SetupDirectDownloadCertificate;
+import org.apache.cloudstack.agent.lb.SetupMSListAnswer;
+import org.apache.cloudstack.agent.lb.SetupMSListCommand;
+import org.apache.cloudstack.ca.PostCertificateRenewalCommand;
 import org.apache.cloudstack.ca.SetupCertificateAnswer;
 import org.apache.cloudstack.ca.SetupCertificateCommand;
 import org.apache.cloudstack.ca.SetupKeyStoreCommand;
 import org.apache.cloudstack.ca.SetupKeystoreAnswer;
 import org.apache.cloudstack.managed.context.ManagedContextTimerTask;
 import org.apache.cloudstack.utils.security.KeyStoreUtils;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 import org.slf4j.MDC;
@@ -63,8 +69,10 @@ import com.cloud.agent.api.StartupCommand;
 import com.cloud.agent.transport.Request;
 import com.cloud.agent.transport.Response;
 import com.cloud.exception.AgentControlChannelException;
+import com.cloud.host.Host;
 import com.cloud.resource.ServerResource;
 import com.cloud.utils.PropertiesUtil;
+import com.cloud.utils.StringUtils;
 import com.cloud.utils.backoff.BackoffAlgorithm;
 import com.cloud.utils.concurrency.NamedThreadFactory;
 import com.cloud.utils.exception.CloudRuntimeException;
@@ -121,6 +129,8 @@ public class Agent implements HandlerFactory, IAgentControl {
     Long _id;
 
     Timer _timer = new Timer("Agent Timer");
+    Timer certTimer;
+    Timer hostLBTimer;
 
     List<WatchTask> _watchList = new ArrayList<WatchTask>();
     long _sequence = 0;
@@ -133,8 +143,10 @@ public class Agent implements HandlerFactory, IAgentControl {
     long _startupWait = _startupWaitDefault;
     boolean _reconnectAllowed = true;
     //For time sentitive task, e.g. PingTask
-    private final ThreadPoolExecutor _ugentTaskPool;
+    ThreadPoolExecutor _ugentTaskPool;
     ExecutorService _executor;
+
+    Thread _shutdownThread = new ShutdownThread(this);
 
     private String _keystoreSetupPath;
     private String _keystoreCertImportPath;
@@ -144,9 +156,9 @@ public class Agent implements HandlerFactory, IAgentControl {
         _shell = shell;
         _link = null;
 
-        _connection = new NioClient("Agent", _shell.getHost(), _shell.getPort(), _shell.getWorkers(), this);
+        _connection = new NioClient("Agent", _shell.getNextHost(), _shell.getPort(), _shell.getWorkers(), this);
 
-        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
+        Runtime.getRuntime().addShutdownHook(_shutdownThread);
 
         _ugentTaskPool =
                 new ThreadPoolExecutor(shell.getPingRetries(), 2 * shell.getPingRetries(), 10, TimeUnit.MINUTES, new SynchronousQueue<Runnable>(), new NamedThreadFactory(
@@ -179,13 +191,13 @@ public class Agent implements HandlerFactory, IAgentControl {
             throw new ConfigurationException("Unable to configure " + _resource.getName());
         }
 
-        final String host = _shell.getHost();
+        final String host = _shell.getNextHost();
         _connection = new NioClient("Agent", host, _shell.getPort(), _shell.getWorkers(), this);
 
         // ((NioClient)_connection).setBindAddress(_shell.getPrivateIp());
 
         s_logger.debug("Adding shutdown hook");
-        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
+        Runtime.getRuntime().addShutdownHook(_shutdownThread);
 
         _ugentTaskPool =
                 new ThreadPoolExecutor(shell.getPingRetries(), 2 * shell.getPingRetries(), 10, TimeUnit.MINUTES, new SynchronousQueue<Runnable>(), new NamedThreadFactory(
@@ -232,20 +244,39 @@ public class Agent implements HandlerFactory, IAgentControl {
         return _resource.getClass().getSimpleName();
     }
 
+    /**
+     * In case of a software based agent restart, this method
+     * can help to perform explicit garbage collection of any old
+     * agent instances and its inner objects.
+     */
+    private void scavengeOldAgentObjects() {
+        _executor.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(2000L);
+                } catch (final InterruptedException ignored) {
+                } finally {
+                    System.gc();
+                }
+            }
+        });
+    }
+
     public void start() {
         if (!_resource.start()) {
             s_logger.error("Unable to start the resource: " + _resource.getName());
             throw new CloudRuntimeException("Unable to start the resource: " + _resource.getName());
         }
 
-        _keystoreSetupPath = Script.findScript("scripts/util/", KeyStoreUtils.keyStoreSetupScript);
+        _keystoreSetupPath = Script.findScript("scripts/util/", KeyStoreUtils.KS_SETUP_SCRIPT);
         if (_keystoreSetupPath == null) {
-            throw new CloudRuntimeException(String.format("Unable to find the '%s' script", KeyStoreUtils.keyStoreSetupScript));
+            throw new CloudRuntimeException(String.format("Unable to find the '%s' script", KeyStoreUtils.KS_SETUP_SCRIPT));
         }
 
-        _keystoreCertImportPath = Script.findScript("scripts/util/", KeyStoreUtils.keyStoreImportScript);
+        _keystoreCertImportPath = Script.findScript("scripts/util/", KeyStoreUtils.KS_IMPORT_SCRIPT);
         if (_keystoreCertImportPath == null) {
-            throw new CloudRuntimeException(String.format("Unable to find the '%s' script", KeyStoreUtils.keyStoreImportScript));
+            throw new CloudRuntimeException(String.format("Unable to find the '%s' script", KeyStoreUtils.KS_IMPORT_SCRIPT));
         }
 
         try {
@@ -255,7 +286,7 @@ public class Agent implements HandlerFactory, IAgentControl {
             s_logger.info("Attempted to connect to the server, but received an unexpected exception, trying again...");
         }
         while (!_connection.isStartup()) {
-            final String host = _shell.getHost();
+            final String host = _shell.getNextHost();
             _shell.getBackoffAlgorithm().waitBeforeRetry();
             _connection = new NioClient("Agent", host, _shell.getPort(), _shell.getWorkers(), this);
             s_logger.info("Connecting to host:" + host);
@@ -266,6 +297,8 @@ public class Agent implements HandlerFactory, IAgentControl {
                 s_logger.info("Attempted to connect to the server, but received an unexpected exception, trying again...");
             }
         }
+        _shell.updateConnectedHost();
+        scavengeOldAgentObjects();
     }
 
     public void stop(final String reason, final String detail) {
@@ -290,6 +323,7 @@ public class Agent implements HandlerFactory, IAgentControl {
             }
             _connection.stop();
             _connection = null;
+            _link = null;
         }
 
         if (_resource != null) {
@@ -297,7 +331,34 @@ public class Agent implements HandlerFactory, IAgentControl {
             _resource = null;
         }
 
-        _ugentTaskPool.shutdownNow();
+        if (_startup != null) {
+            _startup = null;
+        }
+
+        if (_ugentTaskPool != null) {
+            _ugentTaskPool.shutdownNow();
+            _ugentTaskPool = null;
+        }
+
+        if (_executor != null) {
+            _executor.shutdown();
+            _executor = null;
+        }
+
+        if (_timer != null) {
+            _timer.cancel();
+            _timer = null;
+        }
+
+        if (hostLBTimer != null) {
+            hostLBTimer.cancel();
+            hostLBTimer = null;
+        }
+
+        if (certTimer != null) {
+            certTimer.cancel();
+            certTimer = null;
+        }
     }
 
     public Long getId() {
@@ -308,6 +369,26 @@ public class Agent implements HandlerFactory, IAgentControl {
         s_logger.info("Set agent id " + id);
         _id = id;
         _shell.setPersistentProperty(getResourceName(), "id", Long.toString(id));
+    }
+
+    private synchronized void scheduleServicesRestartTask() {
+        if (certTimer != null) {
+            certTimer.cancel();
+            certTimer.purge();
+        }
+        certTimer = new Timer("Certificate Renewal Timer");
+        certTimer.schedule(new PostCertificateRenewalTask(this), 5000L);
+    }
+
+    private synchronized void scheduleHostLBCheckerTask(final long checkInterval) {
+        if (hostLBTimer != null) {
+            hostLBTimer.cancel();
+        }
+        if (checkInterval > 0L) {
+            s_logger.info("Scheduling preferred host timer task with host.lb.interval=" + checkInterval + "ms");
+            hostLBTimer = new Timer("Host LB Timer");
+            hostLBTimer.scheduleAtFixedRate(new PreferredHostCheckerTask(), checkInterval, checkInterval);
+        }
     }
 
     public void scheduleWatch(final Link link, final Request request, final long delay, final long period) {
@@ -332,8 +413,8 @@ public class Agent implements HandlerFactory, IAgentControl {
             _watchList.clear();
         }
     }
-    public synchronized void lockStartupTask(final Link link)
-    {
+
+    public synchronized void lockStartupTask(final Link link) {
         _startup = new StartupTask(link);
         _timer.schedule(_startup, _startupWait);
     }
@@ -341,9 +422,11 @@ public class Agent implements HandlerFactory, IAgentControl {
     public void sendStartup(final Link link) {
         final StartupCommand[] startup = _resource.initialize();
         if (startup != null) {
+            final String msHostList = _shell.getPersistentProperty(null, "host");
             final Command[] commands = new Command[startup.length];
             for (int i = 0; i < startup.length; i++) {
                 setupStartupCommand(startup[i]);
+                startup[i].setMSHostList(msHostList);
                 commands[i] = startup[i];
             }
             final Request request = new Request(_id != null ? _id : -1, -1, commands, false, false);
@@ -402,25 +485,17 @@ public class Agent implements HandlerFactory, IAgentControl {
             }
         }
 
-        link.close();
-        link.terminated();
+        if (link != null) {
+            link.close();
+            link.terminated();
+        }
 
         setLink(null);
         cancelTasks();
 
         _resource.disconnected();
 
-        int inProgress = 0;
-        do {
-            _shell.getBackoffAlgorithm().waitBeforeRetry();
-
-            s_logger.info("Lost connection to the server. Dealing with the remaining commands...");
-
-            inProgress = _inProgress.get();
-            if (inProgress > 0) {
-                s_logger.info("Cannot connect because we still have " + inProgress + " commands in progress.");
-            }
-        } while (inProgress > 0);
+        s_logger.info("Lost connection to host: " + _shell.getConnectedHost() + ". Attempting reconnection while we still have " + _inProgress.get() + " commands in progress.");
 
         _connection.stop();
 
@@ -434,7 +509,7 @@ public class Agent implements HandlerFactory, IAgentControl {
             _shell.getBackoffAlgorithm().waitBeforeRetry();
         }
 
-        final String host = _shell.getHost();
+        final String host = _shell.getNextHost();
         do {
             _connection = new NioClient("Agent", host, _shell.getPort(), _shell.getWorkers(), this);
             s_logger.info("Reconnecting to host:" + host);
@@ -452,7 +527,8 @@ public class Agent implements HandlerFactory, IAgentControl {
             }
             _shell.getBackoffAlgorithm().waitBeforeRetry();
         } while (!_connection.isStartup());
-        s_logger.info("Connected to the server");
+        _shell.updateConnectedHost();
+        s_logger.info("Connected to the host: " + _shell.getConnectedHost());
     }
 
     public void processStartupAnswer(final Answer answer, final Response response, final Link link) {
@@ -552,8 +628,13 @@ public class Agent implements HandlerFactory, IAgentControl {
                         answer = setupAgentKeystore((SetupKeyStoreCommand) cmd);
                     } else if (cmd instanceof SetupCertificateCommand && ((SetupCertificateCommand) cmd).isHandleByAgent()) {
                         answer = setupAgentCertificate((SetupCertificateCommand) cmd);
+                        if (Host.Type.Routing.equals(_resource.getType())) {
+                            scheduleServicesRestartTask();
+                        }
                     } else if (cmd instanceof SetupDirectDownloadCertificate) {
                         answer = setupDirectDownloadCertificate((SetupDirectDownloadCertificate) cmd);
+                    } else if (cmd instanceof SetupMSListCommand) {
+                        answer = setupManagementServerList((SetupMSListCommand) cmd);
                     } else {
                         if (cmd instanceof ReadyCommand) {
                             processReadyCommand(cmd);
@@ -613,7 +694,7 @@ public class Agent implements HandlerFactory, IAgentControl {
             return new Answer(cmd, false, "Failed to find agent.properties file");
         }
 
-        final String keyStoreFile = agentFile.getParent() + "/" + KeyStoreUtils.defaultKeystoreFile;
+        final String keyStoreFile = agentFile.getParent() + "/" + KeyStoreUtils.KS_FILENAME;
 
         String cerFile = agentFile.getParent() + "/" + certificateName + ".cer";
         Script.runSimpleBashScript(String.format("echo '%s' > %s", certificate, cerFile));
@@ -638,13 +719,13 @@ public class Agent implements HandlerFactory, IAgentControl {
         if (agentFile == null) {
             return new Answer(cmd, false, "Failed to find agent.properties file");
         }
-        final String keyStoreFile = agentFile.getParent() + "/" + KeyStoreUtils.defaultKeystoreFile;
-        final String csrFile = agentFile.getParent() + "/" + KeyStoreUtils.defaultCsrFile;
+        final String keyStoreFile = agentFile.getParent() + "/" + KeyStoreUtils.KS_FILENAME;
+        final String csrFile = agentFile.getParent() + "/" + KeyStoreUtils.CSR_FILENAME;
 
-        String storedPassword = _shell.getPersistentProperty(null, KeyStoreUtils.passphrasePropertyName);
+        String storedPassword = _shell.getPersistentProperty(null, KeyStoreUtils.KS_PASSPHRASE_PROPERTY);
         if (Strings.isNullOrEmpty(storedPassword)) {
             storedPassword = keyStorePassword;
-            _shell.setPersistentProperty(null, KeyStoreUtils.passphrasePropertyName, storedPassword);
+            _shell.setPersistentProperty(null, KeyStoreUtils.KS_PASSPHRASE_PROPERTY, storedPassword);
         }
 
         Script script = new Script(_keystoreSetupPath, 60000, s_logger);
@@ -678,10 +759,10 @@ public class Agent implements HandlerFactory, IAgentControl {
         if (agentFile == null) {
             return new Answer(cmd, false, "Failed to find agent.properties file");
         }
-        final String keyStoreFile = agentFile.getParent() + "/" + KeyStoreUtils.defaultKeystoreFile;
-        final String certFile = agentFile.getParent() + "/" + KeyStoreUtils.defaultCertFile;
-        final String privateKeyFile = agentFile.getParent() + "/" + KeyStoreUtils.defaultPrivateKeyFile;
-        final String caCertFile = agentFile.getParent() + "/" + KeyStoreUtils.defaultCaCertFile;
+        final String keyStoreFile = agentFile.getParent() + "/" + KeyStoreUtils.KS_FILENAME;
+        final String certFile = agentFile.getParent() + "/" + KeyStoreUtils.CERT_FILENAME;
+        final String privateKeyFile = agentFile.getParent() + "/" + KeyStoreUtils.PKEY_FILENAME;
+        final String caCertFile = agentFile.getParent() + "/" + KeyStoreUtils.CACERT_FILENAME;
 
         try {
             FileUtils.writeStringToFile(new File(certFile), certificate, Charset.defaultCharset());
@@ -694,7 +775,7 @@ public class Agent implements HandlerFactory, IAgentControl {
         Script script = new Script(_keystoreCertImportPath, 60000, s_logger);
         script.add(agentFile.getAbsolutePath());
         script.add(keyStoreFile);
-        script.add(KeyStoreUtils.agentMode);
+        script.add(KeyStoreUtils.AGENT_MODE);
         script.add(certFile);
         script.add("");
         script.add(caCertFile);
@@ -706,6 +787,30 @@ public class Agent implements HandlerFactory, IAgentControl {
             throw new CloudRuntimeException("Unable to import certificate into keystore file");
         }
         return new SetupCertificateAnswer(true);
+    }
+
+    private void processManagementServerList(final List<String> msList, final String lbAlgorithm, final Long lbCheckInterval) {
+        if (CollectionUtils.isNotEmpty(msList) && !Strings.isNullOrEmpty(lbAlgorithm)) {
+            try {
+                final String newMSHosts = String.format("%s%s%s", StringUtils.toCSVList(msList), IAgentShell.hostLbAlgorithmSeparator, lbAlgorithm);
+                _shell.setPersistentProperty(null, "host", newMSHosts);
+                _shell.setHosts(newMSHosts);
+                _shell.resetHostCounter();
+                s_logger.info("Processed new management server list: " + newMSHosts);
+            } catch (final Exception e) {
+                throw new CloudRuntimeException("Could not persist received management servers list", e);
+            }
+        }
+        if ("shuffle".equals(lbAlgorithm)) {
+            scheduleHostLBCheckerTask(0);
+        } else {
+            scheduleHostLBCheckerTask(_shell.getLbCheckerInterval(lbCheckInterval));
+        }
+    }
+
+    private Answer setupManagementServerList(final SetupMSListCommand cmd) {
+        processManagementServerList(cmd.getMsList(), cmd.getLbAlgorithm(), cmd.getLbCheckInterval());
+        return new SetupMSListAnswer(true);
     }
 
     public void processResponse(final Response response, final Link link) {
@@ -728,15 +833,16 @@ public class Agent implements HandlerFactory, IAgentControl {
     }
 
     public void processReadyCommand(final Command cmd) {
-
         final ReadyCommand ready = (ReadyCommand)cmd;
 
-        s_logger.info("Proccess agent ready command, agent id = " + ready.getHostId());
+        s_logger.info("Processing agent ready command, agent id = " + ready.getHostId());
         if (ready.getHostId() != null) {
             setId(ready.getHostId());
         }
-        s_logger.info("Ready command is processed: agent id = " + getId());
 
+        processManagementServerList(ready.getMsHostList(), ready.getLbAlgorithm(), ready.getLbCheckInterval());
+
+        s_logger.info("Ready command is processed for agent id = " + getId());
     }
 
     public void processOtherTask(final Task task) {
@@ -1018,4 +1124,98 @@ public class Agent implements HandlerFactory, IAgentControl {
             }
         }
     }
+
+    /**
+     * Task stops the current agent and launches a new agent
+     * when there are no outstanding jobs in the agent's task queue
+     */
+    public class PostCertificateRenewalTask extends ManagedContextTimerTask {
+
+        private Agent agent;
+
+        public PostCertificateRenewalTask(final Agent agent) {
+            this.agent = agent;
+        }
+
+        @Override
+        protected void runInContext() {
+            while (true) {
+                try {
+                    if (_inProgress.get() == 0) {
+                        s_logger.debug("Running post certificate renewal task to restart services.");
+
+                        // Let the resource perform any post certificate renewal cleanups
+                        _resource.executeRequest(new PostCertificateRenewalCommand());
+
+                        IAgentShell shell = agent._shell;
+                        ServerResource resource = agent._resource.getClass().newInstance();
+
+                        // Stop current agent
+                        agent.cancelTasks();
+                        agent._reconnectAllowed = false;
+                        Runtime.getRuntime().removeShutdownHook(agent._shutdownThread);
+                        agent.stop(ShutdownCommand.Requested, "Restarting due to new X509 certificates");
+
+                        // Nullify references for GC
+                        agent._shell = null;
+                        agent._watchList = null;
+                        agent._shutdownThread = null;
+                        agent._controlListeners = null;
+                        agent = null;
+
+                        // Start a new agent instance
+                        shell.launchNewAgent(resource);
+                        return;
+                    }
+                    if (s_logger.isTraceEnabled()) {
+                        s_logger.debug("Other tasks are in progress, will retry post certificate renewal command after few seconds");
+                    }
+                    Thread.sleep(5000);
+                } catch (final Exception e) {
+                    s_logger.warn("Failed to execute post certificate renewal command:", e);
+                    break;
+                }
+            }
+        }
+    }
+
+    public class PreferredHostCheckerTask extends ManagedContextTimerTask {
+
+        @Override
+        protected void runInContext() {
+            try {
+                final String[] msList = _shell.getHosts();
+                if (msList == null || msList.length < 1) {
+                    return;
+                }
+                final String preferredHost  = msList[0];
+                final String connectedHost = _shell.getConnectedHost();
+                if (s_logger.isTraceEnabled()) {
+                    s_logger.trace("Running preferred host checker task, connected host=" + connectedHost + ", preferred host=" + preferredHost);
+                }
+                if (preferredHost != null && !preferredHost.equals(connectedHost) && _link != null) {
+                    boolean isHostUp = true;
+                    try (final Socket socket = new Socket()) {
+                        socket.connect(new InetSocketAddress(preferredHost, _shell.getPort()), 5000);
+                    } catch (final IOException e) {
+                        isHostUp = false;
+                        if (s_logger.isTraceEnabled()) {
+                            s_logger.trace("Host: " + preferredHost + " is not reachable");
+                        }
+                    }
+                    if (isHostUp && _link != null && _inProgress.get() == 0) {
+                        if (s_logger.isDebugEnabled()) {
+                            s_logger.debug("Preferred host " + preferredHost + " is found to be reachable, trying to reconnect");
+                        }
+                        _shell.resetHostCounter();
+                        reconnect(_link);
+                    }
+                }
+            } catch (Throwable t) {
+                s_logger.error("Error caught while attempting to connect to preferred host", t);
+            }
+        }
+
+    }
+
 }

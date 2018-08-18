@@ -340,13 +340,13 @@ setup_common() {
   fi
 
   # Workaround to activate vSwitch under VMware
-  timeout 3 ping -n -c 3 $GW || true
+  timeout 3 ping -n -c 3 $GW &
   if [ -n "$MGMTNET"  -a -n "$LOCAL_GW" ]
   then
-      timeout 3 ping -n -c 3 $LOCAL_GW || true
+      timeout 3 ping -n -c 3 $LOCAL_GW &
       #This code is added to address ARP issue by pinging MGMT_GW
       MGMT_GW=$(echo $MGMTNET | awk -F "." '{print $1"."$2"."$3".1"}')
-      timeout 3 ping -n -c 3 $MGMT_GW || true
+      timeout 3 ping -n -c 3 $MGMT_GW &
   fi
 
   if [ "$HYPERVISOR" == "vmware" ]; then
@@ -503,9 +503,6 @@ clean_ipalias_config() {
 
 setup_apache2_common() {
   sed -i 's/^Include ports.conf.*/# CS: Done by Python CsApp config\n#Include ports.conf/g' /etc/apache2/apache2.conf
-  [ -f /etc/apache2/conf.d/security ] && sed -i -e "s/^ServerTokens .*/ServerTokens Prod/g" /etc/apache2/conf.d/security
-  [ -f /etc/apache2/conf.d/security ] && sed -i -e "s/^ServerSignature .*/ServerSignature Off/g" /etc/apache2/conf.d/security
-
   # Disable listing of http://SSVM-IP/icons folder for security issue. see article http://www.i-lateral.com/tutorials/disabling-the-icons-folder-on-an-ubuntu-web-server/
   [ -f /etc/apache2/mods-available/alias.conf ] && sed -i s/"Options Indexes MultiViews"/"Options -Indexes MultiViews"/ /etc/apache2/mods-available/alias.conf
 
@@ -595,7 +592,7 @@ routing_svcs() {
    systemctl enable haproxy
    echo "haproxy apache2" > /var/cache/cloud/enabled_svcs
    echo "cloud nfs-common portmap" > /var/cache/cloud/disabled_svcs
-   if [ $RROUTER -eq 1 ]
+   if [ "$RROUTER" -eq "1" ]
    then
        systemctl disable --now dnsmasq
        systemctl enable conntrackd

@@ -24,7 +24,7 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack</artifactId>
-    <version>4.11.0.0</version>
+    <version>4.11.1.0</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <build>
@@ -53,6 +53,7 @@
     <module>storage/datamotion</module>
     <module>storage/cache</module>
     <module>storage/snapshot</module>
+    <module>storage/configdrive</module>
     <module>components-api</module>
     <module>network</module>
     <module>service</module>

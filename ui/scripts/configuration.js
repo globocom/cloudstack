@@ -2404,18 +2404,25 @@
                                         var $useVpc = args.$form.find('.form-item[rel=\"useVpc\"]');
                                         var $useVpcCb = $useVpc.find("input[type=checkbox]");
                                         var $supportedServices = args.$form.find('.form-item[rel=\"supportedServices\"]');
+                                        var $userDataL2 = args.$form.find('.form-item[rel=\"userDataL2\"]');
                                         if ($guestTypeField.val() == 'Shared') { //Shared network offering
                                             $useVpc.hide();
+                                            $userDataL2.hide();
                                             $supportedServices.css('display', 'inline-block');
                                             if ($useVpcCb.is(':checked')) { //if useVpc is checked,
                                                 $useVpcCb.removeAttr("checked"); //remove "checked" attribute in useVpc
                                             }
+                                            $conservemode.css('display', 'inline-block');
                                         } else if ($guestTypeField.val() == 'Isolated') { //Isolated network offering
                                             $useVpc.css('display', 'inline-block');
                                             $supportedServices.css('display', 'inline-block');
+                                            $userDataL2.hide();
+                                            $conservemode.css('display', 'inline-block');
                                         } else if ($guestTypeField.val() == 'L2') {
                                             $useVpc.hide();
                                             $supportedServices.hide();
+                                            $userDataL2.css('display', 'inline-block');
+                                            $conservemode.hide();
                                         }
                                         var $providers = $useVpcCb.closest('form').find('.dynamic-input select[name!="service.Connectivity.provider"]');
                                         var $optionsOfProviders = $providers.find('option');
@@ -2801,6 +2808,13 @@
                                         label: 'label.vpc',
                                         docID: 'helpNetworkOfferingVPC',
                                         isBoolean: true
+                                    },
+
+                                    userDataL2: {
+                                        label: 'label.user.data',
+                                        docID: 'helpL2UserData',
+                                        isBoolean: true,
+                                        isHidden: true
                                     },
 
                                     lbType: { //only shown when VPC is checked and LB service is checked
@@ -3384,6 +3398,17 @@
                                     } else { //specifyVlan checkbox is unchecked
                                         delete inputData.specifyVlan; //if specifyVlan checkbox is unchecked, do not pass specifyVlan parameter to API call since we need to keep API call's size as small as possible (p.s. specifyVlan is defaulted as false at server-side)
                                     }
+
+                                    if (inputData['userDataL2'] == 'on') {
+                                        inputData['serviceProviderList[0].service'] = 'UserData';
+                                        inputData['serviceProviderList[0].provider'] = 'ConfigDrive';
+                                        inputData['supportedServices'] = 'UserData';
+                                    } else {
+                                        delete inputData.serviceProviderList;
+                                    }
+
+                                    //Conserve mode is irrelevant on L2 network offerings as there are no resources to conserve, do not pass it, true by default on server side
+                                    delete inputData.conservemode;
                                 }
 
                                 if (inputData['forvpc'] == 'on') {
@@ -3392,10 +3417,12 @@
                                     delete inputData.forvpc; //if forVpc checkbox is unchecked, do not pass forVpc parameter to API call since we need to keep API call's size as small as possible (p.s. forVpc is defaulted as false at server-side)
                                 }
 
-                                if (inputData['conservemode'] == 'on') {
-                                    delete inputData.conservemode; //if ConserveMode checkbox is checked, do not pass conservemode parameter to API call since we need to keep API call's size as small as possible (p.s. conservemode is defaulted as true at server-side)
-                                } else {
-                                    inputData['conservemode'] = false;
+                                if (inputData['guestIpType'] == "Shared" || inputData['guestIpType'] == "Isolated") {
+                                    if (inputData['conservemode'] == 'on') {
+                                        delete inputData.conservemode; //if ConserveMode checkbox is checked, do not pass conservemode parameter to API call since we need to keep API call's size as small as possible (p.s. conservemode is defaulted as true at server-side)
+                                    } else {
+                                        inputData['conservemode'] = false;
+                                    }
                                 }
 
                                 // Make service provider map
@@ -3926,7 +3953,8 @@
                                             });
                                             networkServiceObjs.push({
                                                 name: 'UserData',
-                                                provider: [{name: 'VpcVirtualRouter'}]
+                                                provider: [{name: 'VpcVirtualRouter'},
+                                                           {name: 'ConfigDrive'}]
                                             });
                                             networkServiceObjs.push({
                                                 name: 'Vpn',

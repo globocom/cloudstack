@@ -82,6 +82,7 @@ import com.cloud.network.dao.NetworkDetailsDao;
 import com.cloud.network.dao.NetworkVO;
 import com.cloud.network.dao.PhysicalNetworkVO;
 import com.cloud.network.manager.NuageVspManager;
+import com.cloud.network.router.VirtualRouter;
 import com.cloud.offering.NetworkOffering;
 import com.cloud.offerings.dao.NetworkOfferingDao;
 import com.cloud.offerings.dao.NetworkOfferingServiceMapDao;
@@ -94,6 +95,7 @@ import com.cloud.utils.StringUtils;
 import com.cloud.utils.db.DB;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.net.Ip;
+import com.cloud.vm.DomainRouterVO;
 import com.cloud.vm.Nic;
 import com.cloud.vm.NicProfile;
 import com.cloud.vm.NicVO;
@@ -101,6 +103,7 @@ import com.cloud.vm.ReservationContext;
 import com.cloud.vm.VMInstanceVO;
 import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachineProfile;
+import com.cloud.vm.dao.DomainRouterDao;
 import com.cloud.vm.dao.VMInstanceDao;
 
 public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements NetworkGuruAdditionalFunctions {
@@ -134,6 +137,8 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
     DataCenterDetailsDao _dcDetailsDao;
     @Inject
     VlanDetailsDao _vlanDetailsDao;
+    @Inject
+    private DomainRouterDao _routerDao;
 
     public NuageVspGuestNetworkGuru() {
         super();
@@ -255,7 +260,7 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
             VpcDetailVO detail = _vpcDetailsDao.findDetail(network.getVpcId(), NuageVspManager.nuageDomainTemplateDetailName);
             if (detail != null && network.getNetworkACLId() != null) {
                 s_logger.error("Pre-configured DT are used in combination with ACL lists. Which is not supported.");
-                throw new IllegalArgumentException("CloudStack ACLs are not supported with Nuage Preconfigured Domain Template");
+                throw new IllegalArgumentException("CloudStack ACLs are not supported with Nuage Pre-configured Domain Template");
             }
 
             if(detail != null && !_nuageVspManager.checkIfDomainTemplateExist(network.getDomainId(),detail.getValue(),network.getDataCenterId(),null)){
@@ -302,7 +307,9 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
                 implemented.setCidr(network.getCidr());
             }
 
-            VspNetwork vspNetwork = _nuageVspEntityBuilder.buildVspNetwork(implemented, true);
+            implemented.setBroadcastUri(_nuageVspManager.calculateBroadcastUri(implemented));
+            implemented.setBroadcastDomainType(Networks.BroadcastDomainType.Vsp);
+            VspNetwork vspNetwork = _nuageVspEntityBuilder.buildVspNetwork(implemented);
 
             if (vspNetwork.isShared()) {
                 Boolean previousUnderlay= null;
@@ -321,11 +328,6 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
                 }
             }
 
-            String tenantId = context.getDomain().getName() + "-" + context.getAccount().getAccountId();
-            String broadcastUriStr = implemented.getUuid() + "/" + vspNetwork.getVirtualRouterIp();
-            implemented.setBroadcastUri(Networks.BroadcastDomainType.Vsp.toUri(broadcastUriStr));
-            implemented.setBroadcastDomainType(Networks.BroadcastDomainType.Vsp);
-
             boolean implementSucceeded = implement(network.getVpcId(), physicalNetworkId, vspNetwork, implemented, _nuageVspEntityBuilder.buildNetworkDhcpOption(network, offering));
 
             if (!implementSucceeded) {
@@ -340,6 +342,7 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
                 }
             }
 
+            String tenantId = context.getDomain().getName() + "-" + context.getAccount().getAccountId();
             s_logger.info("Implemented OK, network " + implemented.getUuid() + " in tenant " + tenantId + " linked to " + implemented.getBroadcastUri());
         } finally {
             _networkDao.releaseFromLockTable(network.getId());
@@ -430,7 +433,7 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
     public NicProfile allocate(Network network, NicProfile nic, VirtualMachineProfile vm) throws InsufficientVirtualNetworkCapacityException, InsufficientAddressCapacityException {
         if (vm.getType() != VirtualMachine.Type.DomainRouter && _nuageVspEntityBuilder.usesVirtualRouter(network.getNetworkOfferingId())) {
             VspNetwork vspNetwork = _nuageVspEntityBuilder.buildVspNetwork(network);
-            if (nic != null && nic.getRequestedIPv4() != null && vspNetwork.getVirtualRouterIp().equals(nic.getRequestedIPv4())) {
+            if (nic != null && nic.getRequestedIPv4() != null && nic.getRequestedIPv4().equals(vspNetwork.getVirtualRouterIp())) {
                 DataCenter dc = _dcDao.findById(network.getDataCenterId());
                 s_logger.error("Unable to acquire requested Guest IP address " + nic.getRequestedIPv4() + " because it is reserved for the VR in network " + network);
                 throw new InsufficientVirtualNetworkCapacityException("Unable to acquire requested Guest IP address " + nic.getRequestedIPv4() + " because it is reserved " +
@@ -470,14 +473,13 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
             HostVO nuageVspHost = _nuageVspManager.getNuageVspHost(network.getPhysicalNetworkId());
             VspNetwork vspNetwork = _nuageVspEntityBuilder.buildVspNetwork(vm.getVirtualMachine().getDomainId(), network);
 
-            if (vm.getType() == VirtualMachine.Type.DomainRouter && vspNetwork.getVirtualRouterIp().equals("null")) {
-                //In case of upgrade network offering
-                vspNetwork = _nuageVspEntityBuilder.buildVspNetwork(vm.getVirtualMachine().getDomainId(), network, null, true);
-                String broadcastUriStr = network.getUuid() + "/" + vspNetwork.getVirtualRouterIp();
-                NetworkVO updatedNetwork = _networkDao.createForUpdate(network.getId());
-                updatedNetwork.setBroadcastUri(Networks.BroadcastDomainType.Vsp.toUri(broadcastUriStr));
-                _networkDao.update(updatedNetwork.getId(), updatedNetwork);
+            boolean vrAddedToNuage = vm.getType() == VirtualMachine.Type.DomainRouter && vspNetwork.getVirtualRouterIp()
+                                                                                          .equals("null");
+            if (vrAddedToNuage) {
+                //In case a VR is added due to upgrade network offering - recalculate the broadcast uri before using it.
+                _nuageVspManager.updateBroadcastUri(network);
                 network = _networkDao.findById(network.getId());
+                vspNetwork = _nuageVspEntityBuilder.buildVspNetwork(vm.getVirtualMachine().getDomainId(), network, null);
             }
 
             if (vspNetwork.isShared()) {
@@ -531,29 +533,34 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
             nic.setBroadcastUri(network.getBroadcastUri());
             nic.setIsolationUri(network.getBroadcastUri());
 
-            //NicProfile does not contain the NIC UUID. We need this information to set it in the VMInterface and VPort
-            //that we create in VSP
-            NicVO nicFromDb = _nicDao.findById(nic.getId());
-            IPAddressVO staticNatIp = _ipAddressDao.findByVmIdAndNetworkId(network.getId(), vm.getId());
             VspVm vspVm = _nuageVspEntityBuilder.buildVspVm(vm.getVirtualMachine(), network);
-            VspNic vspNic = _nuageVspEntityBuilder.buildVspNic(nicFromDb.getUuid(), nic);
-            VspStaticNat vspStaticNat = null;
-            if (staticNatIp != null) {
-                VlanVO staticNatVlan = _vlanDao.findById(staticNatIp.getVlanId());
-                vspStaticNat = _nuageVspEntityBuilder.buildVspStaticNat(null, staticNatIp, staticNatVlan, vspNic);
-            }
 
-            boolean defaultHasDns = getDefaultHasDns(networkHasDnsCache, nicFromDb);
-            VspDhcpVMOption dhcpOption = _nuageVspEntityBuilder.buildVmDhcpOption(nicFromDb, defaultHasDns, networkHasDns);
-            ReserveVmInterfaceVspCommand cmd = new ReserveVmInterfaceVspCommand(vspNetwork, vspVm, vspNic, vspStaticNat, dhcpOption);
-            Answer answer = _agentMgr.easySend(nuageVspHost.getId(), cmd);
-
-            if (answer == null || !answer.getResult()) {
-                s_logger.error("ReserveVmInterfaceNuageVspCommand failed for NIC " + nic.getId() + " attached to VM " + vm.getId() + " in network " + network.getId());
-                if ((null != answer) && (null != answer.getDetails())) {
-                    s_logger.error(answer.getDetails());
+            if (vm.isRollingRestart()) {
+                ((NetworkVO)network).setRollingRestart(true);
+            } else {
+                //NicProfile does not contain the NIC UUID. We need this information to set it in the VMInterface and VPort
+                //that we create in VSP
+                NicVO nicFromDb = _nicDao.findById(nic.getId());
+                IPAddressVO staticNatIp = _ipAddressDao.findByVmIdAndNetworkId(network.getId(), vm.getId());
+                VspNic vspNic = _nuageVspEntityBuilder.buildVspNic(nicFromDb.getUuid(), nic);
+                VspStaticNat vspStaticNat = null;
+                if (staticNatIp != null) {
+                    VlanVO staticNatVlan = _vlanDao.findById(staticNatIp.getVlanId());
+                    vspStaticNat = _nuageVspEntityBuilder.buildVspStaticNat(null, staticNatIp, staticNatVlan, vspNic);
                 }
-                throw new InsufficientVirtualNetworkCapacityException("Failed to reserve VM in Nuage VSP.", Network.class, network.getId());
+
+                boolean defaultHasDns = getDefaultHasDns(networkHasDnsCache, nicFromDb);
+                VspDhcpVMOption dhcpOption = _nuageVspEntityBuilder.buildVmDhcpOption(nicFromDb, defaultHasDns, networkHasDns);
+                ReserveVmInterfaceVspCommand cmd = new ReserveVmInterfaceVspCommand(vspNetwork, vspVm, vspNic, vspStaticNat, dhcpOption);
+                Answer answer = _agentMgr.easySend(nuageVspHost.getId(), cmd);
+
+                if (answer == null || !answer.getResult()) {
+                    s_logger.error("ReserveVmInterfaceNuageVspCommand failed for NIC " + nic.getId() + " attached to VM " + vm.getId() + " in network " + network.getId());
+                    if ((null != answer) && (null != answer.getDetails())) {
+                        s_logger.error(answer.getDetails());
+                    }
+                    throw new InsufficientVirtualNetworkCapacityException("Failed to reserve VM in Nuage VSP.", Network.class, network.getId());
+                }
             }
 
             if (vspVm.getDomainRouter() == Boolean.TRUE) {
@@ -698,15 +705,18 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
         }
 
         try {
+            final VirtualMachine virtualMachine = vm.getVirtualMachine();
             if (s_logger.isDebugEnabled()) {
                 s_logger.debug("Handling deallocate() call back, which is called when a VM is destroyed or interface is removed, " + "to delete VM Interface with IP "
-                        + nic.getIPv4Address() + " from a VM " + vm.getInstanceName() + " with state " + vm.getVirtualMachine().getState());
+                        + nic.getIPv4Address() + " from a VM " + vm.getInstanceName() + " with state " + virtualMachine
+                                                                                                           .getState());
             }
 
             NicVO nicFromDb = _nicDao.findById(nic.getId());
 
-            VspNetwork vspNetwork = _nuageVspEntityBuilder.buildVspNetwork(vm.getVirtualMachine().getDomainId(), network);
-            VspVm vspVm = _nuageVspEntityBuilder.buildVspVm(vm.getVirtualMachine(), network);
+            VspNetwork vspNetwork = _nuageVspEntityBuilder.buildVspNetwork(virtualMachine
+                                                                             .getDomainId(), network);
+            VspVm vspVm = _nuageVspEntityBuilder.buildVspVm(virtualMachine, network);
             VspNic vspNic = _nuageVspEntityBuilder.buildVspNic(nicFromDb.getUuid(), nic);
             HostVO nuageVspHost = _nuageVspManager.getNuageVspHost(network.getPhysicalNetworkId());
 
@@ -725,6 +735,32 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
                 nic.deallocate();
             } else {
                 super.deallocate(network, nic, vm);
+            }
+
+            if (virtualMachine.getType() == VirtualMachine.Type.DomainRouter) {
+                final List<DomainRouterVO> routers = _routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
+                final DomainRouterVO otherRouter = routers.stream()
+                                                          .filter(r -> r.getId() != vm.getId())
+                                                          .findFirst()
+                                                          .orElse(null);
+
+                if (otherRouter != null) {
+                    nicFromDb = _nicDao.findByNtwkIdAndInstanceId(network.getId(), otherRouter.getId());
+                    vspVm = _nuageVspEntityBuilder.buildVspVm(otherRouter, network);
+                    vspNic = _nuageVspEntityBuilder.buildVspNic(nicFromDb);
+
+                    VspDhcpVMOption dhcpOption = _nuageVspEntityBuilder.buildVmDhcpOption(nicFromDb, false, false);
+                    ReserveVmInterfaceVspCommand reserveCmd = new ReserveVmInterfaceVspCommand(vspNetwork, vspVm, vspNic, null, dhcpOption);
+
+                    answer = _agentMgr.easySend(nuageVspHost.getId(), reserveCmd);
+                    if (answer == null || !answer.getResult()) {
+                        s_logger.error("DeallocateVmNuageVspCommand for VM " + vm.getUuid() + " failed on Nuage VSD " + nuageVspHost.getDetail("hostname"));
+                        if ((null != answer) && (null != answer.getDetails())) {
+                            s_logger.error(answer.getDetails());
+                        }
+                    }
+                }
+
             }
         } finally {
             if (network != null && lockedNetwork) {
@@ -766,17 +802,17 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
                 s_logger.debug("Handling trash() call back to delete the network " + network.getName() + " with uuid " + network.getUuid() + " from VSP");
             }
 
+            VspNetwork vspNetwork = _nuageVspEntityBuilder.buildVspNetwork(network);
+
             boolean networkMigrationCopy = network.getRelated() != network.getId();
 
-            cleanUpNetworkCaching(network.getId());
             if (networkMigrationCopy) {
                 if (s_logger.isDebugEnabled()) {
                     s_logger.debug("Network " + network.getName() + " is a copy of a migrated network. Cleaning up network details of related network.");
                 }
                 cleanUpNetworkCaching(network.getRelated());
             }
-
-            VspNetwork vspNetwork = _nuageVspEntityBuilder.buildVspNetwork(network);
+            cleanUpNetworkCaching(network.getId());
 
             //Clean up VSD managed subnet caching
             if (vspNetwork.getNetworkRelatedVsdIds().isVsdManaged()) {
@@ -806,6 +842,7 @@ public class NuageVspGuestNetworkGuru extends GuestNetworkGuru implements Networ
         _networkDetailsDao.removeDetail(id, NuageVspManager.NETWORK_METADATA_VSD_DOMAIN_ID);
         _networkDetailsDao.removeDetail(id, NuageVspManager.NETWORK_METADATA_VSD_ZONE_ID);
         _networkDetailsDao.removeDetail(id, NuageVspManager.NETWORK_METADATA_VSD_SUBNET_ID);
+        _networkDetailsDao.removeDetail(id, NuageVspManager.NETWORK_METADATA_VSD_MANAGED);
     }
 
     private boolean networkHasDns(Network network) {

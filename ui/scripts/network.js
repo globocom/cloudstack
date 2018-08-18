@@ -86,12 +86,6 @@
             });
 
         } else { //non-portable IP which has only one NIC
-            /*
-             var nic = $.grep(instance.nic, function(nic) {
-             return nic.networkid == network.id;
-             })[0];
-             */
-
             // Get NIC IPs
             $.ajax({
                 url: createURL('listNics'),
@@ -170,12 +164,6 @@
             });
 
         } else { //non-portable IP which has only one NIC
-            /*
-             var nic = $.grep(instance.nic, function(nic) {
-             return nic.networkid == network.id;
-             })[0];
-             */
-
             // Get NIC IPs
             $.ajax({
                 url: createURL('listNics'),
@@ -420,7 +408,11 @@
                         //Ajax call to check if VPN is enabled.
                         $.ajax({
                             url: createURL('listRemoteAccessVpns'),
-                            data: data,
+
+                            data: {
+                                listAll: true
+                            },
+
                             async: false,
                             success: function(vpnResponse) {
                                 var isVPNEnabled = vpnResponse.listremoteaccessvpnsresponse.count;
@@ -751,9 +743,9 @@
                                         gateway: args.data.guestGateway
                                     });
                                 }
-                                if (args.data.guestGateway != null && args.data.guestGateway.length > 0) {
+                                if (args.data.guestNetmask != null && args.data.guestNetmask.length > 0) {
                                     $.extend(dataObj, {
-                                        gateway: args.data.guestGateway
+                                        netmask: args.data.guestNetmask
                                     });
                                 }
                                 if (args.data.externalId != null && args.data.externalId.length > 0) {
@@ -1120,10 +1112,22 @@
                                         });
                                         args.$form.find('.form-item[rel=cleanup]').find('input').attr('checked', 'checked'); //checked
                                         args.$form.find('.form-item[rel=cleanup]').css('display', 'inline-block'); //shown
+                                        args.$form.find('.form-item[rel=makeredundant]').find('input').attr('checked', 'checked'); //checked
+                                        args.$form.find('.form-item[rel=makeredundant]').css('display', 'inline-block'); //shown
+
+                                        if (Boolean(args.context.networks[0].redundantrouter)) {
+                                            args.$form.find('.form-item[rel=makeredundant]').hide();
+                                        } else {
+                                            args.$form.find('.form-item[rel=makeredundant]').show();
+                                        }
                                     },
                                     fields: {
                                         cleanup: {
                                             label: 'label.clean.up',
+                                            isBoolean: true
+                                        },
+                                        makeredundant: {
+                                            label: 'label.make.redundant',
                                             isBoolean: true
                                         }
                                     }
@@ -1134,10 +1138,13 @@
                                     }
                                 },
                                 action: function(args) {
-                                    var array1 = [];
-                                    array1.push("&cleanup=" + (args.data.cleanup == "on"));
                                     $.ajax({
-                                        url: createURL("restartNetwork&id=" + args.context.networks[0].id + array1.join("")),
+                                        url: createURL("restartNetwork"),
+                                        data: {
+                                            id: args.context.networks[0].id,
+                                            cleanup: (args.data.cleanup == "on"),
+                                            makeredundant: (args.data.makeredundant == "on")
+                                        },
                                         dataType: "json",
                                         async: true,
                                         success: function(json) {
@@ -1448,10 +1455,20 @@
                                         label: 'label.reserved.ip.range'
                                     },
 
+                                    redundantrouter: {
+                                        label: 'label.redundant.router',
+                                        converter: function(booleanValue) {
+                                            if (booleanValue == true) {
+                                                return "Yes";
+                                            }
+                                            return "No";
+                                        }
+                                    },
 
                                     networkdomaintext: {
                                         label: 'label.network.domain.text'
                                     },
+
                                     networkdomain: {
                                         label: 'label.network.domain',
                                         isEditable: true
@@ -2458,8 +2475,6 @@
                                 $.ajax({
                                     url: createURL('listZones'),
                                     data: dataObj,
-                                    //      id: args.context.networks[0].zoneid
-                                    //    },
                                     async: false,
                                     success: function(json) {
                                         zoneObj = json.listzonesresponse.zone[0];
@@ -3981,7 +3996,7 @@
 
                                                 var stickyData = $.extend(true, {}, args.data.sticky);
                                                 var certificateData = $.extend(true, {}, args.data.sslcertificate);
-                                                  
+
                                                 //***** create new LB rule > Add VMs *****
                                                 $.ajax({
                                                     url: createURL('createLoadBalancerRule'),
@@ -3994,70 +4009,27 @@
                                                         var lbID = data.createloadbalancerruleresponse.id;
 
                                                         var inputData = {
-                                                        	id: data.createloadbalancerruleresponse.id	
-                                                        };    
-                                                        
+                                                        	id: data.createloadbalancerruleresponse.id
+                                                        };
+
                                                         var selectedVMs = args.itemData;
                                                         if (selectedVMs != null) {
                                                         	var vmidipmapIndex = 0;
-                                                    		for (var vmIndex = 0; vmIndex < selectedVMs.length; vmIndex++) {      
+                                                    		for (var vmIndex = 0; vmIndex < selectedVMs.length; vmIndex++) {
                                                     			var selectedIPs = selectedVMs[vmIndex]._subselect;
                                                     			for (var ipIndex = 0; ipIndex < selectedIPs.length; ipIndex++) {
                                                     				inputData['vmidipmap[' + vmidipmapIndex + '].vmid'] = selectedVMs[vmIndex].id;
-                                                        			
+
                                                     				if (args.context.ipAddresses[0].isportable) {
-                                                        			    inputData['vmidipmap[' + vmidipmapIndex + '].vmip'] = selectedIPs[ipIndex].split(',')[1];  
+                                                        			    inputData['vmidipmap[' + vmidipmapIndex + '].vmip'] = selectedIPs[ipIndex].split(',')[1];
                                                         			} else {
                                                         				inputData['vmidipmap[' + vmidipmapIndex + '].vmip'] = selectedIPs[ipIndex];
                                                         			}
-                                                    				
+
                                                     				vmidipmapIndex++;
-                                                    			}                                                			
+                                                    			}
                                                     		}
-                                                    	}   
-                                                        
-                                                        /*$.ajax({
-                                                            url: createURL('assignCertToLoadBalancer'),
-                                                            data: {certid: certificateData.certificate, lbruleid: lbID},
-                                                            success: function(data) {
-                                                                var jobID = data.assigncerttoloadbalancerresponse.jobid;
-                                                                var lbProtocolCreated = false;
-
-                                                                args.response.success({
-                                                                    _custom: {
-                                                                        jobId: jobID 
-                                                                    },
-                                                                    notification: {
-                                                                        label: 'label.add.certificate',
-                                                                        poll: function(args) {
-                                                                            var complete = args.complete;
-                                                                            var error = args.error;
-
-                                                                            pollAsyncJobResult({
-                                                                                _custom: {
-                                                                                    jobId: jobID
-                                                                                },
-                                                                                complete: function(args) {
-                                                                                    if (lbProtocolCreated) return;
-
-                                                                                    lbProtocolCreated = true;
-
-                                                                                    if (certificateData && certificateData.certificate) {
-                                                                                        cloudStack.lbCertificatePolicy.actions.add(lbID, certificateData, complete, error);
-                                                                                    } else {
-                                                                                        complete();
-                                                                                    }
-                                                                                },
-                                                                                error: error
-                                                                            });
-                                                                        }
-                                                                    }
-                                                                });
-                                                            },
-                                                            error: function(data) {
-                                                                args.response.error(parseXMLHttpResponse(data));
-                                                            }
-                                                        });*/
+                                                    	}
 
                                                         $.ajax({
                                                             url: createURL('assignToLoadBalancerRule'),
@@ -5690,10 +5662,13 @@
                                                         }
                                                     };
 
-                                                    nuageDomainTemplateHandler(null, advZones[0].id);
-                                                    args.$select.bind('click', nuageDomainTemplateHandler); //bind on both events click, change, change event of dropdown.
-                                                    args.$select.bind('change', nuageDomainTemplateHandler);
-                                                    args.$form.find("[rel=nuageusedomaintemplate]").find("input").attr('checked', false);
+                                                    if (advZones && advZones.length > 0) {
+                                                        nuageDomainTemplateHandler(null, advZones[0].id);
+                                                        args.$select.bind('click', nuageDomainTemplateHandler); //bind on both events click, change, change event of dropdown.
+                                                        args.$select.bind('change', nuageDomainTemplateHandler);
+                                                        args.$form.find("[rel=nuageusedomaintemplate]").find("input").attr('checked', false);
+                                                    }
+
                                                     args.response.success({
                                                         data: $.map(advZones, function(zone) {
                                                             return {
@@ -6431,11 +6406,6 @@
                                         docID: 'helpVPNGatewayIKEDH',
                                         select: function(args) {
                                             var items = [];
-                                            //  StrongSwan now requires a DH group to be specified...
-                                            //items.push({
-                                            //    id: '',
-                                            //    description: _l('label.none')
-                                            //});
                                             items.push({
                                                 id: 'modp1536',
                                                 description: 'Group 5(modp1536)'

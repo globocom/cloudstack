@@ -38,6 +38,9 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
+import com.cloud.agent.api.Command;
+import com.cloud.agent.api.UnsupportedAnswer;
+import com.cloud.hypervisor.kvm.resource.LibvirtVMDef.CpuTuneDef;
 import org.apache.commons.lang.SystemUtils;
 import org.joda.time.Duration;
 import org.junit.Assert;
@@ -184,6 +187,8 @@ public class LibvirtComputingResourceTest {
 
     @Mock
     private LibvirtComputingResource libvirtComputingResource;
+    @Mock
+    VirtualMachineTO vmTO;
 
     String hyperVisorType = "kvm";
     Random random = new Random();
@@ -5151,5 +5156,66 @@ public class LibvirtComputingResourceTest {
         Domain domainMock = Mockito.mock(Domain.class);
         when(domainMock.memoryStats(2)).thenReturn(mem);
         return domainMock;
+    }
+
+    @Test
+    public void testSetQuotaAndPeriod() {
+        double pct = 0.33d;
+        Mockito.when(vmTO.getLimitCpuUse()).thenReturn(true);
+        Mockito.when(vmTO.getCpuQuotaPercentage()).thenReturn(pct);
+        CpuTuneDef cpuTuneDef = new CpuTuneDef();
+        final LibvirtComputingResource lcr = new LibvirtComputingResource();
+        lcr.setQuotaAndPeriod(vmTO, cpuTuneDef);
+        Assert.assertEquals((int) (CpuTuneDef.DEFAULT_PERIOD * pct), cpuTuneDef.getQuota());
+        Assert.assertEquals(CpuTuneDef.DEFAULT_PERIOD, cpuTuneDef.getPeriod());
+    }
+
+    @Test
+    public void testSetQuotaAndPeriodNoCpuLimitUse() {
+        double pct = 0.33d;
+        Mockito.when(vmTO.getLimitCpuUse()).thenReturn(false);
+        Mockito.when(vmTO.getCpuQuotaPercentage()).thenReturn(pct);
+        CpuTuneDef cpuTuneDef = new CpuTuneDef();
+        final LibvirtComputingResource lcr = new LibvirtComputingResource();
+        lcr.setQuotaAndPeriod(vmTO, cpuTuneDef);
+        Assert.assertEquals(0, cpuTuneDef.getQuota());
+        Assert.assertEquals(0, cpuTuneDef.getPeriod());
+    }
+
+    @Test
+    public void testSetQuotaAndPeriodMinQuota() {
+        double pct = 0.01d;
+        Mockito.when(vmTO.getLimitCpuUse()).thenReturn(true);
+        Mockito.when(vmTO.getCpuQuotaPercentage()).thenReturn(pct);
+        CpuTuneDef cpuTuneDef = new CpuTuneDef();
+        final LibvirtComputingResource lcr = new LibvirtComputingResource();
+        lcr.setQuotaAndPeriod(vmTO, cpuTuneDef);
+        Assert.assertEquals(CpuTuneDef.MIN_QUOTA, cpuTuneDef.getQuota());
+        Assert.assertEquals((int) (CpuTuneDef.MIN_QUOTA / pct), cpuTuneDef.getPeriod());
+    }
+
+    @Test
+    public void testUnknownCommand() {
+        libvirtComputingResource = new LibvirtComputingResource();
+        Command cmd = new Command() {
+            @Override public boolean executeInSequence() {
+                return false;
+            }
+        };
+        Answer ans = libvirtComputingResource.executeRequest(cmd);
+        assertTrue(ans instanceof UnsupportedAnswer);
+    }
+
+    @Test
+    public void testKnownCommand() {
+        libvirtComputingResource = new LibvirtComputingResource();
+        Command cmd = new PingTestCommand() {
+            @Override public boolean executeInSequence() {
+                throw new NullPointerException("test succeeded");
+            }
+        };
+        Answer ans = libvirtComputingResource.executeRequest(cmd);
+        assertFalse(ans instanceof UnsupportedAnswer);
+        assertTrue(ans instanceof Answer);
     }
 }
