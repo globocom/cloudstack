@@ -137,6 +137,7 @@ then
   keytool -delete -alias $aliasName -keystore $keyStore -storepass $storepass -noprompt || true
   keytool -import -alias $aliasName -keystore $keyStore -storepass $storepass -noprompt -file $customCACert
   keytool -importkeystore -srckeystore $defaultJavaKeyStoreFile -destkeystore $keyStore -srcstorepass $defaultJavaKeyStorePass -deststorepass $storepass -noprompt
+  keytool -import -alias ${aliasName}CHAIN -keystore $keyStore -storepass $storepass -noprompt -file $customCertChain
 fi
 
 config_apache2_conf $publicIp $hostName
