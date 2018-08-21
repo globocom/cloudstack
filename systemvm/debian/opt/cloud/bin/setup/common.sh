@@ -697,7 +697,7 @@ parse_cmd_line() {
             export DOMAIN=$VALUE
             ;;
         dnssearchorder)
-            export DNS_SEARCH_ORDER=$VALUE
+            export DNS_SEARCH_ORDER=$DOMAIN,$VALUE
             ;;
         useextdns)
             export USE_EXTERNAL_DNS=$VALUE
