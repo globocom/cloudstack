@@ -1764,6 +1764,12 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                         portableIpRange = createPortableIpRange(zoneId, globoNetwork.getVlanNum(), globoNetwork.getNetworkCidr(), networkGateway);
                     }
 
+                    try {
+                        _ipAddrMgr.releasePortableIpAddress(globoNetwork.getIpId());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
                     IPAddressVO ip = (IPAddressVO)_ipAddrMgr.allocatePortableIp(owner, caller, zoneId, networkId, null, globoNetwork.getIp());
 
                     GloboNetworkIpDetailVO gnIpDetail = new GloboNetworkIpDetailVO(ip.getId(), globoNetwork.getIpId());
