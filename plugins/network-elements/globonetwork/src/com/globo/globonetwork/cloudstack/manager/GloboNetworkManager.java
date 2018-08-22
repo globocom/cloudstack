@@ -1764,10 +1764,12 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                         portableIpRange = createPortableIpRange(zoneId, globoNetwork.getVlanNum(), globoNetwork.getNetworkCidr(), networkGateway);
                     }
 
-                    try {
-                        _ipAddrMgr.releasePortableIpAddress(globoNetwork.getIpId());
-                    } catch (Exception e) {
-                        e.printStackTrace();
+                    List<IPAddressVO> ipAdressVO = _ipAddrDao.listByAssociatedNetwork(networkId, null);
+                    for (IPAddressVO ip : ipAdressVO) {
+                        if (ip.getAddress().addr().equals(globoNetwork.getIp()) && ip.getState() == IPAddressVO.State.Allocated) {
+                            _ipAddrMgr.releasePortableIpAddress(ip.getId());
+                            break;
+                        }
                     }
 
                     IPAddressVO ip = (IPAddressVO)_ipAddrMgr.allocatePortableIp(owner, caller, zoneId, networkId, null, globoNetwork.getIp());
