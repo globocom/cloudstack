@@ -26,6 +26,9 @@ import java.util.Map;
 
 import javax.inject.Inject;
 
+import com.cloud.server.ResourceTag;
+import com.cloud.tags.TagKeysBuilder;
+import com.cloud.tags.dao.ResourceTagDao;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -173,6 +176,9 @@ public class CommandSetupHelper {
     private VlanDao _vlanDao;
     @Inject
     private IPAddressDao _ipAddressDao;
+    @Inject
+    private ResourceTagDao _resourceTagDao;
+
 
     @Inject
     private RouterControlHelper _routerControlHelper;
@@ -1004,6 +1010,23 @@ public class CommandSetupHelper {
         return setupCmd;
     }
 
+    public static void buildTagMetadata(VmDataCommand cmd, long vmId,ResourceTagDao resourceTagDao) {
+        List<? extends ResourceTag> resourceTags = resourceTagDao.listBy(vmId, ResourceTag.ResourceObjectType.UserVm);
+
+        TagKeysBuilder tagKeysBuilder = new TagKeysBuilder();
+        for (ResourceTag resourceTag : resourceTags) {
+            String key = resourceTag.getKey();
+            if (key != null && !key.isEmpty()){
+                String value = resourceTag.getValue() != null ? resourceTag.getValue() : "";
+                String metadataKey = TagKeysBuilder.getKeyMetadata(key);
+                cmd.addVmData("metadata", metadataKey, value);
+
+            }
+        }
+
+        cmd.addVmData("metadata", TagKeysBuilder.TAGKEYS_METADATA_KEY, tagKeysBuilder.buildTagKeys((List<ResourceTag>)resourceTags));
+    }
+
     private VmDataCommand generateVmDataCommand(final VirtualRouter router, final String vmPrivateIpAddress, final String userData, final String serviceOffering,
             final String zoneName, final String guestIpAddress, final String vmName, final String vmInstanceName, final long vmId, final String vmUuid, final String publicKey,
             final long guestNetworkId) {
@@ -1021,6 +1044,7 @@ public class CommandSetupHelper {
         cmd.addVmData("metadata", "availability-zone", StringUtils.unicodeEscape(zoneName));
         cmd.addVmData("metadata", "local-ipv4", guestIpAddress);
         cmd.addVmData("metadata", "local-hostname", StringUtils.unicodeEscape(vmName));
+        buildTagMetadata(cmd,vmId,_resourceTagDao);
         if (dcVo.getNetworkType() == NetworkType.Basic) {
             cmd.addVmData("metadata", "public-ipv4", guestIpAddress);
             cmd.addVmData("metadata", "public-hostname", StringUtils.unicodeEscape(vmName));

@@ -127,7 +127,7 @@ class CsRedundant(object):
             "%s/%s" % (self.CS_TEMPLATES_DIR, "checkrouter.sh.templ"), "/opt/cloud/bin/checkrouter.sh")
 
         CsHelper.execute(
-            'sed -i "s/--exec\ \$DAEMON;/--exec\ \$DAEMON\ --\ --vrrp;/g" /etc/init.d/keepalived')
+            'sed -i "s/--exec $DAEMON;/--exec $DAEMON -- --vrrp;/g" /etc/init.d/keepalived')
         # checkrouter.sh configuration
         check_router = CsFile("/opt/cloud/bin/checkrouter.sh")
         check_router.greplace("[RROUTER_LOG]", self.RROUTER_LOG)
@@ -245,6 +245,7 @@ class CsRedundant(object):
 
         interfaces = [interface for interface in self.address.get_interfaces() if interface.needs_vrrp()]
         for interface in interfaces:
+            CsPasswdSvc(interface.get_ip()).stop()
             CsPasswdSvc(interface.get_gateway()).stop()
 
         self.cl.set_fault_state()
@@ -281,7 +282,9 @@ class CsRedundant(object):
 
         interfaces = [interface for interface in self.address.get_interfaces() if interface.needs_vrrp()]
         for interface in interfaces:
+            CsPasswdSvc(interface.get_ip()).stop()
             CsPasswdSvc(interface.get_gateway()).stop()
+
         CsHelper.service("dnsmasq", "stop")
 
         self.cl.set_master_state(False)
@@ -319,7 +322,7 @@ class CsRedundant(object):
                     logging.info("Adding gateway ==> %s to device ==> %s" % (gateway, dev))
                     if dev == CsHelper.PUBLIC_INTERFACES[self.cl.get_type()]:
                         route.add_defaultroute(gateway)
-                except:
+                except Exception:
                     logging.error("ERROR getting gateway from device %s" % dev)
             else:
                 logging.error("Device %s was not ready could not bring it up" % dev)
@@ -335,8 +338,10 @@ class CsRedundant(object):
         CsHelper.execute("%s -B" % cmd)
         CsHelper.service("ipsec", "restart")
         CsHelper.service("xl2tpd", "restart")
+
         interfaces = [interface for interface in self.address.get_interfaces() if interface.needs_vrrp()]
         for interface in interfaces:
+            CsPasswdSvc(interface.get_ip()).restart()
             CsPasswdSvc(interface.get_gateway()).restart()
 
         CsHelper.service("dnsmasq", "restart")

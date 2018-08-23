@@ -193,14 +193,12 @@ import com.cloud.offerings.NetworkOfferingVO;
 import com.cloud.offerings.dao.NetworkOfferingDao;
 import com.cloud.resource.ResourceManager;
 import com.cloud.server.ConfigurationServer;
-import com.cloud.server.ResourceTag;
 import com.cloud.service.ServiceOfferingVO;
 import com.cloud.service.dao.ServiceOfferingDao;
 import com.cloud.storage.Storage.ProvisioningType;
 import com.cloud.storage.dao.GuestOSDao;
 import com.cloud.storage.dao.VMTemplateDao;
 import com.cloud.storage.dao.VolumeDao;
-import com.cloud.tags.TagKeysBuilder;
 
 import com.cloud.user.Account;
 import com.cloud.user.AccountManager;
@@ -716,7 +714,7 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
             setVmInstanceId(vmUuid, cmd);
         }
 
-        buildTagMetadata(cmd, vmId);
+        CommandSetupHelper.buildTagMetadata(cmd, vmId,_resourceTagDao);
         cmd.addVmData("metadata", "public-keys", publicKey);
 
         String cloudIdentifier = _configDao.getValue("cloud.identifier");
@@ -730,23 +728,7 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
         return cmd;
     }
 
-    protected void buildTagMetadata(VmDataCommand cmd, long vmId) {
-        List<? extends ResourceTag> resourceTags = _resourceTagDao.listBy(vmId, ResourceTag.ResourceObjectType.UserVm);
 
-        TagKeysBuilder tagKeysBuilder = new TagKeysBuilder();
-        for (ResourceTag resourceTag : resourceTags) {
-            String key = resourceTag.getKey();
-            if (key != null && !key.isEmpty()){
-                String value = resourceTag.getValue() != null ? resourceTag.getValue() : "";
-
-                String metadataKey = TagKeysBuilder.getKeyMetadata(key);
-                cmd.addVmData("metadata", metadataKey, value);
-
-            }
-        }
-
-        cmd.addVmData("metadata", TagKeysBuilder.TAGKEYS_METADATA_KEY, tagKeysBuilder.buildTagKeys((List<ResourceTag>)resourceTags));
-    }
 
     private void setVmInstanceId(final String vmUuid, final VmDataCommand cmd) {
         cmd.addVmData("metadata", "instance-id", vmUuid);
@@ -1460,7 +1442,7 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
                 if (dest.getHost().getHypervisorType() == HypervisorType.VMware || dest.getHost().getHypervisorType() == HypervisorType.Hyperv) {
                     s_logger.info("Check if we need to add management server explicit route to DomR. pod cidr: " + dest.getPod().getCidrAddress() + "/"
                             + dest.getPod().getCidrSize() + ", pod gateway: " + dest.getPod().getGateway() + ", management host: "
-                            + ApiServiceConfiguration.ManagementHostIPAdr.value());
+                            + ApiServiceConfiguration.ManagementServerAddresses.value());
 
                     if (s_logger.isInfoEnabled()) {
                         s_logger.info("Add management server explicit route to DomR.");
@@ -1571,7 +1553,7 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
             } else {
                 buf.append(String.format(" baremetalnotificationsecuritykey=%s", user.getSecretKey()));
                 buf.append(String.format(" baremetalnotificationapikey=%s", user.getApiKey()));
-                buf.append(" host=").append(ApiServiceConfiguration.ManagementHostIPAdr.value());
+                buf.append(" host=").append(ApiServiceConfiguration.ManagementServerAddresses.value());
                 buf.append(" port=").append(_configDao.getValue(Config.BaremetalProvisionDoneNotificationPort.key()));
             }
         }

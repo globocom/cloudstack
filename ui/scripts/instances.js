@@ -2998,6 +2998,16 @@
                                 }
                             }
                         },
+                        preFilter: function(args) {
+                            var hiddenFields;
+                            if (isAdmin()) {
+                                hiddenFields = [];
+                            } else {
+                                hiddenFields = ["broadcasturi", "isolationuri"];
+                            }
+
+                            return hiddenFields;
+                        },
                         fields: [{
                             id: {
                                 label: 'label.id'
@@ -3037,7 +3047,12 @@
                             ip6cidr: {
                                 label: 'label.ipv6.CIDR'
                             },
-
+                            broadcasturi : {
+                                label: 'label.broadcast.uri'
+                            },
+                            isolationuri : {
+                                label: 'label.isolation.uri'
+                            },
                             isdefault: {
                                 label: 'label.is.default',
                                 converter: function(data) {

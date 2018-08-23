@@ -246,14 +246,14 @@ public class ConfigurationServerImpl extends ManagerBase implements Configuratio
             if (hostIpAdr != null) {
                 Boolean devel = Boolean.valueOf(_configDao.getValue("developer"));
                 if (devel) {
-                    String value = _configDao.getValue(ApiServiceConfiguration.ManagementHostIPAdr.key());
+                    String value = _configDao.getValue(ApiServiceConfiguration.ManagementServerAddresses.key());
                     if (value != null && !value.equals("localhost")) {
                         needUpdateHostIp = false;
                     }
                 }
 
                 if (needUpdateHostIp) {
-                    _configDepot.createOrUpdateConfigObject(ApiServiceConfiguration.class.getSimpleName(), ApiServiceConfiguration.ManagementHostIPAdr, hostIpAdr);
+                    _configDepot.createOrUpdateConfigObject(ApiServiceConfiguration.class.getSimpleName(), ApiServiceConfiguration.ManagementServerAddresses, hostIpAdr);
                     s_logger.debug("ConfigurationServer saved \"" + hostIpAdr + "\" as host.");
                 }
             }
@@ -1175,6 +1175,8 @@ public class ConfigurationServerImpl extends ManagerBase implements Configuratio
                     _ntwkOfferingServiceMapDao.persist(offService);
                     s_logger.trace("Added service for the network offering: " + offService);
                 }
+
+                _networkOfferingDao.persistDefaultL2NetworkOfferings();
             }
         });
     }

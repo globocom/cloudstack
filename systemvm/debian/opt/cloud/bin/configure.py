@@ -196,7 +196,7 @@ class CsAcl(CsDataBag):
                 egressIpsetStr = ''
                 if sflag and dflag:
                     egressIpsetStr = " -m set --match-set %s src " % sourceIpsetName + \
-                                " -m set --match-set %s dst " % destIpsetName
+                                     " -m set --match-set %s dst " % destIpsetName
                 elif sflag:
                     egressIpsetStr = " -m set --match-set %s src " % sourceIpsetName
                 elif dflag:
@@ -204,10 +204,10 @@ class CsAcl(CsDataBag):
 
                 if rule['protocol'] == "icmp":
                     fwr += egressIpsetStr + " -p %s " % rule['protocol'] + " -m %s " % rule['protocol'] + \
-                                    " --icmp-type %s" % icmp_type
+                                     " --icmp-type %s" % icmp_type
                 elif rule['protocol'] != "all":
                     fwr += egressIpsetStr + " -p %s " % rule['protocol'] + " -m %s " % rule['protocol'] + \
-                           " %s" % rnge
+                                     " %s" % rnge
                 elif rule['protocol'] == "all":
                     fwr += egressIpsetStr
 
@@ -926,8 +926,8 @@ class CsForwardingRules(CsDataBag):
                         "-I PREROUTING -s %s/32 -m state --state NEW -j CONNMARK --save-mark --nfmask 0xffffffff --ctmask 0xffffffff" %
                         rule["internal_ip"]])
         self.fw.append(["mangle", "",
-                        "-I PREROUTING -s %s/32 -m state --state NEW -j MARK --set-xmark 0x%s/0xffffffff" %
-                        (rule["internal_ip"], device[len("eth"):])])
+                        "-I PREROUTING -s %s/32 -m state --state NEW -j MARK --set-xmark %s/0xffffffff" %
+                        (rule["internal_ip"], hex(int(device[len("eth"):])))])
         self.fw.append(["nat", "front",
                         "-A PREROUTING -d %s/32 -j DNAT --to-destination %s" % (rule["public_ip"], rule["internal_ip"])])
         self.fw.append(["nat", "front",
@@ -937,12 +937,9 @@ class CsForwardingRules(CsDataBag):
         self.fw.append(["filter", "",
                         "-A FORWARD -i %s -o eth0  -d %s  -m state  --state NEW -j ACCEPT " % (device, rule["internal_ip"])])
 
-        # Configure the hairpin nat
-        self.fw.append(["nat", "front",
-                        "-A PREROUTING -d %s -i eth0 -j DNAT --to-destination %s" % (rule["public_ip"], rule["internal_ip"])])
-
-        self.fw.append(["nat", "front", "-A POSTROUTING -s %s -d %s -j SNAT -o eth0 --to-source %s" %
-                        (self.getNetworkByIp(rule['internal_ip']), rule["internal_ip"], self.getGuestIp())])
+        # Configure the hairpin snat
+        self.fw.append(["nat", "front", "-A POSTROUTING -s %s -d %s -j SNAT -o %s --to-source %s" %
+                        (self.getNetworkByIp(rule['internal_ip']), rule["internal_ip"], self.getDeviceByIp(rule["internal_ip"]), self.getGuestIp())])
 
 
 class IpTablesExecutor:
@@ -957,6 +954,7 @@ class IpTablesExecutor:
         acls.process()
 
         acls = CsAcl('firewallrules', self.config)
+        acls.flushAllowAllEgressRules()
         acls.process()
 
         fwd = CsForwardingRules("forwardingrules", self.config)
@@ -1051,6 +1049,7 @@ def main(argv):
     red = CsRedundant(config)
     red.set()
     return 0
+
 
 if __name__ == "__main__":
     main(sys.argv)

@@ -109,6 +109,7 @@ Obsoletes: cloud-daemonize < 4.1.0
 Group:   System Environment/Libraries
 %description common
 The Apache CloudStack files shared between agent and management server
+%global __requires_exclude ^libuuid\\.so\\.1$
 
 %package agent
 Summary: CloudStack Agent for KVM hypervisors
@@ -251,7 +252,7 @@ mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/sudoers.d
 mkdir -p ${RPM_BUILD_ROOT}%{_datadir}/%{name}-common/scripts
 mkdir -p ${RPM_BUILD_ROOT}%{_datadir}/%{name}-common/vms
 mkdir -p ${RPM_BUILD_ROOT}%{python_sitearch}/
-mkdir -p ${RPM_BUILD_ROOT}%/usr/bin
+mkdir -p ${RPM_BUILD_ROOT}/usr/bin
 cp -r scripts/* ${RPM_BUILD_ROOT}%{_datadir}/%{name}-common/scripts
 install -D systemvm/dist/systemvm.iso ${RPM_BUILD_ROOT}%{_datadir}/%{name}-common/vms/systemvm.iso
 install python/lib/cloud_utils.py ${RPM_BUILD_ROOT}%{python_sitearch}/cloud_utils.py
@@ -468,6 +469,10 @@ if [ -f "%{_sysconfdir}/cloud.rpmsave/management/db.properties" ]; then
     fi
     # make sure we only do this on the first install of this RPM, don't want to overwrite on a reinstall
     mv %{_sysconfdir}/cloud.rpmsave/management/db.properties %{_sysconfdir}/cloud.rpmsave/management/db.properties.rpmsave
+fi
+
+if [ -f %{_sysconfdir}/sysconfig/%{name}-management ] ; then
+    rm -f %{_sysconfdir}/sysconfig/%{name}-management
 fi
 
 chown -R cloud:cloud /var/log/cloudstack/management

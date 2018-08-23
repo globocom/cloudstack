@@ -304,8 +304,8 @@ class TestVPCRedundancy(cloudstackTestCase):
         time.sleep(3 * self.advert_int + 5)
 
     def check_routers_state(self,count=2, status_to_check="MASTER", expected_count=1, showall=False):
-        vals = ["MASTER", "BACKUP", "UNKNOWN"]
-        cnts = [0, 0, 0]
+        vals = ["MASTER", "BACKUP", "UNKNOWN", "FAULT"]
+        cnts = [0, 0, 0, 0]
 
         self.wait_for_vrrp()
 
@@ -612,7 +612,8 @@ class TestVPCRedundancy(cloudstackTestCase):
 
         time.sleep(total_sleep * 3)
 
-        self.check_routers_state(status_to_check="BACKUP", expected_count=2)
+        # Router will be in FAULT state, i.e. keepalived is stopped
+        self.check_routers_state(status_to_check="FAULT", expected_count=2)
         self.start_vm()
         self.check_routers_state(status_to_check="MASTER")
 
@@ -691,7 +692,7 @@ class TestVPCRedundancy(cloudstackTestCase):
     def do_default_routes_test(self):
         for o in self.networks:
             for vmObj in o.get_vms():
-                ssh_command = "ping -c 3 8.8.8.8"
+                ssh_command = "ping -c 10 8.8.8.8"
 
                 # Should be able to SSH VM
                 packet_loss = 100

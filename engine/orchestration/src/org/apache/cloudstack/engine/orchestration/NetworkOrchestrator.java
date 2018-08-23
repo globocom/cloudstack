@@ -38,14 +38,11 @@ import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
-import org.apache.log4j.Logger;
-
 import org.apache.cloudstack.acl.ControlledEntity.ACLType;
 import org.apache.cloudstack.context.CallContext;
 import org.apache.cloudstack.engine.cloud.entity.api.db.VMNetworkMapVO;
 import org.apache.cloudstack.engine.cloud.entity.api.db.dao.VMNetworkMapDao;
 import org.apache.cloudstack.engine.orchestration.service.NetworkOrchestrationService;
-import org.apache.cloudstack.framework.config.ConfigDepot;
 import org.apache.cloudstack.framework.config.ConfigKey;
 import org.apache.cloudstack.framework.config.ConfigKey.Scope;
 import org.apache.cloudstack.framework.config.Configurable;
@@ -53,8 +50,7 @@ import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 import org.apache.cloudstack.framework.messagebus.MessageBus;
 import org.apache.cloudstack.framework.messagebus.PublishScope;
 import org.apache.cloudstack.managed.context.ManagedContextRunnable;
-import org.apache.cloudstack.region.PortableIpDao;
-
+import org.apache.log4j.Logger;
 
 import com.cloud.agent.AgentManager;
 import com.cloud.agent.Listener;
@@ -86,7 +82,6 @@ import com.cloud.deploy.DataCenterDeployment;
 import com.cloud.deploy.DeployDestination;
 import com.cloud.deploy.DeploymentPlan;
 import com.cloud.domain.Domain;
-import com.cloud.event.dao.UsageEventDao;
 import com.cloud.exception.ConcurrentOperationException;
 import com.cloud.exception.ConnectionException;
 import com.cloud.exception.InsufficientAddressCapacityException;
@@ -118,6 +113,7 @@ import com.cloud.network.Networks.TrafficType;
 import com.cloud.network.PhysicalNetwork;
 import com.cloud.network.PhysicalNetworkSetupInfo;
 import com.cloud.network.RemoteAccessVpn;
+import com.cloud.network.VpcVirtualNetworkApplianceService;
 import com.cloud.network.addr.PublicIp;
 import com.cloud.network.dao.AccountGuestVlanMapDao;
 import com.cloud.network.dao.AccountGuestVlanMapVO;
@@ -127,7 +123,6 @@ import com.cloud.network.dao.IPAddressVO;
 import com.cloud.network.dao.NetworkAccountDao;
 import com.cloud.network.dao.NetworkAccountVO;
 import com.cloud.network.dao.NetworkDao;
-import com.cloud.network.dao.NetworkDetailsDao;
 import com.cloud.network.dao.NetworkDomainDao;
 import com.cloud.network.dao.NetworkDomainVO;
 import com.cloud.network.dao.NetworkServiceMapDao;
@@ -140,7 +135,6 @@ import com.cloud.network.dao.PhysicalNetworkTrafficTypeVO;
 import com.cloud.network.dao.PhysicalNetworkVO;
 import com.cloud.network.dao.RemoteAccessVpnDao;
 import com.cloud.network.dao.RemoteAccessVpnVO;
-import com.cloud.network.dao.VpnUserDao;
 import com.cloud.network.element.AggregatedCommandExecutor;
 import com.cloud.network.element.DhcpServiceProvider;
 import com.cloud.network.element.DnsServiceProvider;
@@ -182,6 +176,7 @@ import com.cloud.user.User;
 import com.cloud.user.dao.AccountDao;
 import com.cloud.utils.NumbersUtil;
 import com.cloud.utils.Pair;
+import com.cloud.utils.StringUtils;
 import com.cloud.utils.UuidUtils;
 import com.cloud.utils.component.AdapterBase;
 import com.cloud.utils.component.ManagerBase;
@@ -200,9 +195,9 @@ import com.cloud.utils.db.TransactionStatus;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.fsm.NoTransitionException;
 import com.cloud.utils.fsm.StateMachine2;
+import com.cloud.utils.net.Dhcp;
 import com.cloud.utils.net.NetUtils;
 import com.cloud.vm.DomainRouterVO;
-import com.cloud.utils.net.Dhcp;
 import com.cloud.vm.Nic;
 import com.cloud.vm.Nic.ReservationStrategy;
 import com.cloud.vm.NicExtraDhcpOptionVO;
@@ -286,11 +281,11 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
     @Inject
     VMNetworkMapDao _vmNetworkMapDao;
     @Inject
-    DomainRouterDao _rotuerDao;
+    DomainRouterDao _routerDao;
     @Inject
     RemoteAccessVpnDao _remoteAccessVpnDao;
     @Inject
-    VpnUserDao _vpnUserDao;
+    VpcVirtualNetworkApplianceService _routerService;
 
     List<NetworkGuru> networkGurus;
 
@@ -368,17 +363,9 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
     @Inject
     NetworkACLManager _networkACLMgr;
     @Inject
-    UsageEventDao _usageEventDao;
-    @Inject
     NetworkModel _networkModel;
     @Inject
     NicSecondaryIpDao _nicSecondaryIpDao;
-    @Inject
-    PortableIpDao _portableIpDao;
-    @Inject
-    ConfigDepot _configDepot;
-    @Inject
-    NetworkDetailsDao _networkDetailsDao;
 
     protected StateMachine2<Network.State, Network.Event, Network> _stateMachine;
     ScheduledExecutorService _executor;
@@ -574,6 +561,8 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
                     offering.setDedicatedLB(false);
                     _networkOfferingDao.update(offering.getId(), offering);
                 }
+
+                _networkOfferingDao.persistDefaultL2NetworkOfferings();
             }
         });
 
@@ -1146,29 +1135,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         }
         // get providers to implement
         final List<Provider> providersToImplement = getNetworkProviders(network.getId());
-        for (final NetworkElement element : networkElements) {
-            if (providersToImplement.contains(element.getProvider())) {
-                if (!_networkModel.isProviderEnabledInPhysicalNetwork(_networkModel.getPhysicalNetworkId(network), element.getProvider().getName())) {
-                    // The physicalNetworkId will not get translated into a uuid by the reponse serializer,
-                    // because the serializer would look up the NetworkVO class's table and retrieve the
-                    // network id instead of the physical network id.
-                    // So just throw this exception as is. We may need to TBD by changing the serializer.
-                    throw new CloudRuntimeException("Service provider " + element.getProvider().getName() + " either doesn't exist or is not enabled in physical network id: "
-                            + network.getPhysicalNetworkId());
-                }
-
-                if (s_logger.isDebugEnabled()) {
-                    s_logger.debug("Asking " + element.getName() + " to implement " + network);
-                }
-
-                if (!element.implement(network, offering, dest, context)) {
-                    final CloudRuntimeException ex = new CloudRuntimeException("Failed to implement provider " + element.getProvider().getName() + " for network with specified id");
-                    ex.addProxyObject(network.getUuid(), "networkId");
-                    throw ex;
-                }
-            }
-        }
-
+        implementNetworkElements(dest, context, network, offering, providersToImplement);
 
         //Reset the extra DHCP option that may have been cleared per nic.
         List<NicVO> nicVOs = _nicDao.listByNetworkId(network.getId());
@@ -1216,6 +1183,32 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         }
     }
 
+    private void implementNetworkElements(final DeployDestination dest, final ReservationContext context, final Network network, final NetworkOffering offering, final List<Provider> providersToImplement)
+            throws ConcurrentOperationException, ResourceUnavailableException, InsufficientCapacityException {
+        for (NetworkElement element : networkElements) {
+            if (providersToImplement.contains(element.getProvider())) {
+                if (!_networkModel.isProviderEnabledInPhysicalNetwork(_networkModel.getPhysicalNetworkId(network), element.getProvider().getName())) {
+                    // The physicalNetworkId will not get translated into a uuid by the reponse serializer,
+                    // because the serializer would look up the NetworkVO class's table and retrieve the
+                    // network id instead of the physical network id.
+                    // So just throw this exception as is. We may need to TBD by changing the serializer.
+                    throw new CloudRuntimeException("Service provider " + element.getProvider().getName() + " either doesn't exist or is not enabled in physical network id: "
+                            + network.getPhysicalNetworkId());
+                }
+
+                if (s_logger.isDebugEnabled()) {
+                    s_logger.debug("Asking " + element.getName() + " to implemenet " + network);
+                }
+
+                if (!element.implement(network, offering, dest, context)) {
+                    CloudRuntimeException ex = new CloudRuntimeException("Failed to implement provider " + element.getProvider().getName() + " for network with specified id");
+                    ex.addProxyObject(network.getUuid(), "networkId");
+                    throw ex;
+                }
+            }
+        }
+    }
+
     // This method re-programs the rules/ips for existing network
     protected boolean reprogramNetworkRules(final long networkId, final Account caller, final Network network) throws ResourceUnavailableException {
         boolean success = true;
@@ -1233,7 +1226,6 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
             s_logger.warn("Failed to reapply firewall Egress rule(s) as a part of network id=" + networkId + " restart");
             success = false;
         }
-
 
         // associate all ip addresses
         if (!_ipAddrMgr.applyIpAssociations(network, false)) {
@@ -1343,15 +1335,15 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         List<Provider> providers = getNetworkProviders(network.getId());
 
         //check if the there are no service provider other than virtualrouter.
-        for(Provider provider :providers){
-            if(provider!=Provider.VirtualRouter)
+        for(Provider provider : providers) {
+            if (provider!=Provider.VirtualRouter)
                 throw new UnsupportedOperationException("Cannot update the network resources in sequence when providers other than virtualrouter are used");
         }
         //check if routers are in correct state before proceeding with the update
-        List<DomainRouterVO> routers=_rotuerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
-        for(DomainRouterVO router :routers){
-            if(router.getRedundantState()== VirtualRouter.RedundantState.UNKNOWN){
-                if(!forced){
+        List<DomainRouterVO> routers = _routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
+        for (DomainRouterVO router : routers){
+            if (router.getRedundantState() == VirtualRouter.RedundantState.UNKNOWN) {
+                if (!forced) {
                     throw new CloudRuntimeException("Domain router: "+router.getInstanceName()+" is in unknown state, Cannot update network. set parameter forced to true for forcing an update");
                 }
             }
@@ -2116,16 +2108,12 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
 
         boolean ipv6 = false;
 
-        if (ip6Gateway != null && ip6Cidr != null) {
+        if (StringUtils.isNotBlank(ip6Gateway) && StringUtils.isNotBlank(ip6Cidr)) {
             ipv6 = true;
         }
         // Validate zone
         final DataCenterVO zone = _dcDao.findById(zoneId);
         if (zone.getNetworkType() == NetworkType.Basic) {
-            if (ipv6) {
-                throw new InvalidParameterValueException("IPv6 is not supported in Basic zone");
-            }
-
             // In Basic zone the network should have aclType=Domain, domainId=1, subdomainAccess=true
             if (aclType == null || aclType != ACLType.Domain) {
                 throw new InvalidParameterValueException("Only AclType=Domain can be specified for network creation in Basic zone");
@@ -2186,6 +2174,10 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
             if (ntwkOff.getElasticIp() || ntwkOff.getElasticLb()) {
                 throw new InvalidParameterValueException("Elastic IP and Elastic LB services are supported in zone of type " + NetworkType.Basic);
             }
+        }
+
+        if (ipv6 && !NetUtils.isValidIp6Cidr(ip6Cidr)) {
+            throw new InvalidParameterValueException("Invalid IPv6 cidr specified");
         }
 
         //TODO(VXLAN): Support VNI specified
@@ -2290,12 +2282,13 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         final boolean cidrRequired = zone.getNetworkType() == NetworkType.Advanced
                 && ntwkOff.getTrafficType() == TrafficType.Guest
                 && (ntwkOff.getGuestType() == GuestType.Shared || (ntwkOff.getGuestType() == GuestType.Isolated
-                && !_networkModel.areServicesSupportedByNetworkOffering(ntwkOff.getId(), Service.SourceNat))
-                || ntwkOff.getGuestType() == GuestType.L2 && !_networkModel.listNetworkOfferingServices(ntwkOff.getId()).isEmpty());
+                && !_networkModel.areServicesSupportedByNetworkOffering(ntwkOff.getId(), Service.SourceNat)));
         if (cidr == null && ip6Cidr == null && cidrRequired) {
             throw new InvalidParameterValueException("StartIp/endIp/gateway/netmask are required when create network of" + " type " + Network.GuestType.Shared
                     + " and network of type " + GuestType.Isolated + " with service " + Service.SourceNat.getName() + " disabled");
         }
+
+        checkL2OfferingServices(ntwkOff);
 
         // No cidr can be specified in Basic zone
         if (zone.getNetworkType() == NetworkType.Basic && cidr != null) {
@@ -2328,7 +2321,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
                     userNetwork.setGateway(gateway);
                 }
 
-                if (ip6Cidr != null && ip6Gateway != null) {
+                if (StringUtils.isNotBlank(ip6Gateway) && StringUtils.isNotBlank(ip6Cidr)) {
                     userNetwork.setIp6Cidr(ip6Cidr);
                     userNetwork.setIp6Gateway(ip6Gateway);
                 }
@@ -2393,6 +2386,21 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         CallContext.current().setEventDetails("Network Id: " + network.getId());
         CallContext.current().putContextParameter(Network.class, network.getUuid());
         return network;
+    }
+
+    /**
+     * Checks for L2 network offering services. Only 2 cases allowed:
+     * - No services
+     * - User Data service only, provided by ConfigDrive
+     * @param ntwkOff network offering
+     */
+    protected void checkL2OfferingServices(NetworkOfferingVO ntwkOff) {
+        if (ntwkOff.getGuestType() == GuestType.L2 && !_networkModel.listNetworkOfferingServices(ntwkOff.getId()).isEmpty() &&
+                (!_networkModel.areServicesSupportedByNetworkOffering(ntwkOff.getId(), Service.UserData) ||
+                        (_networkModel.areServicesSupportedByNetworkOffering(ntwkOff.getId(), Service.UserData) &&
+                                _networkModel.listNetworkOfferingServices(ntwkOff.getId()).size() > 1))) {
+            throw new InvalidParameterValueException("For L2 networks, only UserData service is allowed");
+        }
     }
 
     @Override
@@ -2856,26 +2864,18 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         s_logger.debug("Restarting network " + networkId + "...");
 
         final ReservationContext context = new ReservationContextImpl(null, null, callerUser, callerAccount);
+        final NetworkOffering offering = _networkOfferingDao.findByIdIncludingRemoved(network.getNetworkOfferingId());
+        final DeployDestination dest = new DeployDestination(_dcDao.findById(network.getDataCenterId()), null, null, null);
 
         if (cleanup) {
-            // shutdown the network
-            s_logger.debug("Shutting down the network id=" + networkId + " as a part of network restart");
-
-            if (!shutdownNetworkElementsAndResources(context, true, network)) {
-                s_logger.debug("Failed to shutdown the network elements and resources as a part of network restart: " + network.getState());
+            if (!rollingRestartRouters(network, offering, dest, context)) {
                 setRestartRequired(network, true);
                 return false;
             }
-        } else {
-            s_logger.debug("Skip the shutting down of network id=" + networkId);
+            return true;
         }
 
-        // implement the network elements and rules again
-        final DeployDestination dest = new DeployDestination(_dcDao.findById(network.getDataCenterId()), null, null, null);
-
-        s_logger.debug("Implementing the network " + network + " elements and resources as a part of network restart");
-        final NetworkOfferingVO offering = _networkOfferingDao.findById(network.getNetworkOfferingId());
-
+        s_logger.debug("Implementing the network " + network + " elements and resources as a part of network restart without cleanup");
         try {
             implementNetworkElementsAndResources(dest, context, network, offering);
             setRestartRequired(network, true);
@@ -2884,6 +2884,103 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
             s_logger.warn("Failed to implement network " + network + " elements and resources as a part of network restart due to ", ex);
             return false;
         }
+    }
+
+    @Override
+    public void destroyExpendableRouters(final List<? extends VirtualRouter> routers, final ReservationContext context) throws ResourceUnavailableException {
+        final List<VirtualRouter> remainingRouters = new ArrayList<>();
+        for (final VirtualRouter router : routers) {
+            if (router.getState() == VirtualMachine.State.Stopped ||
+                    router.getState() == VirtualMachine.State.Error ||
+                    router.getState() == VirtualMachine.State.Shutdowned ||
+                    router.getState() == VirtualMachine.State.Unknown) {
+                s_logger.debug("Destroying old router " + router);
+                _routerService.destroyRouter(router.getId(), context.getAccount(), context.getCaller().getId());
+            } else {
+                remainingRouters.add(router);
+            }
+        }
+
+        if (remainingRouters.size() < 2) {
+            return;
+        }
+
+        VirtualRouter backupRouter = null;
+        for (final VirtualRouter router : remainingRouters) {
+            if (router.getRedundantState() == VirtualRouter.RedundantState.BACKUP) {
+                backupRouter = router;
+            }
+        }
+        if (backupRouter == null) {
+            backupRouter = routers.get(routers.size() - 1);
+        }
+        if (backupRouter != null) {
+            _routerService.destroyRouter(backupRouter.getId(), context.getAccount(), context.getCaller().getId());
+        }
+    }
+
+    @Override
+    public boolean areRoutersRunning(final List<? extends VirtualRouter> routers) {
+        for (final VirtualRouter router : routers) {
+            if (router.getState() != VirtualMachine.State.Running) {
+                s_logger.debug("Found new router " + router.getInstanceName() + " to be in non-Running state: " + router.getState() + ". Please try restarting network again.");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * rollingRestartRouters performs restart of routers of a network by first
+     * deploying a new VR and then destroying old VRs in rolling fashion. For
+     * non-redundant network, it will re-program the new router as final step
+     * otherwise deploys a backup router for the network.
+     * @param network network to be restarted
+     * @param offering network offering
+     * @param dest deployment destination
+     * @param context reservation context
+     * @return returns true when the rolling restart operation succeeds
+     * @throws ResourceUnavailableException
+     * @throws ConcurrentOperationException
+     * @throws InsufficientCapacityException
+     */
+    private boolean rollingRestartRouters(final NetworkVO network, final NetworkOffering offering, final DeployDestination dest, final ReservationContext context) throws ResourceUnavailableException, ConcurrentOperationException, InsufficientCapacityException {
+        s_logger.debug("Performing rolling restart of routers of network " + network);
+        destroyExpendableRouters(_routerDao.findByNetwork(network.getId()), context);
+
+        final List<Provider> providersToImplement = getNetworkProviders(network.getId());
+        final List<DomainRouterVO> oldRouters = _routerDao.findByNetwork(network.getId());
+
+        // Deploy a new router
+        if (oldRouters.size() > 0) {
+            network.setRollingRestart(true);
+        }
+        implementNetworkElements(dest, context, network, offering, providersToImplement);
+        if (oldRouters.size() > 0) {
+            network.setRollingRestart(false);
+        }
+
+        // For redundant network wait for 3*advert_int+skew_seconds for VRRP to kick in
+        if (network.isRedundant() || (oldRouters.size() == 1 && oldRouters.get(0).getIsRedundantRouter())) {
+            try {
+                Thread.sleep(NetworkOrchestrationService.RVRHandoverTime);
+            } catch (final InterruptedException ignored) {}
+        }
+
+        // Destroy old routers
+        for (final DomainRouterVO oldRouter : oldRouters) {
+            _routerService.destroyRouter(oldRouter.getId(), context.getAccount(), context.getCaller().getId());
+        }
+
+        if (network.isRedundant()) {
+            // Add a new backup router for redundant network
+            implementNetworkElements(dest, context, network, offering, providersToImplement);
+        } else {
+            // Re-apply rules for non-redundant network
+            implementNetworkElementsAndResources(dest, context, network, offering);
+        }
+
+        return areRoutersRunning(_routerDao.findByNetwork(network.getId()));
     }
 
     private void setRestartRequired(final NetworkVO network, final boolean restartRequired) {

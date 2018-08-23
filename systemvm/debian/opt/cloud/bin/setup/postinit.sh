@@ -65,9 +65,6 @@ do
    systemctl disable --no-block --now $svc
 done
 
-# Enable SSH by default
-systemctl enable --no-block --now ssh
-
 # Restore the persistent iptables nat, rules and filters for IPv4 and IPv6 if they exist
 ipv4="/etc/iptables/rules.v4"
 if [ -e $ipv4 ]
@@ -78,8 +75,11 @@ fi
 ipv6="/etc/iptables/rules.v6"
 if [ -e $ipv6 ]
 then
-   iptables-restore < $ipv6
+   ip6tables-restore < $ipv6
 fi
+
+# Enable SSH by default
+systemctl enable --no-block --now ssh
 
 date > /var/cache/cloud/boot_up_done
 logger -t cloud "Boot up process done"

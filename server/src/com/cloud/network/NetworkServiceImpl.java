@@ -1101,8 +1101,8 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
         }
 
         // Only Admin can create Shared networks
-        if (ntwkOff.getGuestType() == GuestType.Shared && !_accountMgr.isAdmin(caller.getId())) {
-            throw new InvalidParameterValueException("Only Admins can create network with guest type " + GuestType.Shared);
+        if ((ntwkOff.getGuestType() == GuestType.Shared || ntwkOff.getGuestType() == GuestType.L2) && !_accountMgr.isAdmin(caller.getId())) {
+            throw new InvalidParameterValueException("Only Admins can create network with guest type " + GuestType.Shared + " or " + GuestType.L2);
         }
 
         // Check if the network is domain specific
@@ -1846,7 +1846,7 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
 
     @Override
     @ActionEvent(eventType = EventTypes.EVENT_NETWORK_RESTART, eventDescription = "restarting network", async = true)
-    public boolean restartNetwork(RestartNetworkCmd cmd, boolean cleanup) throws ConcurrentOperationException, ResourceUnavailableException, InsufficientCapacityException {
+    public boolean restartNetwork(RestartNetworkCmd cmd, boolean cleanup, boolean makeRedundant) throws ConcurrentOperationException, ResourceUnavailableException, InsufficientCapacityException {
         // This method restarts all network elements belonging to the network and re-applies all the rules
         Long networkId = cmd.getNetworkId();
 
@@ -1875,6 +1875,14 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
         }
 
         _accountMgr.checkAccess(callerAccount, null, true, network);
+
+        if (!network.isRedundant() && makeRedundant) {
+            network.setRedundant(true);
+            if (!_networksDao.update(network.getId(), network)) {
+                throw new CloudRuntimeException("Failed to update network into a redundant one, please try again");
+            }
+            cleanup = true;
+        }
 
         boolean success = _networkMgr.restartNetwork(networkId, callerAccount, callerUser, cleanup);
 

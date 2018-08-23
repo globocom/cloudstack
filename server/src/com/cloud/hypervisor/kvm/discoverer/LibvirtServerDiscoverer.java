@@ -18,6 +18,7 @@ package com.cloud.hypervisor.kvm.discoverer;
 
 import java.net.InetAddress;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -27,9 +28,9 @@ import java.util.UUID;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
+import org.apache.cloudstack.agent.lb.IndirectAgentLB;
 import org.apache.cloudstack.ca.CAManager;
 import org.apache.cloudstack.ca.SetupCertificateCommand;
-import org.apache.cloudstack.config.ApiServiceConfiguration;
 import org.apache.cloudstack.framework.ca.Certificate;
 import org.apache.cloudstack.utils.security.KeyStoreUtils;
 import org.apache.log4j.Logger;
@@ -62,6 +63,7 @@ import com.cloud.resource.ServerResource;
 import com.cloud.resource.UnableDeleteHostException;
 import com.cloud.utils.PasswordGenerator;
 import com.cloud.utils.StringUtils;
+import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.ssh.SSHCmdHelper;
 import com.trilead.ssh2.Connection;
 
@@ -75,6 +77,8 @@ public abstract class LibvirtServerDiscoverer extends DiscovererBase implements 
     private AgentManager agentMgr;
     @Inject
     private CAManager caManager;
+    @Inject
+    private IndirectAgentLB indirectAgentLB;
 
     @Override
     public abstract Hypervisor.HypervisorType getHypervisorType();
@@ -138,14 +142,8 @@ public abstract class LibvirtServerDiscoverer extends DiscovererBase implements 
     }
 
     private void setupAgentSecurity(final Connection sshConnection, final String agentIp, final String agentHostname) {
-        if (!caManager.canProvisionCertificates()) {
-            s_logger.warn("Cannot secure agent communication because configure CA plugin cannot provision client certificate");
-            return;
-        }
-
         if (sshConnection == null) {
-            s_logger.warn("Cannot secure agent communication because ssh connection is invalid for host ip=" + agentIp);
-            return;
+            throw new CloudRuntimeException("Cannot secure agent communication because ssh connection is invalid for host ip=" + agentIp);
         }
 
         Integer validityPeriod = CAManager.CertValidityPeriod.value();
@@ -154,49 +152,46 @@ public abstract class LibvirtServerDiscoverer extends DiscovererBase implements 
         }
 
         final SSHCmdHelper.SSHCmdResult keystoreSetupResult = SSHCmdHelper.sshExecuteCmdWithResult(sshConnection,
-                String.format("/usr/share/cloudstack-common/scripts/util/%s " +
+                String.format("sudo /usr/share/cloudstack-common/scripts/util/%s " +
                                 "/etc/cloudstack/agent/agent.properties " +
                                 "/etc/cloudstack/agent/%s " +
                                 "%s %d " +
                                 "/etc/cloudstack/agent/%s",
-                        KeyStoreUtils.keyStoreSetupScript,
-                        KeyStoreUtils.defaultKeystoreFile,
+                        KeyStoreUtils.KS_SETUP_SCRIPT,
+                        KeyStoreUtils.KS_FILENAME,
                         PasswordGenerator.generateRandomPassword(16),
                         validityPeriod,
-                        KeyStoreUtils.defaultCsrFile));
+                        KeyStoreUtils.CSR_FILENAME));
 
         if (!keystoreSetupResult.isSuccess()) {
-            s_logger.error("Failing, the keystore setup script failed execution on the KVM host: " + agentIp);
-            return;
+            throw new CloudRuntimeException("Failed to setup keystore on the KVM host: " + agentIp);
         }
 
-        final Certificate certificate = caManager.issueCertificate(keystoreSetupResult.getStdOut(), Collections.singletonList(agentHostname), Collections.singletonList(agentIp), null, null);
+        final Certificate certificate = caManager.issueCertificate(keystoreSetupResult.getStdOut(), Arrays.asList(agentHostname, agentIp), Collections.singletonList(agentIp), null, null);
         if (certificate == null || certificate.getClientCertificate() == null) {
-            s_logger.error("Failing, the configured CA plugin failed to issue certificates for KVM host agent: " + agentIp);
-            return;
+            throw new CloudRuntimeException("Failed to issue certificates for KVM host agent: " + agentIp);
         }
 
         final SetupCertificateCommand certificateCommand = new SetupCertificateCommand(certificate);
         final SSHCmdHelper.SSHCmdResult setupCertResult = SSHCmdHelper.sshExecuteCmdWithResult(sshConnection,
-                    String.format("/usr/share/cloudstack-common/scripts/util/%s " +
+                    String.format("sudo /usr/share/cloudstack-common/scripts/util/%s " +
                                     "/etc/cloudstack/agent/agent.properties " +
                                     "/etc/cloudstack/agent/%s %s " +
                                     "/etc/cloudstack/agent/%s \"%s\" " +
                                     "/etc/cloudstack/agent/%s \"%s\" " +
                                     "/etc/cloudstack/agent/%s \"%s\"",
-                            KeyStoreUtils.keyStoreImportScript,
-                            KeyStoreUtils.defaultKeystoreFile,
-                            KeyStoreUtils.sshMode,
-                            KeyStoreUtils.defaultCertFile,
+                            KeyStoreUtils.KS_IMPORT_SCRIPT,
+                            KeyStoreUtils.KS_FILENAME,
+                            KeyStoreUtils.SSH_MODE,
+                            KeyStoreUtils.CERT_FILENAME,
                             certificateCommand.getEncodedCertificate(),
-                            KeyStoreUtils.defaultCaCertFile,
+                            KeyStoreUtils.CACERT_FILENAME,
                             certificateCommand.getEncodedCaCertificates(),
-                            KeyStoreUtils.defaultPrivateKeyFile,
+                            KeyStoreUtils.PKEY_FILENAME,
                             certificateCommand.getEncodedPrivateKey()));
 
         if (setupCertResult != null && !setupCertResult.isSuccess()) {
-            s_logger.error("Failed to setup certificate in the KVM agent's keystore file, please configure manually!");
-            return;
+            throw new CloudRuntimeException("Failed to setup certificate in the KVM agent's keystore file, please see logs and configure manually!");
         }
 
         if (s_logger.isDebugEnabled()) {
@@ -289,9 +284,13 @@ public abstract class LibvirtServerDiscoverer extends DiscovererBase implements 
                 kvmGuestNic = (kvmPublicNic != null) ? kvmPublicNic : kvmPrivateNic;
             }
 
+            if (!caManager.canProvisionCertificates()) {
+                throw new CloudRuntimeException("Configured CA plugin cannot provision X509 certificate(s), failing to add host due to security insufficiency.");
+            }
+
             setupAgentSecurity(sshConnection, agentIp, hostname);
 
-            String parameters = " -m " + StringUtils.shuffleCSVList(ApiServiceConfiguration.ManagementHostIPAdr.value()) + " -z " + dcId + " -p " + podId + " -c " + clusterId + " -g " + guid + " -a";
+            String parameters = " -m " + StringUtils.toCSVList(indirectAgentLB.getManagementServerList(null, dcId, null)) + " -z " + dcId + " -p " + podId     + " -c " + clusterId + " -g " + guid + " -a -s ";
 
             parameters += " --pubNic=" + kvmPublicNic;
             parameters += " --prvNic=" + kvmPrivateNic;

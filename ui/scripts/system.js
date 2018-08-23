@@ -9461,6 +9461,11 @@
                                                     if (host && host.outofbandmanagement) {
                                                         items[idx].powerstate = host.outofbandmanagement.powerstate;
                                                     }
+
+                                                    if (host && host.hypervisor == "KVM" && host.state == 'Up' && host.details && host.details["secured"] != 'true') {
+                                                        items[idx].state = 'Unsecure';
+                                                    }
+
                                                 });
                                             }
 
@@ -15983,7 +15988,8 @@
                                 'Down': 'off',
                                 'Disconnected': 'off',
                                 'Alert': 'off',
-                                'Error': 'off'
+                                'Error': 'off',
+                                'Unsecure': 'warning'
                             }
                         },
                         powerstate: {
@@ -16030,6 +16036,10 @@
                                     $.each(items, function(idx, host) {
                                         if (host && host.outofbandmanagement) {
                                             items[idx].powerstate = host.outofbandmanagement.powerstate;
+                                        }
+
+                                        if (host && host.hypervisor == "KVM" && host.state == 'Up' && host.details && host.details["secured"] != 'true') {
+                                            items[idx].state = 'Unsecure';
                                         }
                                     });
                                 }
@@ -16800,6 +16810,40 @@
                                 }
                             },
 
+                            secureKVMHost: {
+                                label: 'label.action.secure.host',
+                                action: function(args) {
+                                    var data = {
+                                        hostid: args.context.hosts[0].id
+                                    };
+                                    $.ajax({
+                                        url: createURL('provisionCertificate'),
+                                        data: data,
+                                        async: true,
+                                        success: function(json) {
+                                            args.response.success({
+                                                _custom: {
+                                                    jobId: json.provisioncertificateresponse.jobid,
+                                                    getActionFilter: function () {
+                                                        return hostActionfilter;
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    });
+                                },
+                                messages: {
+                                    confirm: function (args) {
+                                        return 'message.action.secure.host';
+                                    },
+                                    notification: function (args) {
+                                        return 'label.action.secure.host';
+                                    }
+                                },
+                                notification: {
+                                    poll: pollAsyncJobResult
+                                }
+                            },
 
                             enableMaintenanceMode: {
                                 label: 'label.action.enable.maintenance.mode',
@@ -17708,6 +17752,10 @@
                                             var item = json.listhostsresponse.host[0];
                                             if (item && item.outofbandmanagement) {
                                                 item.powerstate = item.outofbandmanagement.powerstate;
+                                            }
+
+                                            if (!item.hypervisorversion && item.details && item.details["Host.OS"]) {
+                                                item.hypervisorversion =  item.details["Host.OS"] + " " +  item.details["Host.OS.Version"];
                                             }
 
                                             if (item && item.hostha) {
@@ -20115,6 +20163,7 @@
                                                             $form.find('.form-item[rel=account]').hide();
                                                             $form.find('.form-item[rel=username]').hide();
                                                             $form.find('.form-item[rel=key]').hide();
+                                                            $form.find('.form-item[rel=storagepolicy]').hide();
                                                         } else if ($(this).val() == "SMB") {
                                                             //NFS, SMB
                                                             $form.find('.form-item[rel=zoneid]').css('display', 'inline-block');
@@ -20147,6 +20196,7 @@
                                                             $form.find('.form-item[rel=account]').hide();
                                                             $form.find('.form-item[rel=username]').hide();
                                                             $form.find('.form-item[rel=key]').hide();
+                                                            $form.find('.form-item[rel=storagepolicy]').hide();
                                                         } else if ($(this).val() == "S3") {
                                                             //NFS, SMB
                                                             $form.find('.form-item[rel=zoneid]').hide();
@@ -20181,6 +20231,7 @@
                                                             $form.find('.form-item[rel=account]').hide();
                                                             $form.find('.form-item[rel=username]').hide();
                                                             $form.find('.form-item[rel=key]').hide();
+                                                            $form.find('.form-item[rel=storagepolicy]').hide();
                                                         } else if ($(this).val() == "Swift") {
                                                             //NFS, SMB
                                                             $form.find('.form-item[rel=zoneid]').hide();
@@ -20213,6 +20264,7 @@
                                                             $form.find('.form-item[rel=account]').css('display', 'inline-block');
                                                             $form.find('.form-item[rel=username]').css('display', 'inline-block');
                                                             $form.find('.form-item[rel=key]').css('display', 'inline-block');
+                                                            $form.find('.form-item[rel=storagepolicy]').css('display', 'inline-block');
                                                         }
                                                     });
 
@@ -20403,14 +20455,26 @@
                                                 }
                                             },
                                             account: {
-                                                label: 'label.account'
+                                                label: 'label.account',
+                                                 validation: {
+                                                     required: true
+                                                 }
                                             },
                                             username: {
-                                                label: 'label.username'
+                                                label: 'label.username',
+                                                 validation: {
+                                                     required: true
+                                                 }
                                             },
                                             key: {
-                                                label: 'label.key'
-                                            }
+                                                label: 'label.key',
+                                                 validation: {
+                                                     required: true
+                                                 }
+                                            },
+                                             storagepolicy: {
+                                                 label: 'label.storagepolicy'
+                                             }
                                             //Swift (end)
                                         }
                                     },
@@ -20575,6 +20639,11 @@
                                             if (args.data.key != null && args.data.key.length > 0) {
                                                 data[ 'details[' + index.toString() + '].key'] = 'key';
                                                 data[ 'details[' + index.toString() + '].value'] = args.data.key;
+                                                index++;
+                                            }
+                                            if (args.data.storagepolicy != null && args.data.storagepolicy.length > 0) {
+                                                data[ 'details[' + index.toString() + '].key'] = 'storagepolicy';
+                                                data[ 'details[' + index.toString() + '].value'] = args.data.storagepolicy;
                                                 index++;
                                             }
                                             $.ajax({
@@ -22283,6 +22352,11 @@
 
             if (jsonObj.state != "Disconnected")
             allowedActions.push("forceReconnect");
+
+            if (jsonObj.hypervisor == "KVM") {
+                allowedActions.push("secureKVMHost");
+            }
+
         } else if (jsonObj.resourcestate == "ErrorInMaintenance") {
             allowedActions.push("edit");
             allowedActions.push("enableMaintenanceMode");

@@ -819,8 +819,12 @@ public class LibvirtVMDef {
             diskBuilder.append(" type='" + _diskType + "'");
             diskBuilder.append(">\n");
             if(qemuDriver) {
-                diskBuilder.append("<driver name='qemu'" + " type='" + _diskFmtType
-                        + "' cache='" + _diskCacheMode + "' ");
+                diskBuilder.append("<driver name='qemu'" + " type='" + _diskFmtType + "' ");
+
+                if (_deviceType != DeviceType.CDROM) {
+                    diskBuilder.append("cache='" + _diskCacheMode + "' ");
+                }
+
                 if(_discard != null && _discard != DiscardType.IGNORE) {
                     diskBuilder.append("discard='" + _discard.toString() + "' ");
                 }
@@ -1171,6 +1175,11 @@ public class LibvirtVMDef {
 
     public static class CpuTuneDef {
         private int _shares = 0;
+        private int quota = 0;
+        private int period = 0;
+        static final int DEFAULT_PERIOD = 10000;
+        static final int MIN_QUOTA = 1000;
+        static final int MAX_PERIOD = 1000000;
 
         public void setShares(int shares) {
             _shares = shares;
@@ -1180,12 +1189,34 @@ public class LibvirtVMDef {
             return _shares;
         }
 
+        public int getQuota() {
+            return quota;
+        }
+
+        public void setQuota(int quota) {
+            this.quota = quota;
+        }
+
+        public int getPeriod() {
+            return period;
+        }
+
+        public void setPeriod(int period) {
+            this.period = period;
+        }
+
         @Override
         public String toString() {
             StringBuilder cpuTuneBuilder = new StringBuilder();
             cpuTuneBuilder.append("<cputune>\n");
             if (_shares > 0) {
                 cpuTuneBuilder.append("<shares>" + _shares + "</shares>\n");
+            }
+            if (quota > 0) {
+                cpuTuneBuilder.append("<quota>" + quota + "</quota>\n");
+            }
+            if (period > 0) {
+                cpuTuneBuilder.append("<period>" + period + "</period>\n");
             }
             cpuTuneBuilder.append("</cputune>\n");
             return cpuTuneBuilder.toString();
@@ -1543,16 +1574,15 @@ public class LibvirtVMDef {
         @Override
         public String toString() {
             StringBuilder fsBuilder = new StringBuilder();
+            fsBuilder.append("<nuage-extension xmlns='nuagenetworks.net/nuage/cna'>\n");
             for (Map.Entry<String, String> address : addresses.entrySet()) {
-                fsBuilder.append("<nuage-extension xmlns='nuagenetworks.net/nuage/cna'>\n")
-                        .append("  <interface mac='")
-                        .append(address.getKey())
-                        .append("' vsp-vr-ip='")
-                        .append(address.getValue())
-                        .append("'></interface>\n")
-                        .append("</nuage-extension>\n");
+                fsBuilder.append("  <interface mac='")
+                         .append(address.getKey())
+                         .append("' vsp-vr-ip='")
+                         .append(address.getValue())
+                         .append("'></interface>\n");
             }
-            return fsBuilder.toString();
+            return fsBuilder.append("</nuage-extension>\n").toString();
         }
     }
 

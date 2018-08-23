@@ -59,6 +59,9 @@ public interface NetworkModel {
     String SERVICE_OFFERING_FILE = "service-offering";
     String AVAILABILITY_ZONE_FILE = "availability-zone";
     String LOCAL_HOSTNAME_FILE = "local-hostname";
+    String LOCAL_IPV4_FILE = "local-ipv4";
+    String PUBLIC_HOSTNAME_FILE = "public-hostname";
+    String PUBLIC_IPV4_FILE = "public-ipv4";
     String INSTANCE_ID_FILE = "instance-id";
     String VM_ID_FILE = "vm-id";
     String PUBLIC_KEYS_FILE = "public-keys";
@@ -70,7 +73,7 @@ public interface NetworkModel {
             AVAILABILITY_ZONE_FILE, "availability_zone",
             LOCAL_HOSTNAME_FILE, "hostname",
             VM_ID_FILE, "uuid",
-            INSTANCE_ID_FILE, "name"
+            PUBLIC_HOSTNAME_FILE, "name"
     );
 
     static final ConfigKey<Integer> MACIdentifier = new ConfigKey<Integer>("Advanced",Integer.class, "mac.identifier", "0",
@@ -309,8 +312,8 @@ public interface NetworkModel {
 
     boolean getNetworkEgressDefaultPolicy(Long networkId);
 
-    List<String[]> generateVmData(String userData, String serviceOffering, String zoneName,
-                                  String vmName, long vmId, String publicKey, String password, Boolean isWindows);
+    List<String[]> generateVmData(String userData, String serviceOffering, long datacenterId,
+                                  String vmName, String vmHostName, long vmId, String vmUuid, String guestIpAddress, String publicKey, String password, Boolean isWindows);
 
     String getValidNetworkCidr(Network guestNetwork);
 
