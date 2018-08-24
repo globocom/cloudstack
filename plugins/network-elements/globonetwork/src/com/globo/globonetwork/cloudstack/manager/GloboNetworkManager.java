@@ -1764,7 +1764,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                         portableIpRange = createPortableIpRange(zoneId, globoNetwork.getVlanNum(), globoNetwork.getNetworkCidr(), networkGateway);
                     }
 
-                    List<IPAddressVO> ipAdressVO = _ipAddrDao.listByAssociatedNetwork(networkId, null);
+
+                    List<IPAddressVO> ipAdressVO = _ipAddrDao.listByAccount(caller.getAccountId());
                     for (IPAddressVO ip : ipAdressVO) {
                         if (ip.getAddress().addr().equals(globoNetwork.getIp()) && ip.getState() == IPAddressVO.State.Allocated) {
                             _ipAddrMgr.releasePortableIpAddress(ip.getId());
