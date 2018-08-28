@@ -374,6 +374,10 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
     @ActionEvent(eventType = EventTypes.EVENT_TAGS_DELETE, eventDescription = "deleting resource tags")
     public boolean deleteTags(List<String> resourceIds, ResourceObjectType resourceType, Map<String, String> tags) {
         Account caller = CallContext.current().getCallingAccount();
+
+        if(resourceType == ResourceObjectType.AutoScaleVmGroup){
+            _autoscaleManager.deleteTagsFromAutoScaleGroupVms(resourceIds, tags);
+        }
         if(s_logger.isDebugEnabled()) {
             s_logger.debug("ResourceIds to Find " + String.join(", ", resourceIds));
         }
