@@ -97,7 +97,7 @@ case "$1" in
     export RABBIT_MQ_PORT="5672"
     export RABBIT_MQ_USER="guest"
     export RABBIT_MQ_PASSWORD="guest"
-    MAVEN_OPTS="-Xmx2048m -XX:MaxPermSize=512m -Xdebug -Xrunjdwp:transport=dt_socket,address=8787,server=y,suspend=n" mvn -Dnonoss -Djava.awt.headless=true -Djava.net.preferIPv4Stack=true -Dsimulator -pl :cloud-client-ui jetty:run
+    MAVEN_OPTS="-Dlog4j.debug -Xmx2048m -XX:MaxPermSize=512m -Xdebug -Xrunjdwp:transport=dt_socket,address=8787,server=y,suspend=n" mvn -Dnonoss -Djava.awt.headless=true -Djava.net.preferIPv4Stack=true -Dsimulator -pl :cloud-client-ui jetty:run
     ;;
   compile)
     mvn -Dnonoss -Pdeveloper,systemvm -Djava.awt.headless=true -Dsimulator clean install -DskipTests

@@ -19,7 +19,7 @@ under the License.
 -->
 <!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
 
-<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/" debug="false">
+<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/" debug="true">
    <throwableRenderer class="com.cloud.utils.log.CglibThrowableRenderer"/>
 
    <!-- ================================= -->
@@ -38,6 +38,22 @@ under the License.
          <param name="ConversionPattern" value="%d{ISO8601} %-5p [%c{1.}] (%t:%x) (logid:%X{logcontextid}) %m%n"/>
       </layout>
    </appender>
+
+   <appender name="graylog" class="org.graylog2.log.GelfAppender">
+        <param name="Threshold" value="DEBUG"/>
+        <param name="graylogHost" value="udp:logging.udp.dev.globoi.com"/>
+        <param name="graylogPort" value="12201"/>
+        <param name="originHost" value="maquinadevlocal.com"/>
+        <param name="extractStacktrace" value="true"/>
+        <param name="onlyShortMessage" value="true"/>
+        <param name="addExtendedInformation" value="true"/>
+        <param name="sendTimeout" value="200000"/>
+        <param name="facility" value="gelf-java"/>
+        <param name="retry" value="false"/>
+        <param name="blocking" value="false"/>
+        <param name="debug" value="true"/>
+        <param name="additionalFields" value="{'tags':'cloudstack', 'app': 'cloudstack'}"/>
+    </appender>
 
    <appender name="APISERVER" class="org.apache.log4j.rolling.RollingFileAppender">
       <param name="Append" value="true"/>
@@ -194,6 +210,7 @@ under the License.
       <appender-ref ref="SYSLOG"/>
       <appender-ref ref="CONSOLE"/>
       <appender-ref ref="FILE"/>
+      <appender-ref ref="graylog"/>
    </root>
 
 </log4j:configuration>
