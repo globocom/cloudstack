@@ -29,10 +29,9 @@ import javax.net.SocketFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
 
+import junit.framework.TestCase;
 import streamer.debug.MockServer;
 import streamer.debug.MockServer.Packet;
 
@@ -93,7 +92,6 @@ public class MockServerTest extends TestCase {
 
     @Test
     public void testIsMockServerCanUpgradeConnectionToSsl() throws Exception {
-
         final byte[] mockClientData1 = new byte[] {0x01, 0x02, 0x03};
         final byte[] mockServerData1 = new byte[] {0x03, 0x02, 0x01};
 

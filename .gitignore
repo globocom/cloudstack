@@ -17,7 +17,6 @@
 
 build/replace.properties
 build/build.number
-bin/
 .lock-wscript
 .waf-*
 waf-*
@@ -29,7 +28,6 @@ dist/
 *.bak
 cloud-*.tar.bz2
 *.log
-*.log*
 *.pyc
 *.egginfo/
 *.egg-info/
@@ -39,7 +37,6 @@ build.number
 cloud.log.*.*
 unittest
 deps/cloud.userlibraries
-deps/awsapi-lib/
 .DS_Store
 .idea
 *.iml
@@ -54,20 +51,20 @@ tools/cli/build/
 *.jar
 *.war
 *.mar
-*.zip
 *.iso
 *.tar.gz
 *.tgz
-.*
+
+# this ignores _all files starting with '.'. Don't do that!
+#.*
+
 target-eclipse
-awsapi/modules/*
 !.gitignore
 .classpath
 .settings.xml
 .settings/
 db.properties.override
 replace.properties.override
-awsapi/overlays/
 tools/marvin/marvin/cloudstackAPI/*
 *.egg-info/
 docs/tmp
@@ -87,7 +84,6 @@ configure-stamp
 *_flymake.js
 engine/storage/integration-test/test-output
 tools/apidoc/log/
-log/
 plugins/network-elements/juniper-contrail/logs/
 scripts/vm/hypervisor/xenserver/vhd-util
 *.orig
@@ -96,5 +92,10 @@ tools/appliance/box/
 .checkstyle
 .pmd
 .pmdruleset.xml
-test/integration/globo/test-result.xml
-api/test/META-INF
+.pydevproject
+systemvm/.pydevproject
+test/.pydevprojec
+plugins/hypervisors/kvm/.pydevproject
+scripts/.pydevproject
+*.qcow2
+*.raw

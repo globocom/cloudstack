@@ -24,7 +24,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -59,10 +58,10 @@ import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.SearchCriteria.Func;
 import com.cloud.utils.db.TransactionLegacy;
+import com.cloud.utils.db.UpdateBuilder;
 import com.cloud.utils.exception.CloudRuntimeException;
 
 @Component
-@Local(value = {VMTemplateDao.class})
 public class VMTemplateDaoImpl extends GenericDaoBase<VMTemplateVO, Long> implements VMTemplateDao {
     private static final Logger s_logger = Logger.getLogger(VMTemplateDaoImpl.class);
 
@@ -104,6 +103,8 @@ public class VMTemplateDaoImpl extends GenericDaoBase<VMTemplateVO, Long> implem
     private SearchBuilder<VMTemplateVO> UserIsoSearch;
     private GenericSearchBuilder<VMTemplateVO, Long> CountTemplatesByAccount;
     // private SearchBuilder<VMTemplateVO> updateStateSearch;
+    private SearchBuilder<VMTemplateVO> AllFieldsSearch;
+    protected SearchBuilder<VMTemplateVO> ParentTemplateIdSearch;
 
     @Inject
     ResourceTagDao _tagsDao;
@@ -133,6 +134,14 @@ public class VMTemplateDaoImpl extends GenericDaoBase<VMTemplateVO, Long> implem
         SearchCriteria<VMTemplateVO> sc = NameSearch.create();
         sc.setParameters("name", templateName);
         return findOneIncludingRemovedBy(sc);
+    }
+
+    @Override
+    public List<VMTemplateVO> listByParentTemplatetId(long parentTemplatetId) {
+        SearchCriteria<VMTemplateVO> sc = ParentTemplateIdSearch.create();
+        sc.setParameters("parentTemplateId", parentTemplatetId);
+        sc.setParameters("state", VirtualMachineTemplate.State.Active);
+        return listBy(sc);
     }
 
     @Override
@@ -370,7 +379,7 @@ public class VMTemplateDaoImpl extends GenericDaoBase<VMTemplateVO, Long> implem
         tmpltZoneSearch.and("zoneId", tmpltZoneSearch.entity().getZoneId(), SearchCriteria.Op.EQ);
 
         TmpltsInZoneSearch = createSearchBuilder();
-        TmpltsInZoneSearch.and("state", TmpltsInZoneSearch.entity().getState(), SearchCriteria.Op.EQ);
+        TmpltsInZoneSearch.and("state", TmpltsInZoneSearch.entity().getState(), SearchCriteria.Op.IN);
         TmpltsInZoneSearch.and().op("avoidtype", TmpltsInZoneSearch.entity().getTemplateType(), SearchCriteria.Op.NEQ);
         TmpltsInZoneSearch.or("templateType", TmpltsInZoneSearch.entity().getTemplateType(), SearchCriteria.Op.NULL);
         TmpltsInZoneSearch.cp();
@@ -379,7 +388,7 @@ public class VMTemplateDaoImpl extends GenericDaoBase<VMTemplateVO, Long> implem
         TmpltsInZoneSearch.done();
 
         ActiveTmpltSearch = createSearchBuilder();
-        ActiveTmpltSearch.and("state", ActiveTmpltSearch.entity().getState(), SearchCriteria.Op.EQ);
+        ActiveTmpltSearch.and("state", ActiveTmpltSearch.entity().getState(), SearchCriteria.Op.IN);
 
         CountTemplatesByAccount = createSearchBuilder(Long.class);
         CountTemplatesByAccount.select(null, Func.COUNT, null);
@@ -392,6 +401,21 @@ public class VMTemplateDaoImpl extends GenericDaoBase<VMTemplateVO, Long> implem
         //        updateStateSearch.and("state", updateStateSearch.entity().getState(), Op.EQ);
         //        updateStateSearch.and("updatedCount", updateStateSearch.entity().getUpdatedCount(), Op.EQ);
         //        updateStateSearch.done();
+
+        AllFieldsSearch = createSearchBuilder();
+        AllFieldsSearch.and("state", AllFieldsSearch.entity().getState(), SearchCriteria.Op.EQ);
+        AllFieldsSearch.and("accountId", AllFieldsSearch.entity().getAccountId(), SearchCriteria.Op.EQ);
+        AllFieldsSearch.and("id", AllFieldsSearch.entity().getId(), SearchCriteria.Op.EQ);
+        AllFieldsSearch.and("destroyed", AllFieldsSearch.entity().getState(), SearchCriteria.Op.EQ);
+        AllFieldsSearch.and("notDestroyed", AllFieldsSearch.entity().getState(), SearchCriteria.Op.NEQ);
+        AllFieldsSearch.and("updatedCount", AllFieldsSearch.entity().getUpdatedCount(), SearchCriteria.Op.EQ);
+        AllFieldsSearch.and("name", AllFieldsSearch.entity().getName(), SearchCriteria.Op.EQ);
+        AllFieldsSearch.done();
+
+        ParentTemplateIdSearch = createSearchBuilder();
+        ParentTemplateIdSearch.and("parentTemplateId", ParentTemplateIdSearch.entity().getParentTemplateId(), SearchCriteria.Op.EQ);
+        ParentTemplateIdSearch.and("state", ParentTemplateIdSearch.entity().getState(), SearchCriteria.Op.EQ);
+        ParentTemplateIdSearch.done();
 
         return result;
     }
@@ -761,7 +785,7 @@ public class VMTemplateDaoImpl extends GenericDaoBase<VMTemplateVO, Long> implem
             tmpltZoneVO = new VMTemplateZoneVO(zoneId, tmplt.getId(), new Date());
             _templateZoneDao.persist(tmpltZoneVO);
         } else {
-            tmpltZoneVO.setRemoved(null);
+            tmpltZoneVO.setRemoved(GenericDaoBase.DATE_TO_NULL);
             tmpltZoneVO.setLastUpdated(new Date());
             _templateZoneDao.update(tmpltZoneVO.getId(), tmpltZoneVO);
         }
@@ -781,9 +805,25 @@ public class VMTemplateDaoImpl extends GenericDaoBase<VMTemplateVO, Long> implem
     }
 
     @Override
+    public List<VMTemplateVO> listInZoneByState(long dataCenterId, VirtualMachineTemplate.State... states) {
+        SearchCriteria<VMTemplateVO> sc = TmpltsInZoneSearch.create();
+        sc.setParameters("avoidtype", TemplateType.PERHOST.toString());
+        sc.setParameters("state", (Object[])states);
+        sc.setJoinParameters("tmpltzone", "zoneId", dataCenterId);
+        return listBy(sc);
+    }
+
+    @Override
     public List<VMTemplateVO> listAllActive() {
         SearchCriteria<VMTemplateVO> sc = ActiveTmpltSearch.create();
         sc.setParameters("state", VirtualMachineTemplate.State.Active.toString());
+        return listBy(sc);
+    }
+
+    @Override
+    public List<VMTemplateVO> listByState(VirtualMachineTemplate.State... states) {
+        SearchCriteria<VMTemplateVO> sc = ActiveTmpltSearch.create();
+        sc.setParameters("state", (Object[])states);
         return listBy(sc);
     }
 
@@ -1000,4 +1040,64 @@ public class VMTemplateDaoImpl extends GenericDaoBase<VMTemplateVO, Long> implem
      * return templateZonePairList; }
      */
 
+    @Override
+    public boolean updateState(
+            com.cloud.template.VirtualMachineTemplate.State currentState,
+            com.cloud.template.VirtualMachineTemplate.Event event,
+            com.cloud.template.VirtualMachineTemplate.State nextState,
+            VirtualMachineTemplate vo, Object data) {
+
+        Long oldUpdated = vo.getUpdatedCount();
+        Date oldUpdatedTime = vo.getUpdated();
+
+        SearchCriteria<VMTemplateVO> sc = AllFieldsSearch.create();
+        sc.setParameters("id", vo.getId());
+        sc.setParameters("state", currentState);
+        sc.setParameters("updatedCount", vo.getUpdatedCount());
+
+        vo.incrUpdatedCount();
+
+        UpdateBuilder builder = getUpdateBuilder(vo);
+        builder.set(vo, "state", nextState);
+        builder.set(vo, "updated", new Date());
+
+        int rows = update((VMTemplateVO)vo, sc);
+        if (rows == 0 && s_logger.isDebugEnabled()) {
+            VMTemplateVO dbTemplate = findByIdIncludingRemoved(vo.getId());
+            if (dbTemplate != null) {
+                StringBuilder str = new StringBuilder("Unable to update ").append(vo.toString());
+                str.append(": DB Data={id=")
+                    .append(dbTemplate.getId())
+                    .append("; state=")
+                    .append(dbTemplate.getState())
+                    .append("; updatecount=")
+                    .append(dbTemplate.getUpdatedCount())
+                    .append(";updatedTime=")
+                    .append(dbTemplate.getUpdated());
+                str.append(": New Data={id=")
+                    .append(vo.getId())
+                    .append("; state=")
+                    .append(nextState)
+                    .append("; event=")
+                    .append(event)
+                    .append("; updatecount=")
+                    .append(vo.getUpdatedCount())
+                    .append("; updatedTime=")
+                    .append(vo.getUpdated());
+                str.append(": stale Data={id=")
+                    .append(vo.getId())
+                    .append("; state=")
+                    .append(currentState)
+                    .append("; event=")
+                    .append(event)
+                    .append("; updatecount=")
+                    .append(oldUpdated)
+                    .append("; updatedTime=")
+                    .append(oldUpdatedTime);
+            } else {
+                s_logger.debug("Unable to update template: id=" + vo.getId() + ", as no such template exists in the database anymore");
+            }
+        }
+        return rows > 0;
+    }
 }

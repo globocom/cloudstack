@@ -18,7 +18,6 @@ package com.cloud.api.query.dao;
 
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
@@ -41,7 +40,6 @@ import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
 
 @Component
-@Local(value = {AccountJoinDao.class})
 public class AccountJoinDaoImpl extends GenericDaoBase<AccountJoinVO, Long> implements AccountJoinDao {
     public static final Logger s_logger = Logger.getLogger(AccountJoinDaoImpl.class);
 
@@ -164,8 +162,8 @@ public class AccountJoinDaoImpl extends GenericDaoBase<AccountJoinVO, Long> impl
         response.setTemplateAvailable(templateAvail);
 
         // Get stopped and running VMs
-        response.setVmStopped(account.getVmStopped());
-        response.setVmRunning(account.getVmRunning());
+        response.setVmStopped(account.getVmStopped()!=null ? account.getVmStopped() : 0);
+        response.setVmRunning(account.getVmRunning()!=null ? account.getVmRunning() : 0);
 
         //get resource limits for networks
         long networkLimit = ApiDBUtils.findCorrectResourceLimit(account.getNetworkLimit(), account.getId(), ResourceType.network);
@@ -216,7 +214,7 @@ public class AccountJoinDaoImpl extends GenericDaoBase<AccountJoinVO, Long> impl
         //get resource limits for secondary storage space and convert it from Bytes to GiB
         long secondaryStorageLimit = ApiDBUtils.findCorrectResourceLimit(account.getSecondaryStorageLimit(), account.getId(), ResourceType.secondary_storage);
         String secondaryStorageLimitDisplay = (fullView || secondaryStorageLimit == -1) ? "Unlimited" : String.valueOf(secondaryStorageLimit / ResourceType.bytesToGiB);
-        long secondaryStorageTotal = (account.getSecondaryStorageTotal() == null) ? 0 : (account.getSecondaryStorageTotal() / ResourceType.bytesToGiB);
+        float secondaryStorageTotal = (account.getSecondaryStorageTotal() == null) ? 0 : (account.getSecondaryStorageTotal() / (ResourceType.bytesToGiB * 1f));
         String secondaryStorageAvail = (fullView || secondaryStorageLimit == -1) ? "Unlimited" : String.valueOf((secondaryStorageLimit / ResourceType.bytesToGiB)
                 - secondaryStorageTotal);
 

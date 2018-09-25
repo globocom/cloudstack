@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import javax.ejb.Local;
 
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -38,7 +37,6 @@ import com.cloud.utils.db.SearchCriteria.Op;
 import com.cloud.utils.db.TransactionLegacy;
 
 @Component
-@Local(value = {HostPodDao.class})
 public class HostPodDaoImpl extends GenericDaoBase<HostPodVO, Long> implements HostPodDao {
     private static final Logger s_logger = Logger.getLogger(HostPodDaoImpl.class);
 
@@ -132,9 +130,19 @@ public class HostPodDaoImpl extends GenericDaoBase<HostPodVO, Long> implements H
     }
 
     @Override
-    public List<Long> listAllPods(long zoneId) {
+    public List<Long> listAllPods(Long zoneId) {
         SearchCriteria<Long> sc = PodIdSearch.create();
-        sc.addAnd("dataCenterId", SearchCriteria.Op.EQ, zoneId);
+        if (zoneId != null) {
+            sc.addAnd("dataCenterId", SearchCriteria.Op.EQ, zoneId);
+        }
         return customSearch(sc, null);
     }
+    @Override
+    public List<HostPodVO> listAllPodsByCidr(long zoneId, String cidr) {
+        SearchCriteria<HostPodVO> sc = DataCenterAndNameSearch.create();
+        sc.setParameters("dataCenterId", zoneId);
+        sc.setParameters("cidr_address", cidr);
+        return listBy(sc);
+    }
+
 }

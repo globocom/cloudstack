@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -59,7 +58,6 @@ import com.cloud.network.dao.NetworkServiceMapDao;
 import com.cloud.network.dao.PhysicalNetworkDao;
 import com.cloud.network.element.IpDeployer;
 import com.cloud.network.element.LoadBalancingServiceProvider;
-import com.cloud.network.element.NetworkElement;
 import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.network.lb.LoadBalancingRulesManager;
 import com.cloud.network.rules.LbStickinessMethod;
@@ -77,7 +75,6 @@ import com.globo.globonetwork.cloudstack.resource.GloboNetworkResource;
 import com.google.gson.Gson;
 
 @Component
-@Local(value = {NetworkElement.class, LoadBalancingServiceProvider.class})
 public class GloboNetworkElement extends ExternalLoadBalancerDeviceManagerImpl implements LoadBalancingServiceProvider, IpDeployer, ExternalLoadBalancerDeviceManager {
     private static final Logger s_logger = Logger.getLogger(GloboNetworkElement.class);
 
@@ -269,6 +266,11 @@ public class GloboNetworkElement extends ExternalLoadBalancerDeviceManagerImpl i
     @Override
     public List<LoadBalancerTO> updateHealthChecks(Network network, List<LoadBalancingRule> lbrules) {
         return null;
+    }
+
+    @Override
+    public boolean handlesOnlyRulesInTransitionState() {
+        return true;
     }
 
     @Override

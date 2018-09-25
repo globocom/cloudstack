@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 
 import org.springframework.stereotype.Component;
 
@@ -35,7 +34,6 @@ import com.cloud.utils.db.TransactionLegacy;
 import com.cloud.utils.exception.CloudRuntimeException;
 
 @Component
-@Local(value = HostDetailsDao.class)
 public class HostDetailsDaoImpl extends GenericDaoBase<DetailVO, Long> implements HostDetailsDao {
     protected final SearchBuilder<DetailVO> HostSearch;
     protected final SearchBuilder<DetailVO> DetailSearch;
@@ -67,10 +65,13 @@ public class HostDetailsDaoImpl extends GenericDaoBase<DetailVO, Long> implement
     @Override
     public Map<String, String> findDetails(long hostId) {
         SearchCriteria<DetailVO> sc = HostSearch.create();
+
         sc.setParameters("hostId", hostId);
 
         List<DetailVO> results = search(sc, null);
+
         Map<String, String> details = new HashMap<String, String>(results.size());
+
         for (DetailVO result : results) {
             if ("password".equals(result.getName())) {
                 details.put(result.getName(), DBEncryptionUtil.decrypt(result.getValue()));
@@ -78,6 +79,7 @@ public class HostDetailsDaoImpl extends GenericDaoBase<DetailVO, Long> implement
                 details.put(result.getName(), result.getValue());
             }
         }
+
         return details;
     }
 

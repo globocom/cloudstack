@@ -40,6 +40,7 @@ import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.vm.VirtualMachineProfile;
 import com.google.gson.Gson;
+import org.apache.cloudstack.acl.RoleType;
 import org.apache.cloudstack.api.AddBaremetalRctCmd;
 import org.apache.cloudstack.api.DeleteBaremetalRctCmd;
 import org.apache.cloudstack.api.ListBaremetalRctCmd;
@@ -50,7 +51,6 @@ import javax.inject.Inject;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -72,7 +72,7 @@ public class BaremetalVlanManagerImpl extends ManagerBase implements BaremetalVl
     @Inject
     private AccountManager acntMgr;
 
-    private Map<String, BaremetalSwitchBackend> backends = new HashMap<>();
+    private Map<String, BaremetalSwitchBackend> backends;
 
     private class RackPair {
         BaremetalRct.Rack rack;
@@ -112,6 +112,7 @@ public class BaremetalVlanManagerImpl extends ManagerBase implements BaremetalVl
             BaremetalRctResponse rsp = new BaremetalRctResponse();
             rsp.setUrl(vo.getUrl());
             rsp.setId(vo.getUuid());
+            rsp.setObjectName("baremetalrct");
             return rsp;
         } catch (MalformedURLException e) {
             throw new IllegalArgumentException(String.format("%s is not a legal http url", cmd.getRctUrl()));
@@ -247,6 +248,8 @@ public class BaremetalVlanManagerImpl extends ManagerBase implements BaremetalVl
         acnt.setUuid(UUID.randomUUID().toString());
         acnt.setState(Account.State.enabled);
         acnt.setDomainId(1);
+        acnt.setType(RoleType.User.getAccountType());
+        acnt.setRoleId(RoleType.User.getId());
         acnt = acntDao.persist(acnt);
 
         UserVO user = new UserVO();

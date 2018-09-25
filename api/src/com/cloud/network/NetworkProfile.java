@@ -16,11 +16,11 @@
 // under the License.
 package com.cloud.network;
 
-import java.net.URI;
-
 import com.cloud.network.Networks.BroadcastDomainType;
 import com.cloud.network.Networks.Mode;
 import com.cloud.network.Networks.TrafficType;
+
+import java.net.URI;
 
 public class NetworkProfile implements Network {
     private final long id;
@@ -32,6 +32,7 @@ public class NetworkProfile implements Network {
     private String dns2;
     private URI broadcastUri;
     private final State state;
+    private boolean isRedundant;
     private final String name;
     private final Mode mode;
     private final BroadcastDomainType broadcastDomainType;
@@ -56,6 +57,7 @@ public class NetworkProfile implements Network {
     private Long networkAclId;
     private final String guruName;
     private boolean strechedL2Subnet;
+    private String externalId;
 
     public NetworkProfile(Network network) {
         id = network.getId();
@@ -89,6 +91,8 @@ public class NetworkProfile implements Network {
         networkAclId = network.getNetworkACLId();
         guruName = network.getGuruName();
         strechedL2Subnet = network.isStrechedL2Network();
+        isRedundant = network.isRedundant();
+        externalId = network.getExternalId();
     }
 
     public String getDns1() {
@@ -144,6 +148,16 @@ public class NetworkProfile implements Network {
     @Override
     public State getState() {
         return state;
+    }
+
+    @Override
+    public boolean isRedundant() {
+        return this.isRedundant;
+    }
+
+    @Override
+    public boolean isRollingRestart() {
+        return false;
     }
 
     @Override
@@ -291,6 +305,11 @@ public class NetworkProfile implements Network {
     @Override
     public boolean isStrechedL2Network() {
         return false;
+    }
+
+    @Override
+    public String getExternalId() {
+        return externalId;
     }
 
 }

@@ -48,11 +48,11 @@
 
             // Description text
             var formDesc;
-            if (typeof(args.form.desc) == 'function') {            	
-            	formDesc = args.form.desc(args);
+            if (typeof(args.form.desc) == 'function') {
+                formDesc = args.form.desc(args);
             } else { //typeof(args.form.desc) == 'string' or 'undefined'
-            	formDesc = args.form.desc;
-            }              
+                formDesc = args.form.desc;
+            }
             $('<span>').addClass('message').prependTo($formContainer).html(
                 _l(formDesc)
             );
@@ -193,11 +193,12 @@
                         );
 
                 // red asterisk
-                var $astersikSpan = $('<span>').addClass('field-required').html('*');
-                $name.find('label').prepend($astersikSpan);
+                var $asterisk = $('<span>').addClass('field-required').html('*');
 
-                if (field.validation == null || field.validation.required == false) {
-                    $astersikSpan.hide();
+                $name.find('label').prepend($asterisk);
+
+                if (field.validation == null || !field.validation.required) {
+                    $asterisk.hide();
                 }
 
                 // Tooltip description
@@ -224,7 +225,7 @@
 
                     if ($dependsOn.is('[type=checkbox]')) {
                         var isReverse = false;
-                        
+
                         if (args.form.fields[dependsOn]) {
                             isReverse = args.form.fields[dependsOn].isReverse;
                             isChecked = args.form.fields[dependsOn].isChecked;
@@ -237,10 +238,10 @@
 
                             if (($target.is(':checked') && !isReverse) ||
                                 ($target.is(':unchecked') && isReverse)) {
-                                
-                            	$dependent.css('display', 'inline-block'); //show dependent dropdown field
+
+                                $dependent.css('display', 'inline-block'); //show dependent dropdown field
                                 $dependent.change(); //trigger event handler for default option in dependent dropdown field (CLOUDSTACK-7826)
-                                
+
                                 $dependent.each(function() {
                                     if ($(this).data('dialog-select-fn')) {
                                         $(this).data('dialog-select-fn')();
@@ -282,21 +283,38 @@
                                 $dependsOn.attr('checked', true);
                             }
                         }
+                    } else  if (typeof(field.isHidden) == 'function') {
+                        //If a checkbox depends on a field. Call the isHidden function of the checkbox.
+                        $dependsOn.bind('change', function(event) {
+                            var $target = $(this);
+                            var $dependent = $target.closest('form').find('[depends-on=\'' + dependsOn + '\']');
+                            $dependsOn.attr('checked', isChecked);
+                            if (field.isHidden(args)) {
+                                $dependent.hide();
+                            } else {
+                                $dependent.show();
+                            }
+                        });
                     }
                 }
 
                 // Determine field type of input
                 if (field.select) {
+                    var multiple = false;
+                    if (field.isMultiple != null){
+                        if (typeof(field.isMultiple) == 'boolean' && field.isMultiple == true)
+                            multiple = true;
+                    }
                     isAsync = true;
                     selectArgs = {
                         context: args.context,
                         response: {
                             success: function(args) {
-                            	if (args.data == undefined || args.data.length == 0) {
-                            		var $option = $('<option>')
-                                    .appendTo($input)                                    
+                                if (args.data == undefined || args.data.length == 0) {
+                                    var $option = $('<option>')
+                                    .appendTo($input)
                                     .html("");
-                            	} else {
+                                } else {
                                 $(args.data).each(function() {
                                     var id;
                                     if (field.valueField)
@@ -316,7 +334,7 @@
                                             .data('json-obj', this)
                                             .html(_s(desc));
                                 });
-                            	}
+                                }
 
                                 if (field.defaultValue) {
                                     $input.val(_s(strOrFunc(field.defaultValue, args.data)));
@@ -332,10 +350,18 @@
                     };
 
                     selectFn = field.select;
-                    $input = $('<select>')
-                        .attr({
+                    var attrib = {};
+                    if (multiple)
+                        attrib = {
+                            name: key,
+                            multiple: 'multiple'
+                        };
+                    else
+                        attrib = {
                             name: key
-                        })
+                        }
+                    $input = $('<select>')
+                        .attr(attrib)
                         .data('dialog-select-fn', function(args) {
                             selectFn(args ? $.extend(true, {}, selectArgs, args) : selectArgs);
                         })
@@ -421,14 +447,14 @@
                             name: key,
                             type: 'checkbox'
                         }).appendTo($value);
-                    	var isChecked;
-                    	if (typeof (field.isChecked) == 'function') {
-                    	    isChecked = field.isChecked(args);
-                    	} else {
-                    	    isChecked = field.isChecked;
-                    	}
+                        var isChecked;
+                        if (typeof (field.isChecked) == 'function') {
+                            isChecked = field.isChecked(args);
+                        } else {
+                            isChecked = field.isChecked;
+                        }
                         if (isChecked) {
-                        	$input.attr('checked', strOrFunc(field.isChecked, args));
+                            $input.attr('checked', strOrFunc(field.isChecked, args));
                         } else {
                             // This is mainly for IE compatibility
                             setTimeout(function() {
@@ -485,6 +511,16 @@
                     if (field.defaultValue) {
                         $input.val(strOrFunc(field.defaultValue));
                     }
+                } else if (field.isFileUpload) {
+                    $input = $('<input>').attr({
+                        type: 'file',
+                        name: 'files[]'
+                    }).appendTo($value);
+
+                    // Add events
+                    $input.change(function(event) {
+                        $form.data('files', event.target.files);
+                    });
                 } else if (field.isTokenInput) { // jquery.tokeninput.js
                     isAsync = true;
 
@@ -528,7 +564,9 @@
                     }
                     $input.addClass("disallowSpecialCharacters");
                     $input.datepicker({
-                        dateFormat: 'yy-mm-dd'
+			dateFormat: 'yy-mm-dd',
+			maxDate: field.maxDate,
+			minDate: field.minDate
                     });
 
                 } else if (field.range) { //2 text fields on the same line (e.g. port range: startPort - endPort)
@@ -636,8 +674,14 @@
                 $input.attr('id', inputId);
                 $name.find('label').attr('for', inputId);
 
-                if (field.isDisabled)
-                    $input.attr("disabled", "disabled");
+                if(field.isDisabled ){
+                    if(typeof(field.isDisabled) == 'boolean' && field.isDisabled == true){
+                        $input.attr("disabled","disabled");
+                    }
+                    else if (typeof(field.isDisabled) == 'function' && field.isDisabled(args) == true){
+                        $input.attr("disabled","disabled");
+                    }
+                }
 
                 // Tooltip
                 if (field.docID) {
@@ -680,12 +724,131 @@
                     }
                 }
 
-                args.after({
-                    data: data,
-                    ref: args.ref, // For backwards compatibility; use context
-                    context: args.context,
-                    $form: $form
-                });
+                var uploadFiles = function() {
+                    $form.prepend($('<div>').addClass('loading-overlay'));
+                    args.form.fileUpload.getURL({
+                        $form: $form,
+                        formData: data,
+                        context: args.context,
+                        response: {
+                            success: function(successArgs) {
+                                var $file = $form.find('input[type=file]');
+                                var postUploadArgs = {
+                                    $form: $form,
+                                    data: data,
+                                    context: args.context,
+                                    response: {
+                                        success: function() {
+                                            args.after({
+                                                data: data,
+                                                ref: args.ref, // For backwards compatibility; use context
+                                                context: args.context,
+                                                $form: $form
+                                            });
+
+                                            $('div.overlay').remove();
+                                            $form.find('.loading-overlay').remove();
+                                            $('div.loading-overlay').remove();
+
+                                            $('.tooltip-box').remove();
+                                            $formContainer.remove();
+                                            $(this).dialog('destroy');
+
+                                            $('.hovered-elem').hide();
+                                        },
+                                        error: function(msg) {
+                                            $('div.overlay').remove();
+                                            $form.find('.loading-overlay').remove();
+                                            $('div.loading-overlay').remove();
+
+                                            cloudStack.dialog.error({ message: msg });
+                                        }
+                                    }
+                                };
+                                var postUploadArgsWithStatus = $.extend(true, {}, postUploadArgs);
+
+                                if(successArgs.ajaxPost) {
+                                    var request = new FormData();
+                                    request.append('file', $file.prop("files")[0]);
+                                    $.ajax({
+                                            type: 'POST',
+                                            url: successArgs.url,
+                                            data: request,
+                                            dataType : 'html',
+                                            processData: false,
+                                            contentType: false,
+                                            headers: successArgs.data,
+                                            success: function(r) {
+                                                postUploadArgsWithStatus.error = false;
+                                                args.form.fileUpload.postUpload(postUploadArgsWithStatus);
+                                            },
+                                            error: function(r) {
+                                                postUploadArgsWithStatus.error = true;
+                                                postUploadArgsWithStatus.errorMsg = r.responseText;
+                                                args.form.fileUpload.postUpload(postUploadArgsWithStatus);
+                                            }
+                                        });
+                                } else {
+                                    //
+                                    // Move file field into iframe; keep visible for consistency
+                                    //
+                                    var $uploadFrame = $('<iframe>');
+                                    var $frameForm = $('<form>').attr({
+                                        method: 'POST',
+                                        action: successArgs.url,
+                                        enctype: 'multipart/form-data'
+                                    });
+                                    var $field = $file.closest('.form-item .value');
+
+                                    // Add additional passed data
+                                    $.map(successArgs.data, function(v, k) {
+                                        var $hidden = $('<input>').attr({
+                                            type: 'hidden',
+                                            name: k,
+                                            value: v
+                                        });
+
+                                        $hidden.appendTo($frameForm);
+
+                                    });
+
+                                    console.log("The following object is a hidden HTML form that will submit local file with hidden field signature/expires/metadata:");
+                                    console.log($frameForm);
+
+                                    $uploadFrame.css({ width: $field.outerWidth(), height: $field.height() }).show();
+                                    $frameForm.append($file);
+                                    $field.append($uploadFrame);
+                                    $uploadFrame.contents().find('html body').append($frameForm);
+                                    $frameForm.submit(function() {
+                                        console.log("callback() in $frameForm.submit(callback(){}) is triggered");
+                                        $uploadFrame.load(function() {
+                                            console.log("callback() in $uploadFrame.load(callback(){}) is triggered");
+                                            args.form.fileUpload.postUpload(postUploadArgs);
+                                        });
+                                        return true;
+                                    });
+                                    $frameForm.submit();
+                                }
+                            },
+                            error: function(msg) {
+                                cloudStack.dialog.error({ message: msg });
+                            }
+                        }
+                    });
+                };
+
+                if ($form.data('files')) {
+                    uploadFiles();
+
+                    return false;
+                } else {
+                    args.after({
+                        data: data,
+                        ref: args.ref, // For backwards compatibility; use context
+                        context: args.context,
+                        $form: $form
+                    });
+                }
 
                 return true;
             };
@@ -745,7 +908,7 @@
 
             $listView.dialog({
                 dialogClass: 'multi-edit-add-list panel',
-                width: 825,
+                width: 900,
                 title: args.listView.title ? args.listView.title : _l('Select VM'),
                 buttons: [{
                     text: args.listView.applyButton ? args.listView.applyButton : _l('label.apply'),
@@ -838,7 +1001,7 @@
                     _l(args.message)
                 )
             ).dialog({
-                title: _l('label.confirmation'),
+                title: args.isWarning ? _l('label.warning') : _l('label.confirmation'),
                 dialogClass: args.isWarning ? 'confirm warning': 'confirm',
                 closeOnEscape: false,
                 zIndex: 5000,

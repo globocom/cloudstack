@@ -17,10 +17,8 @@
 package com.cloud.agent;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -37,7 +35,6 @@ import javax.naming.ConfigurationException;
 import org.apache.commons.daemon.Daemon;
 import org.apache.commons.daemon.DaemonContext;
 import org.apache.commons.daemon.DaemonInitException;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
@@ -53,6 +50,7 @@ import com.cloud.utils.PropertiesUtil;
 import com.cloud.utils.backoff.BackoffAlgorithm;
 import com.cloud.utils.backoff.impl.ConstantTimeBackoff;
 import com.cloud.utils.exception.CloudRuntimeException;
+import com.google.common.base.Strings;
 
 public class AgentShell implements IAgentShell, Daemon {
     private static final Logger s_logger = Logger.getLogger(AgentShell.class.getName());
@@ -70,10 +68,14 @@ public class AgentShell implements IAgentShell, Daemon {
     private int _proxyPort;
     private int _workers;
     private String _guid;
+    private int _hostCounter = 0;
     private int _nextAgentId = 1;
     private volatile boolean _exit = false;
     private int _pingRetries;
     private final List<Agent> _agents = new ArrayList<Agent>();
+    private String hostToConnect;
+    private String connectedHost;
+    private Long preferredHostCheckInterval;
 
     public AgentShell() {
     }
@@ -109,8 +111,54 @@ public class AgentShell implements IAgentShell, Daemon {
     }
 
     @Override
-    public String getHost() {
-        return _host;
+    public String getNextHost() {
+        final String[] hosts = getHosts();
+        if (_hostCounter >= hosts.length) {
+            _hostCounter = 0;
+        }
+        hostToConnect = hosts[_hostCounter % hosts.length];
+        _hostCounter++;
+        return hostToConnect;
+    }
+
+    @Override
+    public String getConnectedHost() {
+        return connectedHost;
+    }
+
+    @Override
+    public long getLbCheckerInterval(final Long receivedLbInterval) {
+        if (preferredHostCheckInterval != null) {
+            return preferredHostCheckInterval * 1000L;
+        }
+        if (receivedLbInterval != null) {
+            return receivedLbInterval * 1000L;
+        }
+        return 0L;
+    }
+
+    @Override
+    public void updateConnectedHost() {
+        connectedHost = hostToConnect;
+    }
+
+
+    @Override
+    public void resetHostCounter() {
+        _hostCounter = 0;
+    }
+
+    @Override
+    public String[] getHosts() {
+        return _host.split(",");
+    }
+
+    @Override
+    public void setHosts(final String host) {
+        if (!Strings.isNullOrEmpty(host)) {
+            _host = host.split(hostLbAlgorithmSeparator)[0];
+            resetHostCounter();
+        }
     }
 
     @Override
@@ -174,16 +222,12 @@ public class AgentShell implements IAgentShell, Daemon {
 
         s_logger.info("agent.properties found at " + file.getAbsolutePath());
 
-        InputStream propertiesStream = null;
         try {
-            propertiesStream = new FileInputStream(file);
-            _properties.load(propertiesStream);
+            PropertiesUtil.loadFromFile(_properties, file);
         } catch (final FileNotFoundException ex) {
             throw new CloudRuntimeException("Cannot find the file: " + file.getAbsolutePath(), ex);
         } catch (final IOException ex) {
             throw new CloudRuntimeException("IOException in reading " + file.getAbsolutePath(), ex);
-        } finally {
-            IOUtils.closeQuietly(propertiesStream);
         }
     }
 
@@ -247,7 +291,8 @@ public class AgentShell implements IAgentShell, Daemon {
         if (host == null) {
             host = "localhost";
         }
-        _host = host;
+
+        setHosts(host);
 
         if (zone != null)
             _zone = zone;
@@ -286,6 +331,9 @@ public class AgentShell implements IAgentShell, Daemon {
             _guid = UUID.randomUUID().toString();
             _properties.setProperty("guid", _guid);
         }
+
+        String val = getProperty(null, preferredHostIntervalKey);
+        preferredHostCheckInterval = (Strings.isNullOrEmpty(val) ? null : Long.valueOf(val));
 
         return true;
     }
@@ -371,7 +419,7 @@ public class AgentShell implements IAgentShell, Daemon {
                 final Constructor<?> constructor = impl.getDeclaredConstructor();
                 constructor.setAccessible(true);
                 ServerResource resource = (ServerResource)constructor.newInstance();
-                launchAgent(getNextAgentId(), resource);
+                launchNewAgent(resource);
             } catch (final ClassNotFoundException e) {
                 throw new ConfigurationException("Resource class not found: " + name + " due to: " + e.toString());
             } catch (final SecurityException e) {
@@ -399,9 +447,10 @@ public class AgentShell implements IAgentShell, Daemon {
         s_logger.trace("Launching agent based on type=" + typeInfo);
     }
 
-    private void launchAgent(int localAgentId, ServerResource resource) throws ConfigurationException {
+    public void launchNewAgent(ServerResource resource) throws ConfigurationException {
         // we don't track agent after it is launched for now
-        Agent agent = new Agent(this, localAgentId, resource);
+        _agents.clear();
+        Agent agent = new Agent(this, getNextAgentId(), resource);
         _agents.add(agent);
         agent.start();
     }
@@ -416,12 +465,7 @@ public class AgentShell implements IAgentShell, Daemon {
             /* By default we only search for log4j.xml */
             LogUtils.initLog4j("log4j-cloud.xml");
 
-            /*
-                By default we disable IPv6 for now to maintain backwards
-                compatibility. At a later point in time we can change this
-                behavior to prefer IPv6 over IPv4.
-            */
-            boolean ipv6disabled = true;
+            boolean ipv6disabled = false;
             String ipv6 = getProperty(null, "ipv6disabled");
             if (ipv6 != null) {
                 ipv6disabled = Boolean.parseBoolean(ipv6);
@@ -471,6 +515,7 @@ public class AgentShell implements IAgentShell, Daemon {
                 while (!_exit)
                     Thread.sleep(1000);
             } catch (InterruptedException e) {
+                s_logger.debug("[ignored] AgentShell was interupted.");
             }
 
         } catch (final ConfigurationException e) {

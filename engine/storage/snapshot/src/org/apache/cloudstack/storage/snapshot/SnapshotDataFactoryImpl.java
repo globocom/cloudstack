@@ -23,8 +23,6 @@ import java.util.List;
 
 import javax.inject.Inject;
 
-import org.springframework.stereotype.Component;
-
 import org.apache.cloudstack.engine.subsystem.api.storage.DataObject;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataStore;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreManager;
@@ -39,7 +37,6 @@ import com.cloud.storage.SnapshotVO;
 import com.cloud.storage.dao.SnapshotDao;
 import com.cloud.utils.exception.CloudRuntimeException;
 
-@Component
 public class SnapshotDataFactoryImpl implements SnapshotDataFactory {
     @Inject
     SnapshotDao snapshotDao;
@@ -68,11 +65,32 @@ public class SnapshotDataFactoryImpl implements SnapshotDataFactory {
     }
 
     @Override
+    public List<SnapshotInfo> getSnapshots(long volumeId, DataStoreRole role) {
+
+        SnapshotDataStoreVO snapshotStore = snapshotStoreDao.findByVolume(volumeId, role);
+        if (snapshotStore == null) {
+            return new ArrayList<>();
+        }
+        DataStore store = storeMgr.getDataStore(snapshotStore.getDataStoreId(), role);
+        List<SnapshotVO> volSnapShots = snapshotDao.listByVolumeId(volumeId);
+        List<SnapshotInfo> infos = new ArrayList<>();
+        for(SnapshotVO snapshot: volSnapShots) {
+            SnapshotObject info = SnapshotObject.getSnapshotObject(snapshot, store);
+            infos.add(info);
+        }
+        return infos;
+    }
+
+
+    @Override
     public SnapshotInfo getSnapshot(long snapshotId, DataStoreRole role) {
         SnapshotVO snapshot = snapshotDao.findById(snapshotId);
         SnapshotDataStoreVO snapshotStore = snapshotStoreDao.findBySnapshot(snapshotId, role);
         if (snapshotStore == null) {
-            return null;
+            snapshotStore = snapshotStoreDao.findByVolume(snapshot.getVolumeId(), role);
+            if (snapshotStore == null) {
+                return null;
+            }
         }
         DataStore store = storeMgr.getDataStore(snapshotStore.getDataStoreId(), role);
         SnapshotObject so = SnapshotObject.getSnapshotObject(snapshot, store);

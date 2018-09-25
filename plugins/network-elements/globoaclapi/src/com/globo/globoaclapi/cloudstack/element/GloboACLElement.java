@@ -38,7 +38,6 @@ import com.cloud.vm.VirtualMachineProfile;
 import com.globo.globoaclapi.cloudstack.resource.GloboAclApiResource;
 import org.springframework.stereotype.Component;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 import java.util.HashMap;
@@ -47,7 +46,6 @@ import java.util.Map;
 import java.util.Set;
 
 @Component
-@Local(NetworkElement.class)
 public class GloboACLElement extends AdapterBase implements NetworkElement, ResourceStateAdapter{
 
     @Inject

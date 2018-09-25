@@ -16,19 +16,8 @@
 // under the License.
 package com.cloud.dc.dao;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.ejb.Local;
-import javax.inject.Inject;
-
-import org.springframework.stereotype.Component;
-
+import com.cloud.dc.ClusterDetailsDao;
+import com.cloud.dc.ClusterDetailsVO;
 import com.cloud.dc.ClusterVO;
 import com.cloud.dc.HostPodVO;
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
@@ -42,9 +31,18 @@ import com.cloud.utils.db.SearchCriteria.Func;
 import com.cloud.utils.db.SearchCriteria.Op;
 import com.cloud.utils.db.TransactionLegacy;
 import com.cloud.utils.exception.CloudRuntimeException;
+import org.springframework.stereotype.Component;
+
+import javax.inject.Inject;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Component
-@Local(value = ClusterDao.class)
 public class ClusterDaoImpl extends GenericDaoBase<ClusterVO, Long> implements ClusterDao {
 
     protected final SearchBuilder<ClusterVO> PodSearch;
@@ -59,7 +57,9 @@ public class ClusterDaoImpl extends GenericDaoBase<ClusterVO, Long> implements C
     private static final String GET_POD_CLUSTER_MAP_PREFIX = "SELECT pod_id, id FROM cloud.cluster WHERE cluster.id IN( ";
     private static final String GET_POD_CLUSTER_MAP_SUFFIX = " )";
     @Inject
-    protected HostPodDao _hostPodDao;
+    private ClusterDetailsDao clusterDetailsDao;
+    @Inject
+    protected HostPodDao hostPodDao;
 
     public ClusterDaoImpl() {
         super();
@@ -216,7 +216,7 @@ public class ClusterDaoImpl extends GenericDaoBase<ClusterVO, Long> implements C
     @Override
     public List<Long> listClustersWithDisabledPods(long zoneId) {
 
-        GenericSearchBuilder<HostPodVO, Long> disabledPodIdSearch = _hostPodDao.createSearchBuilder(Long.class);
+        GenericSearchBuilder<HostPodVO, Long> disabledPodIdSearch = hostPodDao.createSearchBuilder(Long.class);
         disabledPodIdSearch.selectFields(disabledPodIdSearch.entity().getId());
         disabledPodIdSearch.and("dataCenterId", disabledPodIdSearch.entity().getDataCenterId(), Op.EQ);
         disabledPodIdSearch.and("allocationState", disabledPodIdSearch.entity().getAllocationState(), Op.EQ);
@@ -257,9 +257,30 @@ public class ClusterDaoImpl extends GenericDaoBase<ClusterVO, Long> implements C
     }
 
     @Override
-    public List<Long> listAllCusters(long zoneId) {
+    public List<Long> listAllClusters(Long zoneId) {
         SearchCriteria<Long> sc = ClusterIdSearch.create();
-        sc.setParameters("dataCenterId", zoneId);
+        if (zoneId != null) {
+            sc.setParameters("dataCenterId", zoneId);
+        }
         return customSearch(sc, null);
+    }
+
+    @Override
+    public boolean getSupportsResigning(long clusterId) {
+        ClusterVO cluster = findById(clusterId);
+
+        if (cluster == null || cluster.getAllocationState() != Grouping.AllocationState.Enabled) {
+            return false;
+        }
+
+        ClusterDetailsVO clusterDetailsVO = clusterDetailsDao.findDetail(clusterId, "supportsResign");
+
+        if (clusterDetailsVO != null) {
+            String value = clusterDetailsVO.getValue();
+
+            return Boolean.parseBoolean(value);
+        }
+
+        return false;
     }
 }

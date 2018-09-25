@@ -16,14 +16,33 @@
 // under the License.
 package org.apache.cloudstack.saml;
 
-import com.cloud.domain.Domain;
-import com.cloud.user.DomainManager;
-import com.cloud.user.User;
-import com.cloud.user.UserVO;
-import com.cloud.user.dao.UserDao;
-import com.cloud.utils.PropertiesUtil;
-import com.cloud.utils.component.AdapterBase;
-import org.apache.cloudstack.api.auth.PluggableAPIAuthenticator;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutput;
+import java.io.ObjectOutputStream;
+import java.security.InvalidKeyException;
+import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.SignatureException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import javax.inject.Inject;
+import javax.xml.stream.FactoryConfigurationError;
+
 import org.apache.cloudstack.api.command.AuthorizeSAMLSSOCmd;
 import org.apache.cloudstack.api.command.GetServiceProviderMetaDataCmd;
 import org.apache.cloudstack.api.command.ListAndSwitchSAMLAccountCmd;
@@ -35,9 +54,11 @@ import org.apache.cloudstack.framework.config.ConfigKey;
 import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.cloudstack.framework.security.keystore.KeystoreDao;
 import org.apache.cloudstack.framework.security.keystore.KeystoreVO;
+import org.apache.cloudstack.utils.security.CertUtils;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.log4j.Logger;
+import org.bouncycastle.operator.OperatorCreationException;
 import org.opensaml.DefaultBootstrap;
 import org.opensaml.common.xml.SAMLConstants;
 import org.opensaml.saml2.metadata.ContactPerson;
@@ -62,36 +83,15 @@ import org.opensaml.xml.security.credential.UsageType;
 import org.opensaml.xml.security.keyinfo.KeyInfoHelper;
 import org.springframework.stereotype.Component;
 
-import javax.ejb.Local;
-import javax.inject.Inject;
-import javax.xml.stream.FactoryConfigurationError;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
-import java.security.InvalidKeyException;
-import java.security.KeyPair;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.SignatureException;
-import java.security.cert.CertificateEncodingException;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
+import com.cloud.domain.Domain;
+import com.cloud.user.DomainManager;
+import com.cloud.user.User;
+import com.cloud.user.UserVO;
+import com.cloud.user.dao.UserDao;
+import com.cloud.utils.PropertiesUtil;
+import com.cloud.utils.component.AdapterBase;
 
 @Component
-@Local(value = {SAML2AuthManager.class, PluggableAPIAuthenticator.class})
 public class SAML2AuthManagerImpl extends AdapterBase implements SAML2AuthManager, Configurable {
     private static final Logger s_logger = Logger.getLogger(SAML2AuthManagerImpl.class);
 
@@ -104,6 +104,10 @@ public class SAML2AuthManagerImpl extends AdapterBase implements SAML2AuthManage
     private Timer _timer;
     private int _refreshInterval = SAMLPluginConstants.SAML_REFRESH_INTERVAL;
     private AbstractReloadingMetadataProvider _idpMetaDataProvider;
+
+    public String getSAMLIdentityProviderMetadataURL(){
+        return SAMLIdentityProviderMetadataURL.value();
+    }
 
     @Inject
     private KeystoreDao _ksDao;
@@ -120,12 +124,12 @@ public class SAML2AuthManagerImpl extends AdapterBase implements SAML2AuthManage
     @Override
     public boolean start() {
         if (isSAMLPluginEnabled()) {
-            setup();
             s_logger.info("SAML auth plugin loaded");
+            return setup();
         } else {
             s_logger.info("SAML auth plugin not enabled so not loading");
+            return super.start();
         }
-        return super.start();
     }
 
     @Override
@@ -136,16 +140,18 @@ public class SAML2AuthManagerImpl extends AdapterBase implements SAML2AuthManage
         return super.stop();
     }
 
-    private boolean initSP() {
+    protected boolean initSP() {
         KeystoreVO keyStoreVO = _ksDao.findByName(SAMLPluginConstants.SAMLSP_KEYPAIR);
         if (keyStoreVO == null) {
             try {
-                KeyPair keyPair = SAMLUtils.generateRandomKeyPair();
-                _ksDao.save(SAMLPluginConstants.SAMLSP_KEYPAIR, SAMLUtils.savePrivateKey(keyPair.getPrivate()), SAMLUtils.savePublicKey(keyPair.getPublic()), "samlsp-keypair");
+                KeyPair keyPair = CertUtils.generateRandomKeyPair(4096);
+                _ksDao.save(SAMLPluginConstants.SAMLSP_KEYPAIR,
+                        SAMLUtils.encodePrivateKey(keyPair.getPrivate()),
+                        SAMLUtils.encodePublicKey(keyPair.getPublic()), "samlsp-keypair");
                 keyStoreVO = _ksDao.findByName(SAMLPluginConstants.SAMLSP_KEYPAIR);
                 s_logger.info("No SAML keystore found, created and saved a new Service Provider keypair");
-            } catch (NoSuchProviderException | NoSuchAlgorithmException e) {
-                s_logger.error("Unable to create and save SAML keypair: " + e.toString());
+            } catch (final NoSuchProviderException | NoSuchAlgorithmException e) {
+                s_logger.error("Unable to create and save SAML keypair, due to: ", e);
             }
         }
 
@@ -159,8 +165,8 @@ public class SAML2AuthManagerImpl extends AdapterBase implements SAML2AuthManage
         KeyPair spKeyPair = null;
         X509Certificate spX509Key = null;
         if (keyStoreVO != null) {
-            PrivateKey privateKey = SAMLUtils.loadPrivateKey(keyStoreVO.getCertificate());
-            PublicKey publicKey = SAMLUtils.loadPublicKey(keyStoreVO.getKey());
+            final PrivateKey privateKey = SAMLUtils.decodePrivateKey(keyStoreVO.getCertificate());
+            final PublicKey publicKey = SAMLUtils.decodePublicKey(keyStoreVO.getKey());
             if (privateKey != null && publicKey != null) {
                 spKeyPair = new KeyPair(publicKey, privateKey);
                 KeystoreVO x509VO = _ksDao.findByName(SAMLPluginConstants.SAMLSP_X509CERT);
@@ -173,8 +179,8 @@ public class SAML2AuthManagerImpl extends AdapterBase implements SAML2AuthManage
                         out.flush();
                         _ksDao.save(SAMLPluginConstants.SAMLSP_X509CERT, Base64.encodeBase64String(bos.toByteArray()), "", "samlsp-x509cert");
                         bos.close();
-                    } catch (NoSuchAlgorithmException | NoSuchProviderException | CertificateEncodingException | SignatureException | InvalidKeyException | IOException e) {
-                        s_logger.error("SAML Plugin won't be able to use X509 signed authentication");
+                    } catch (final NoSuchAlgorithmException | NoSuchProviderException | CertificateException | SignatureException | InvalidKeyException | IOException | OperatorCreationException e) {
+                        s_logger.error("SAML plugin won't be able to use X509 signed authentication", e);
                     }
                 } else {
                     try {
@@ -284,18 +290,21 @@ public class SAML2AuthManagerImpl extends AdapterBase implements SAML2AuthManage
                         try {
                             idpMetadata.setSigningCertificate(KeyInfoHelper.getCertificates(kd.getKeyInfo()).get(0));
                         } catch (CertificateException ignored) {
+                            s_logger.info("[ignored] encountered invalid certificate signing.", ignored);
                         }
                     }
                     if (kd.getUse() == UsageType.ENCRYPTION) {
                         try {
                             idpMetadata.setEncryptionCertificate(KeyInfoHelper.getCertificates(kd.getKeyInfo()).get(0));
                         } catch (CertificateException ignored) {
+                            s_logger.info("[ignored] encountered invalid certificate encryption.", ignored);
                         }
                     }
                     if (kd.getUse() == UsageType.UNSPECIFIED) {
                         try {
                             unspecifiedKey = KeyInfoHelper.getCertificates(kd.getKeyInfo()).get(0);
                         } catch (CertificateException ignored) {
+                            s_logger.info("[ignored] encountered invalid certificate.", ignored);
                         }
                     }
                 }
@@ -339,6 +348,7 @@ public class SAML2AuthManagerImpl extends AdapterBase implements SAML2AuthManage
                 return;
             }
             s_logger.debug("Starting SAML IDP Metadata Refresh Task");
+
             Map <String, SAMLProviderMetadata> metadataMap = new HashMap<String, SAMLProviderMetadata>();
             try {
                 discoverAndAddIdp(_idpMetaDataProvider.getMetadata(), metadataMap);
@@ -359,7 +369,7 @@ public class SAML2AuthManagerImpl extends AdapterBase implements SAML2AuthManage
         }
         _timer = new Timer();
         final HttpClient client = new HttpClient();
-        final String idpMetaDataUrl = SAMLIdentityProviderMetadataURL.value();
+        final String idpMetaDataUrl = getSAMLIdentityProviderMetadataURL();
         if (SAMLTimeout.value() != null && SAMLTimeout.value() > SAMLPluginConstants.SAML_REFRESH_INTERVAL) {
             _refreshInterval = SAMLTimeout.value();
         }
@@ -369,21 +379,31 @@ public class SAML2AuthManagerImpl extends AdapterBase implements SAML2AuthManage
                 _idpMetaDataProvider = new HTTPMetadataProvider(_timer, client, idpMetaDataUrl);
             } else {
                 File metadataFile = PropertiesUtil.findConfigFile(idpMetaDataUrl);
-                s_logger.debug("Provided Metadata is not a URL, trying to read metadata file from local path: " + metadataFile.getAbsolutePath());
-                _idpMetaDataProvider = new FilesystemMetadataProvider(_timer, metadataFile);
+                if (metadataFile == null) {
+                    s_logger.error("Provided Metadata is not a URL, Unable to locate metadata file from local path: " + idpMetaDataUrl);
+                    return false;
+                }
+                else{
+                    s_logger.debug("Provided Metadata is not a URL, trying to read metadata file from local path: " + metadataFile.getAbsolutePath());
+                    _idpMetaDataProvider = new FilesystemMetadataProvider(_timer, metadataFile);
+                }
             }
             _idpMetaDataProvider.setRequireValidMetadata(true);
             _idpMetaDataProvider.setParserPool(new BasicParserPool());
             _idpMetaDataProvider.initialize();
             _timer.scheduleAtFixedRate(new MetadataRefreshTask(), 0, _refreshInterval * 1000);
+
         } catch (MetadataProviderException e) {
             s_logger.error("Unable to read SAML2 IDP MetaData URL, error:" + e.getMessage());
             s_logger.error("SAML2 Authentication may be unavailable");
+            return false;
         } catch (ConfigurationException | FactoryConfigurationError e) {
             s_logger.error("OpenSAML bootstrapping failed: error: " + e.getMessage());
+            return false;
         } catch (NullPointerException e) {
             s_logger.error("Unable to setup SAML Auth Plugin due to NullPointerException" +
                     " please check the SAML global settings: " + e.getMessage());
+            return false;
         }
         return true;
     }

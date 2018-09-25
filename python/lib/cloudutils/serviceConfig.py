@@ -54,9 +54,9 @@ class serviceCfgBase(object):
         except:
             logging.debug(formatExceptionInfo())
             if self.syscfg.env.mode == "Server":
-                raise CloudRuntimeException("Configure %s failed, Please check the /var/log/cloudstack/setupManagement.log for detail"%self.serviceName)
+                raise CloudRuntimeException("Configure %s failed, Please check the /var/log/cloudstack/management/setupManagement.log for detail"%self.serviceName)
             else:
-                raise CloudRuntimeException("Configure %s failed, Please check the /var/log/cloudstack/setupAgent.log for detail"%self.serviceName)
+                raise CloudRuntimeException("Configure %s failed, Please check the /var/log/cloudstack/agent/setup.log for detail"%self.serviceName)
 
     def backup(self):
         if self.status is None:
@@ -428,7 +428,7 @@ class securityPolicyConfigUbuntu(serviceCfgBase):
 
             return True
         except:
-            raise CloudRuntimeException("Failed to configure apparmor, please see the /var/log/cloudstack/setupAgent.log for detail, \
+            raise CloudRuntimeException("Failed to configure apparmor, please see the /var/log/cloudstack/agent/setup.log for detail, \
                                         or you can manually disable it before starting myCloud")
 
     def restore(self):
@@ -458,7 +458,7 @@ class securityPolicyConfigRedhat(serviceCfgBase):
                 cfo.replace_line("SELINUX=", "SELINUX=permissive")
                 return True
             except:
-                raise CloudRuntimeException("Failed to configure selinux, please see the /var/log/cloudstack/setupAgent.log for detail, \
+                raise CloudRuntimeException("Failed to configure selinux, please see the /var/log/cloudstack/agent/setup.log for detail, \
                                             or you can manually disable it before starting myCloud")
         else:
             return True
@@ -471,6 +471,23 @@ class securityPolicyConfigRedhat(serviceCfgBase):
             logging.debug(formatExceptionInfo())
             return False
 
+def configureLibvirtConfig(tls_enabled = True, cfg = None):
+    cfo = configFileOps("/etc/libvirt/libvirtd.conf", cfg)
+    if tls_enabled:
+        cfo.addEntry("listen_tcp", "0")
+        cfo.addEntry("listen_tls", "1")
+        cfo.addEntry("key_file", "\"/etc/pki/libvirt/private/serverkey.pem\"")
+        cfo.addEntry("cert_file", "\"/etc/pki/libvirt/servercert.pem\"")
+        cfo.addEntry("ca_file", "\"/etc/pki/CA/cacert.pem\"")
+    else:
+        cfo.addEntry("listen_tcp", "1")
+        cfo.addEntry("listen_tls", "0")
+    cfo.addEntry("tcp_port", "\"16509\"")
+    cfo.addEntry("tls_port", "\"16514\"")
+    cfo.addEntry("auth_tcp", "\"none\"")
+    cfo.addEntry("auth_tls", "\"none\"")
+    cfo.save()
+
 class libvirtConfigRedhat(serviceCfgBase):
     def __init__(self, syscfg):
         super(libvirtConfigRedhat, self).__init__(syscfg)
@@ -478,12 +495,7 @@ class libvirtConfigRedhat(serviceCfgBase):
 
     def config(self):
         try:
-            cfo = configFileOps("/etc/libvirt/libvirtd.conf", self)
-            cfo.addEntry("listen_tcp", "1")
-            cfo.addEntry("tcp_port", "\"16509\"")
-            cfo.addEntry("auth_tcp", "\"none\"")
-            cfo.addEntry("listen_tls", "0")
-            cfo.save()
+            configureLibvirtConfig(self.syscfg.env.secure, self)
 
             cfo = configFileOps("/etc/sysconfig/libvirtd", self)
             cfo.addEntry("export CGROUP_DAEMON", "'cpu:/virt'")
@@ -493,7 +505,6 @@ class libvirtConfigRedhat(serviceCfgBase):
             filename = "/etc/libvirt/qemu.conf"
 
             cfo = configFileOps(filename, self)
-            cfo.addEntry("cgroup_controllers", "[\"cpu\"]")
             cfo.addEntry("security_driver", "\"none\"")
             cfo.addEntry("user", "\"root\"")
             cfo.addEntry("group", "\"root\"")
@@ -517,19 +528,17 @@ class libvirtConfigUbuntu(serviceCfgBase):
         self.serviceName = "Libvirt"
 
     def setupLiveMigration(self):
-        cfo = configFileOps("/etc/libvirt/libvirtd.conf", self)
-        cfo.addEntry("listen_tcp", "1")
-        cfo.addEntry("tcp_port", "\"16509\"");
-        cfo.addEntry("auth_tcp", "\"none\"");
-        cfo.addEntry("listen_tls", "0")
-        cfo.save()
+        configureLibvirtConfig(self.syscfg.env.secure, self)
 
         if os.path.exists("/etc/init/libvirt-bin.conf"):
             cfo = configFileOps("/etc/init/libvirt-bin.conf", self)
             cfo.replace_line("exec /usr/sbin/libvirtd","exec /usr/sbin/libvirtd -d -l")
-        else:
+        elif os.path.exists("/etc/default/libvirt-bin"):
             cfo = configFileOps("/etc/default/libvirt-bin", self)
-            cfo.replace_or_add_line("libvirtd_opts=","libvirtd_opts='-l -d'")
+            cfo.replace_or_add_line("libvirtd_opts=","libvirtd_opts='-l'")
+        elif os.path.exists("/etc/default/libvirtd"):
+            cfo = configFileOps("/etc/default/libvirtd", self)
+            cfo.replace_or_add_line("libvirtd_opts=","libvirtd_opts='-l'")
 
     def config(self):
         try:
@@ -565,7 +574,7 @@ class firewallConfigUbuntu(serviceCfgBase):
 
     def config(self):
         try:
-            ports = "22 1798 16509".split()
+            ports = "22 1798 16509 16514".split()
             for p in ports:
                 bash("ufw allow %s"%p)
             bash("ufw allow proto tcp from any to any port 5900:6100")
@@ -625,7 +634,7 @@ class firewallConfigBase(serviceCfgBase):
 class firewallConfigAgent(firewallConfigBase):
     def __init__(self, syscfg):
         super(firewallConfigAgent, self).__init__(syscfg)
-        self.ports = "22 16509 5900:6100 49152:49216".split()
+        self.ports = "22 16509 16514 5900:6100 49152:49216".split()
         if syscfg.env.distribution.getVersion() == "CentOS":
             self.rules = ["-D FORWARD -j RH-Firewall-1-INPUT"]
         else:
@@ -679,7 +688,8 @@ class cloudAgentConfig(serviceCfgBase):
             cfo.addEntry("guid", str(self.syscfg.env.uuid))
             if cfo.getEntry("local.storage.uuid") == "":
                 cfo.addEntry("local.storage.uuid", str(bash("uuidgen").getStdout()))
-            cfo.addEntry("resource", "com.cloud.hypervisor.kvm.resource.LibvirtComputingResource")
+            if cfo.getEntry("resource") == "":
+                cfo.addEntry("resource", "com.cloud.hypervisor.kvm.resource.LibvirtComputingResource")
             cfo.save()
 
             self.syscfg.svo.stopService("cloudstack-agent")
@@ -721,24 +731,6 @@ class cloudAgentConfig(serviceCfgBase):
     def restore(self):
         return True
 
-
-class sudoersConfig(serviceCfgBase):
-    def __init__(self, syscfg):
-        super(sudoersConfig, self).__init__(syscfg)
-        self.serviceName = "sudoers"
-    def config(self):
-        try:
-            cfo = configFileOps("/etc/sudoers", self)
-            cfo.addEntry("cloud ALL ", "NOPASSWD : /bin/chmod, /bin/cp, /bin/mkdir, /bin/mount, /bin/umount, /usr/bin/keytool")
-            cfo.rmEntry("Defaults", "requiretty", " ")
-            cfo.save()
-            return True
-        except:
-            raise
-
-    def restore(self):
-        return True
-
 class firewallConfigServer(firewallConfigBase):
     def __init__(self, syscfg):
         super(firewallConfigServer, self).__init__(syscfg)
@@ -746,7 +738,7 @@ class firewallConfigServer(firewallConfigBase):
         if self.syscfg.env.svrMode == "myCloud":
             self.ports = "443 8080 8250 8443 9090".split()
         else:
-            self.ports = "8080 7080 8250 9090".split()
+            self.ports = "8080 8250 9090".split()
 
 class ubuntuFirewallConfigServer(firewallConfigServer):
     def allowPort(self, port):

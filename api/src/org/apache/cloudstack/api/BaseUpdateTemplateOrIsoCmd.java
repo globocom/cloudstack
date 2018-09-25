@@ -17,7 +17,6 @@
 package org.apache.cloudstack.api;
 
 import org.apache.log4j.Logger;
-
 import org.apache.cloudstack.api.command.user.iso.UpdateIsoCmd;
 import org.apache.cloudstack.api.response.GuestOSResponse;
 import org.apache.cloudstack.api.response.TemplateResponse;
@@ -70,14 +69,19 @@ public abstract class BaseUpdateTemplateOrIsoCmd extends BaseCmd {
     @Parameter(name = ApiConstants.ROUTING, type = CommandType.BOOLEAN, description = "true if the template type is routing i.e., if template is used to deploy router")
     protected Boolean isRoutingType;
 
-    @Parameter(name = ApiConstants.DETAILS, type = CommandType.MAP, description = "Details in key/value pairs.")
+    @Parameter(name = ApiConstants.DETAILS, type = CommandType.MAP, description = "Details in key/value pairs using format details[i].keyname=keyvalue. Example: details[0].hypervisortoolsversion=xenserver61")
     protected Map details;
+
+    @Parameter(name = ApiConstants.CLEAN_UP_DETAILS,
+            type = CommandType.BOOLEAN,
+            description = "optional boolean field, which indicates if details should be cleaned up or not (if set to true, details removed for this resource, details field ignored; if false or not set, no action)")
+    private Boolean cleanupDetails;
 
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
     /////////////////////////////////////////////////////
 
-    public Boolean isBootable() {
+    public Boolean getBootable() {
         return bootable;
     }
 
@@ -101,7 +105,7 @@ public abstract class BaseUpdateTemplateOrIsoCmd extends BaseCmd {
         return osTypeId;
     }
 
-    public Boolean isPasswordEnabled() {
+    public Boolean getPasswordEnabled() {
         return passwordEnabled;
     }
 
@@ -128,5 +132,9 @@ public abstract class BaseUpdateTemplateOrIsoCmd extends BaseCmd {
 
         Collection paramsCollection = this.details.values();
         return (Map) (paramsCollection.toArray())[0];
+    }
+
+    public boolean isCleanupDetails(){
+        return cleanupDetails == null ? false : cleanupDetails.booleanValue();
     }
 }

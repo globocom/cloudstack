@@ -18,9 +18,9 @@ package com.cloud.network.vpc.dao;
 
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
+import com.google.common.collect.Lists;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
@@ -37,7 +37,6 @@ import com.cloud.utils.db.SearchCriteria.Op;
 import com.cloud.utils.db.TransactionLegacy;
 
 @Component
-@Local(value = NetworkACLItemDao.class)
 @DB()
 public class NetworkACLItemDaoImpl extends GenericDaoBase<NetworkACLItemVO, Long> implements NetworkACLItemDao {
     private static final Logger s_logger = Logger.getLogger(NetworkACLItemDaoImpl.class);
@@ -115,7 +114,9 @@ public class NetworkACLItemDaoImpl extends GenericDaoBase<NetworkACLItemVO, Long
     }
 
     @Override
-    public List<NetworkACLItemVO> listByACL(long aclId) {
+    public List<NetworkACLItemVO> listByACL(Long aclId) {
+        if (aclId == null) return Lists.newArrayList();
+
         SearchCriteria<NetworkACLItemVO> sc = AllFieldsSearch.create();
         sc.setParameters("aclId", aclId);
         List<NetworkACLItemVO> list = listBy(sc);

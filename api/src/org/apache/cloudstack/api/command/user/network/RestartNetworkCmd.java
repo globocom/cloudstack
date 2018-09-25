@@ -39,7 +39,7 @@ import com.cloud.exception.ResourceUnavailableException;
 import com.cloud.network.Network;
 
 @APICommand(name = "restartNetwork",
-            description = "Restarts the network; includes 1) restarting network elements - virtual routers, dhcp servers 2) reapplying all public ips 3) reapplying loadBalancing/portForwarding rules",
+            description = "Restarts the network; includes 1) restarting network elements - virtual routers, DHCP servers 2) reapplying all public IPs 3) reapplying loadBalancing/portForwarding rules",
         responseObject = IPAddressResponse.class, entityType = {Network.class},
             requestHasSensitiveInfo = false,
             responseHasSensitiveInfo = false)
@@ -51,11 +51,14 @@ public class RestartNetworkCmd extends BaseAsyncCmd {
     //////////////// API parameters /////////////////////
     /////////////////////////////////////////////////////
     @ACL(accessType = AccessType.OperateEntry)
-    @Parameter(name = ApiConstants.ID, type = CommandType.UUID, entityType = NetworkResponse.class, required = true, description = "The id of the network to restart.")
+    @Parameter(name = ApiConstants.ID, type = CommandType.UUID, entityType = NetworkResponse.class, required = true, description = "The ID of the network to restart.")
     private Long id;
 
     @Parameter(name = ApiConstants.CLEANUP, type = CommandType.BOOLEAN, required = false, description = "If cleanup old network elements")
-    private Boolean cleanup;
+    private Boolean cleanup = false;
+
+    @Parameter(name = ApiConstants.MAKEREDUNDANT, type = CommandType.BOOLEAN, required = false, description = "Turn the network into a network with redundant routers.", since = "4.11.1")
+    private Boolean makeRedundant = false;
 
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
@@ -64,17 +67,18 @@ public class RestartNetworkCmd extends BaseAsyncCmd {
     public Long getNetworkId() {
         Network network = _networkService.getNetwork(id);
         if (network == null) {
-            throw new InvalidParameterValueException("Unable to find network by id " + id);
+            throw new InvalidParameterValueException("Unable to find network by ID " + id);
         } else {
             return network.getId();
         }
     }
 
     public Boolean getCleanup() {
-        if (cleanup != null) {
-            return cleanup;
-        }
-        return true;
+        return cleanup;
+    }
+
+    public Boolean getMakeRedundant() {
+        return makeRedundant;
     }
 
     /////////////////////////////////////////////////////
@@ -92,7 +96,7 @@ public class RestartNetworkCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() throws ResourceUnavailableException, ResourceAllocationException, ConcurrentOperationException, InsufficientCapacityException {
-        boolean result = _networkService.restartNetwork(this, getCleanup());
+        boolean result = _networkService.restartNetwork(this, getCleanup(), getMakeRedundant());
         if (result) {
             SuccessResponse response = new SuccessResponse(getCommandName());
             setResponseObject(response);
@@ -125,7 +129,7 @@ public class RestartNetworkCmd extends BaseAsyncCmd {
     public long getEntityOwnerId() {
         Network network = _networkService.getNetwork(id);
         if (network == null) {
-            throw new InvalidParameterValueException("Networkd id=" + id + " doesn't exist");
+            throw new InvalidParameterValueException("Networkd ID=" + id + " doesn't exist");
         } else {
             return _networkService.getNetwork(id).getAccountId();
         }

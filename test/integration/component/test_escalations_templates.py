@@ -22,7 +22,8 @@ from marvin.lib.utils import (cleanup_resources,
 from marvin.lib.base import (Account,
                              Zone,
                              Template,
-                             Hypervisor)
+                             Hypervisor,
+                             ServiceOffering)
 from marvin.lib.common import (get_domain,
                                get_zone,
                                get_template,
@@ -55,10 +56,16 @@ class TestTemplates(cloudstackTestCase):
             cls.hypervisor = cls.testClient.getHypervisorInfo()
             cls.services['mode'] = cls.zone.networktype
 
+            cls.mgtSvrDetails = cls.config.__dict__["mgtSvr"][0].__dict__
+
             builtin_info = get_builtin_template_info(cls.api_client, cls.zone.id)
             cls.services["privatetemplate"]["url"] = builtin_info[0]
             cls.services["privatetemplate"]["hypervisor"] = builtin_info[1]
             cls.services["privatetemplate"]["format"] = builtin_info[2]
+            cls.services["templates"]["url"] = builtin_info[0]
+            cls.services["templates"]["hypervisor"] = builtin_info[1]
+            cls.services["templates"]["format"] = builtin_info[2]
+
         except Exception as e:
             cls.tearDownClass()
             raise Exception("Warning: Exception in setup : %s" % e)
@@ -69,9 +76,9 @@ class TestTemplates(cloudstackTestCase):
         self.apiClient = self.testClient.getApiClient()
         self.cleanup = []
         self.account = Account.create(
-                self.apiClient,
-                self.services["account"],
-                domainid=self.domain.id
+            self.apiClient,
+            self.services["account"],
+            domainid=self.domain.id
         )
         # Getting authentication for user in newly created Account
         self.user = self.account.user[0]
@@ -123,6 +130,52 @@ class TestTemplates(cloudstackTestCase):
                     "expected Value: %s, is not matching with actual value: %s" %
                     (exp_val, act_val))
         return return_flag
+
+    def download(self, apiclient, template_id, retries=72, interval=5):
+        """Check if template download will finish in 6 minutes"""
+        while retries > -1:
+            time.sleep(interval)
+            template_response = Template.list(
+                apiclient,
+                id=template_id,
+                zoneid=self.zone.id,
+                templatefilter='self'
+            )
+
+            if isinstance(template_response, list):
+                template = template_response[0]
+                if not hasattr(template, 'status') or not template or not template.status:
+                    retries = retries - 1
+                    continue
+
+                # If template is ready,
+                # template.status = Download Complete
+                # Downloading - x% Downloaded
+                # if Failed
+                # Error - Any other string
+                if 'Failed' in template.status:
+                    raise Exception(
+                        "Failed to download template: status - %s" %
+                        template.status)
+
+                elif template.status == 'Download Complete' and template.isready:
+                    return
+
+                elif 'Downloaded' in template.status:
+                    retries = retries - 1
+                    continue
+
+                elif 'Installing' not in template.status:
+                    if retries >= 0:
+                        retries = retries - 1
+                        continue
+                    raise Exception(
+                        "Error in downloading template: status - %s" %
+                        template.status)
+
+            else:
+                retries = retries - 1
+        raise Exception("Template download failed exception.")
 
     @attr(tags=["advanced", "basic"], required_hardware="true")
     def test_01_list_templates_pagination(self):
@@ -231,32 +284,7 @@ class TestTemplates(cloudstackTestCase):
         )
         # Verifying the state of the template to be ready. If not waiting for
         # state to become ready
-        template_ready = False
-        count = 0
-        while template_ready is False:
-            list_template = Template.list(
-                self.userapiclient,
-                id=template_created.id,
-                listall=self.services["listall"],
-                templatefilter=self.services["templatefilter"],
-            )
-            status = validateList(list_template)
-            self.assertEquals(
-                PASS,
-                status[0],
-                "Failed to list Templates by Id"
-            )
-            if list_template[0].isready is True:
-                template_ready = True
-            elif (str(list_template[0].status) == "Error"):
-                self.fail("Created Template is in Errored state")
-                break
-            elif count > 10:
-                self.fail("Timed out before Template came into ready state")
-                break
-            else:
-                time.sleep(self.services["sleep"])
-                count = count + 1
+        self.download(self.apiClient, template_created.id)
 
         # Deleting the Template present in page 2
         Template.delete(
@@ -339,32 +367,7 @@ class TestTemplates(cloudstackTestCase):
         )
         # Verifying the state of the template to be ready. If not waiting for
         # state to become ready till time out
-        template_ready = False
-        count = 0
-        while template_ready is False:
-            list_template = Template.list(
-                self.userapiclient,
-                id=template_created.id,
-                listall=self.services["listall"],
-                templatefilter=self.services["templatefilter"],
-            )
-            status = validateList(list_template)
-            self.assertEquals(
-                PASS,
-                status[0],
-                "Failed to list Templates by Id"
-            )
-            if list_template[0].isready is True:
-                template_ready = True
-            elif (str(list_template[0].status) == "Error"):
-                self.fail("Created Template is in Errored state")
-                break
-            elif count > 10:
-                self.fail("Timed out before Template came into ready state")
-                break
-            else:
-                time.sleep(self.services["sleep"])
-                count = count + 1
+        self.download(self.apiClient, template_created.id)
 
         # Downloading the Template name
         download_template = Template.extract(
@@ -463,32 +466,7 @@ class TestTemplates(cloudstackTestCase):
         )
         # Verifying the state of the template to be ready. If not waiting for
         # state to become ready till time out
-        template_ready = False
-        count = 0
-        while template_ready is False:
-            list_template = Template.list(
-                self.userapiclient,
-                id=template_created.id,
-                listall=self.services["listall"],
-                templatefilter=self.services["templatefilter"],
-            )
-            status = validateList(list_template)
-            self.assertEquals(
-                PASS,
-                status[0],
-                "Failed to list Templates by Id"
-            )
-            if list_template[0].isready is True:
-                template_ready = True
-            elif (str(list_template[0].status) == "Error"):
-                self.fail("Created Template is in Errored state")
-                break
-            elif count > 10:
-                self.fail("Timed out before Template came into ready state")
-                break
-            else:
-                time.sleep(self.services["sleep"])
-                count = count + 1
+        self.download(self.apiClient, template_created.id)
 
         # Editing the Template name
         edited_template = Template.update(
@@ -827,33 +805,7 @@ class TestTemplates(cloudstackTestCase):
             )
             # Verifying the state of the template to be ready. If not waiting
             # for state to become ready till time out
-            template_ready = False
-            count = 0
-            while template_ready is False:
-                list_template = Template.list(
-                    self.userapiclient,
-                    id=template_created.id,
-                    listall=self.services["listall"],
-                    templatefilter=self.services["templatefilter"],
-                )
-                status = validateList(list_template)
-                self.assertEquals(
-                    PASS,
-                    status[0],
-                    "Failed to list Templates by Id"
-                )
-                if list_template[0].isready is True:
-                    template_ready = True
-                elif (str(list_template[0].status) == "Error"):
-                    self.fail("Created Template is in Errored state")
-                    break
-                elif count > 10:
-                    self.fail(
-                        "Timed out before Template came into ready state")
-                    break
-                else:
-                    time.sleep(self.services["sleep"])
-                    count = count + 1
+            self.download(self.apiClient, template_created.id)
 
             # Copying the Template from Zone1 to Zone2
             copied_template = template_created.copy(
@@ -915,3 +867,6 @@ class TestTemplates(cloudstackTestCase):
             )
         del self.services["privatetemplate"]["ostype"]
         return
+
+
+

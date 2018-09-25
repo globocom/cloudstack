@@ -16,11 +16,13 @@
 // under the License.
 package com.cloud.network.guru;
 
+import com.cloud.dc.dao.DataCenterDao.PrivateAllocationData;
+import com.cloud.vm.VirtualMachine;
 import java.util.Random;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
+import com.cloud.network.NetworkModel;
 import org.apache.log4j.Logger;
 
 import com.cloud.dc.Pod;
@@ -39,7 +41,6 @@ import com.cloud.network.StorageNetworkManager;
 import com.cloud.network.dao.NetworkVO;
 import com.cloud.offering.NetworkOffering;
 import com.cloud.user.Account;
-import com.cloud.utils.Pair;
 import com.cloud.utils.component.AdapterBase;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.net.NetUtils;
@@ -48,13 +49,13 @@ import com.cloud.vm.NicProfile;
 import com.cloud.vm.ReservationContext;
 import com.cloud.vm.VirtualMachineProfile;
 
-@Local(value = {NetworkGuru.class})
 public class PodBasedNetworkGuru extends AdapterBase implements NetworkGuru {
     private static final Logger s_logger = Logger.getLogger(PodBasedNetworkGuru.class);
     @Inject
     DataCenterDao _dcDao;
     @Inject
     StorageNetworkManager _sNwMgr;
+
     Random _rand = new Random(System.currentTimeMillis());
 
     private static final TrafficType[] TrafficTypes = {TrafficType.Management};
@@ -83,7 +84,8 @@ public class PodBasedNetworkGuru extends AdapterBase implements NetworkGuru {
         }
 
         NetworkVO config =
-            new NetworkVO(type, Mode.Static, BroadcastDomainType.Native, offering.getId(), Network.State.Setup, plan.getDataCenterId(), plan.getPhysicalNetworkId());
+            new NetworkVO(type, Mode.Static, BroadcastDomainType.Native, offering.getId(), Network.State.Setup, plan.getDataCenterId(),
+                    plan.getPhysicalNetworkId(), offering.getRedundantRouter());
         return config;
     }
 
@@ -102,10 +104,10 @@ public class PodBasedNetworkGuru extends AdapterBase implements NetworkGuru {
         assert trafficType == TrafficType.Management || trafficType == TrafficType.Storage : "Well, I can't take care of this config now can I? " + config;
 
         if (nic != null) {
-            if (nic.getRequestedIpv4() != null) {
+            if (nic.getRequestedIPv4() != null) {
                 throw new CloudRuntimeException("Does not support custom ip allocation at this time: " + nic);
             }
-            nic.setStrategy(nic.getIp4Address() != null ? ReservationStrategy.Create : ReservationStrategy.Start);
+            nic.setReservationStrategy(nic.getIPv4Address() != null ? ReservationStrategy.Create : ReservationStrategy.Start);
         } else {
             nic = new NicProfile(ReservationStrategy.Start, null, null, null, null);
         }
@@ -118,19 +120,25 @@ public class PodBasedNetworkGuru extends AdapterBase implements NetworkGuru {
         throws InsufficientVirtualNetworkCapacityException, InsufficientAddressCapacityException {
         Pod pod = dest.getPod();
 
-        Pair<String, Long> ip = _dcDao.allocatePrivateIpAddress(dest.getDataCenter().getId(), dest.getPod().getId(), nic.getId(), context.getReservationId());
-        if (ip == null) {
+        boolean forSystemVms = vm.getType().equals(VirtualMachine.Type.ConsoleProxy) || vm.getType().equals(VirtualMachine.Type.SecondaryStorageVm);
+        PrivateAllocationData result = _dcDao.allocatePrivateIpAddress(dest.getDataCenter().getId(), dest.getPod().getId(), nic.getId(), context.getReservationId(), forSystemVms);
+        if (result == null) {
             throw new InsufficientAddressCapacityException("Unable to get a management ip address", Pod.class, pod.getId());
         }
+        Integer vlan = result.getVlan();
 
-        nic.setIp4Address(ip.first());
-        nic.setMacAddress(NetUtils.long2Mac(NetUtils.createSequenceBasedMacAddress(ip.second())));
-        nic.setGateway(pod.getGateway());
+        nic.setIPv4Address(result.getIpAddress());
+        nic.setMacAddress(NetUtils.long2Mac(NetUtils.createSequenceBasedMacAddress(result.getMacAddress(), NetworkModel.MACIdentifier.value())));
+        nic.setIPv4Gateway(pod.getGateway());
         nic.setFormat(AddressFormat.Ip4);
         String netmask = NetUtils.getCidrNetmask(pod.getCidrSize());
-        nic.setNetmask(netmask);
+        nic.setIPv4Netmask(netmask);
         nic.setBroadcastType(BroadcastDomainType.Native);
-        nic.setBroadcastUri(null);
+        if (vlan != null) {
+            nic.setBroadcastUri(BroadcastDomainType.Native.toUri(vlan));
+        } else {
+            nic.setBroadcastUri(null);
+        }
         nic.setIsolationUri(null);
 
         s_logger.debug("Allocated a nic " + nic + " for " + vm);

@@ -22,7 +22,7 @@ from nose.plugins.attrib import attr
 from marvin.cloudstackTestCase import cloudstackTestCase
 from marvin.cloudstackException import CloudstackAPIException
 from marvin.cloudstackAPI import updateZone
-from marvin.lib.utils import cleanup_resources
+from marvin.lib.utils import cleanup_resources, validateList
 from marvin.lib.base import (Account,
                              VPC,
                              VpcOffering,
@@ -36,11 +36,13 @@ from marvin.lib.base import (Account,
                              NetworkACL,
                              NATRule,
                              Zone,
-                             StaticNATRule)
+                             StaticNATRule,
+                             VpnCustomerGateway)
 from marvin.lib.common import (get_domain,
                                get_zone,
                                get_template,
                                list_configurations)
+from marvin.codes import PASS
 import time
 
 
@@ -181,6 +183,13 @@ class Services:
             },
             "domain": {
                 "name": "TestDomain"
+            },
+            "vpn_customer_gw": {
+                "ipsecpsk": "s2svpn",
+                "ikepolicy": "3des-md5;modp1536",
+                "ikelifetime": "86400",
+                "esppolicy": "3des-md5",
+                "esplifetime": "3600",
             },
             "ostype": 'CentOS 5.3 (64-bit)',
             # Cent OS 5.3 (64 bit)
@@ -482,7 +491,7 @@ class TestVPC(cloudstackTestCase):
                 )
         return
 
-    @attr(tags=["advanced", "intervlan"], required_hardware="false")
+    @attr(tags=["advanced", "intervlan", "dvs"], required_hardware="false")
     def test_02_restart_vpc_no_networks(self):
         """ Test restart VPC having no networks
         """
@@ -513,7 +522,7 @@ class TestVPC(cloudstackTestCase):
         self.validate_vpc_network(vpc, state='Enabled')
         return
 
-    @attr(tags=["advanced", "intervlan"], required_hardware="false")
+    @attr(tags=["advanced", "intervlan", "dvs"], required_hardware="false")
     def test_03_restart_vpc_with_networks(self):
         """ Test restart VPC having networks
         """
@@ -2432,3 +2441,97 @@ class TestVPC(cloudstackTestCase):
         self.assertEqual(vpc_networks[0].displaytext,
                          new_display_text,
                          "Updation of VPC display text failed.")
+
+    @attr(tags=["advanced", "intervlan"], required_hardware="false")
+    def test_21_deploy_vm_with_gateway_ip(self):
+        self.services["vpc"]["cidr"] = "192.168.1.0/24"
+        self.debug("creating a VPC network in the account: %s" %
+                   self.account.name)
+        vpc = VPC.create(
+            self.apiclient,
+            self.services["vpc"],
+            vpcofferingid=self.vpc_off.id,
+            zoneid=self.zone.id,
+            account=self.account.name,
+            domainid=self.account.domainid
+        )
+        self.validate_vpc_network(vpc)
+        self.network_offering = NetworkOffering.create(
+            self.apiclient,
+            self.services["network_offering"],
+            conservemode=False
+        )
+        # Enable Network offering
+        self.network_offering.update(self.apiclient, state='Enabled')
+        self.cleanup.append(self.network_offering)
+        #Instead of first ip, assigning last ip in the CIDR as the gateway ip
+        gateway = "192.168.1.2"
+        self.services["network"]["netmask"] = "255.255.255.252"
+        # Split the cidr to retrieve gateway
+        # for eg. cidr = 10.0.0.1/24
+        # Gateway = 10.0.0.1
+
+        # Creating network using the network offering created
+        self.debug("Creating network with network offering: %s" %
+                   self.network_offering.id)
+        network = Network.create(
+            self.apiclient,
+            self.services["network"],
+            accountid=self.account.name,
+            domainid=self.account.domainid,
+            networkofferingid=self.network_offering.id,
+            zoneid=self.zone.id,
+            gateway=gateway,
+            vpcid=vpc.id
+        )
+        self.debug("Created network with ID: %s" % network.id)
+        vm = VirtualMachine.create(
+            self.apiclient,
+            self.services["virtual_machine"],
+            accountid=self.account.name,
+            domainid=self.account.domainid,
+            serviceofferingid=self.service_offering.id,
+            networkids=[str(network.id)]
+        )
+        self.debug("Deployed VM in network: %s" % network.id)
+        self.assertIsNotNone(
+            vm,
+            "Failed to create VM with first ip address in the CIDR as the vm ip"
+        )
+        return
+
+    @attr(tags=["advanced", "intervlan"], required_hardware="false")
+    def test_22_vpn_customer_gw_with_hostname(self):
+        """
+            Test to create vpn customer gateway with hostname
+            instead of gateway ip address
+        """
+        try:
+            vpnGw = VpnCustomerGateway.create(
+                self.apiclient,
+                self.services["vpn_customer_gw"],
+                name="test_vpn_customer_gw",
+                gateway="GwWithHostName",
+                cidrlist="10.1.0.0/16"
+            )
+            self.cleanup.append(vpnGw)
+        except Exception as e:
+            self.fail("Creating vpn customer gateway with hostname\
+            PR: https://github.com/apache/cloudstack/pull/955\
+            JIRA: https://issues.apache.org/jira/browse/CLOUDSTACK-8969\
+                      Failed with error :%s" % e)
+        vpn_cgw_res = VpnCustomerGateway.list(
+            self.apiclient,
+            id=vpnGw.id
+        )
+        self.assertEqual(
+            validateList(vpn_cgw_res)[0],
+            PASS,
+            "Invalid response for list vpncustomer gateways"
+        )
+        self.assertEqual(
+            vpnGw.gateway,
+            vpn_cgw_res[0].gateway,
+            "Mismatch in vpn customer gateway names"
+        )
+        return

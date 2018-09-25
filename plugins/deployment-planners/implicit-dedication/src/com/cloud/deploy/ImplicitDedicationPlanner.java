@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -41,7 +40,6 @@ import com.cloud.utils.NumbersUtil;
 import com.cloud.vm.VMInstanceVO;
 import com.cloud.vm.VirtualMachineProfile;
 
-@Local(value = DeploymentPlanner.class)
 public class ImplicitDedicationPlanner extends FirstFitPlanner implements DeploymentClusterPlanner {
 
     private static final Logger s_logger = Logger.getLogger(ImplicitDedicationPlanner.class);
@@ -58,7 +56,7 @@ public class ImplicitDedicationPlanner extends FirstFitPlanner implements Deploy
     @Override
     public boolean configure(final String name, final Map<String, Object> params) throws ConfigurationException {
         super.configure(name, params);
-        capacityReleaseInterval = NumbersUtil.parseInt(_configDao.getValue(Config.CapacitySkipcountingHours.key()), 3600);
+        capacityReleaseInterval = NumbersUtil.parseInt(configDao.getValue(Config.CapacitySkipcountingHours.key()), 3600);
         return true;
     }
 
@@ -137,8 +135,8 @@ public class ImplicitDedicationPlanner extends FirstFitPlanner implements Deploy
     }
 
     private List<VMInstanceVO> getVmsOnHost(long hostId) {
-        List<VMInstanceVO> vms = _vmInstanceDao.listUpByHostId(hostId);
-        List<VMInstanceVO> vmsByLastHostId = _vmInstanceDao.listByLastHostId(hostId);
+        List<VMInstanceVO> vms = vmInstanceDao.listUpByHostId(hostId);
+        List<VMInstanceVO> vmsByLastHostId = vmInstanceDao.listByLastHostId(hostId);
         if (vmsByLastHostId.size() > 0) {
             // check if any VMs are within skip.counting.hours, if yes we have to consider the host.
             for (VMInstanceVO stoppedVM : vmsByLastHostId) {
@@ -200,7 +198,7 @@ public class ImplicitDedicationPlanner extends FirstFitPlanner implements Deploy
         } else {
             String plannerName = offering.getDeploymentPlanner();
             if (plannerName == null) {
-                plannerName = _globalDeploymentPlanner;
+                plannerName = globalDeploymentPlanner;
             }
 
             if (plannerName != null && this.getName().equals(plannerName)) {
@@ -307,8 +305,6 @@ public class ImplicitDedicationPlanner extends FirstFitPlanner implements Deploy
                 // Empty hosts can contain hosts which are not having user vms but system vms are running.
                 // But the host where system vms are running is marked as shared and still be part of empty Hosts.
                 // The scenario will fail where actual Empty hosts and uservms not running host.
-                return PlannerResourceUsage.Dedicated;
-            } else if (!preferred) {
                 return PlannerResourceUsage.Dedicated;
             } else {
                 if (!allOtherHosts.isEmpty() && (hostsToAvoid == null || !hostsToAvoid.containsAll(allOtherHosts))) {

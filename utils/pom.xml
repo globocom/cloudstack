@@ -18,20 +18,26 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <artifactId>cloud-utils</artifactId>
   <name>Apache CloudStack Utils</name>
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.1.0</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <dependencies>
     <dependency>
       <groupId>org.apache.cloudstack</groupId>
       <artifactId>cloud-framework-managed-context</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.cloudstack</groupId>
+      <artifactId>cloud-framework-ca</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -59,12 +65,20 @@
       <artifactId>cglib-nodep</artifactId>
     </dependency>
     <dependency>
+      <groupId>commons-validator</groupId>
+      <artifactId>commons-validator</artifactId>
+    </dependency>
+    <dependency>
       <groupId>commons-codec</groupId>
       <artifactId>commons-codec</artifactId>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk16</artifactId>
+      <artifactId>bcprov-jdk15on</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk15on</artifactId>
     </dependency>
     <dependency>
       <groupId>com.jcraft</groupId>
@@ -80,7 +94,11 @@
     </dependency>
     <dependency>
       <groupId>com.amazonaws</groupId>
-      <artifactId>aws-java-sdk</artifactId>
+      <artifactId>aws-java-sdk-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-s3</artifactId>
     </dependency>
     <dependency>
       <groupId>log4j</groupId>
@@ -88,12 +106,8 @@
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>javax.ejb</groupId>
-      <artifactId>ejb-api</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>com.googlecode.java-ipv6</groupId>
-        <artifactId>java-ipv6</artifactId>
+      <groupId>com.googlecode.java-ipv6</groupId>
+      <artifactId>java-ipv6</artifactId>
     </dependency>
     <dependency>
       <groupId>commons-configuration</groupId>
@@ -101,7 +115,7 @@
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
-      <artifactId>servlet-api</artifactId>
+      <artifactId>javax.servlet-api</artifactId>
       <scope>provided</scope>
     </dependency>
     <!-- Test dependency in mysql for db tests -->
@@ -111,9 +125,10 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-        <groupId>commons-io</groupId>
-        <artifactId>commons-io</artifactId>
-        <scope>provided</scope>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <scope>provided</scope>
+      <version>${cs.commons-io.version}</version>
     </dependency>
     <dependency>
       <groupId>org.reflections</groupId>
@@ -141,6 +156,10 @@
           <groupId>xerces</groupId>
           <artifactId>xmlParserAPIs</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>commons-beanutils</groupId>
+          <artifactId>commons-beanutils-core</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -149,16 +168,40 @@
       <version>${cs.opensaml.version}</version>
     </dependency>
     <dependency>
-        <groupId>commons-net</groupId>
-        <artifactId>commons-net</artifactId>
-        <version>3.3</version>
+      <groupId>commons-net</groupId>
+      <artifactId>commons-net</artifactId>
+      <version>3.6</version>
     </dependency>
     <dependency>
       <groupId>com.google.code.gson</groupId>
       <artifactId>gson</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava-testlib</artifactId>
+      <version>${cs.guava-testlib.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${cs.jackson.version}</version>
+    </dependency>
   </dependencies>
   <build>
+    <sourceDirectory>src/main/java</sourceDirectory>
+    <testSourceDirectory>src/test/java</testSourceDirectory>
+    <outputDirectory>target/classes</outputDirectory>
+    <testOutputDirectory>target/test-classes</testOutputDirectory>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+    </resources>
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+    </testResources>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -178,31 +221,11 @@
           <excludes>
             <exclude>com/cloud/utils/testcase/*TestCase*</exclude>
             <exclude>com/cloud/utils/db/*Test*</exclude>
-            <exclude>com/cloud/utils/testcase/NioTest.java</exclude>
           </excludes>
         </configuration>
-      </plugin>      
-      <plugin>
-        <groupId>com.mycila</groupId>
-        <artifactId>license-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>cloudstack-checklicence</id>
-            <phase>process-classes</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
-    <resources>
-       <resource>
-          <directory>certs</directory>
-       </resource>
-    </resources>
   </build>
-
   <profiles>
     <profile>
       <id>integration</id>
@@ -224,5 +247,4 @@
       </build>
     </profile>
   </profiles>
-
 </project>

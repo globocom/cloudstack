@@ -18,28 +18,10 @@
 #
 # This script should be used to bring up the environment.
 #
+export MAVEN_OPTS="-Xmx4096m -XX:MaxPermSize=800m -Djava.security.egd=file:/dev/urandom"
+echo -e "\nStarting simulator"
+mvn -Dsimulator -Dorg.eclipse.jetty.annotations.maxWait=120 -pl :cloud-client-ui jetty:run 2>&1 > /tmp/jetty-log &
 
-
-export TEST_JOB_NUMBER=`echo $TRAVIS_JOB_NUMBER | cut -d. -f1`
-export TEST_SEQUENCE_NUMBER=`echo $TRAVIS_JOB_NUMBER | cut -d. -f2`
-
-#run regression test only on $REGRESSION_CYCLE
-MOD=$(( $TEST_JOB_NUMBER % $REGRESSION_CYCLE ))
-
-if [ $MOD -ne 0 ]; then
- if [ $TEST_SEQUENCE_NUMBER -ge $REGRESSION_INDEX ]; then
-   #skip test
-   echo "Skipping tests ... SUCCESS !"
-   exit 0
- fi
-fi
-
-
-export CATALINA_BASE=/opt/tomcat
-export CATALINA_HOME=/opt/tomcat
-export MAVEN_OPTS="-Xmx1024m -XX:MaxPermSize=500m"
-
-mvn -Dsimulator -pl :cloud-client-ui jetty:run 2>&1 > /dev/null &
-
-while ! nc -vz localhost 8096 2>&1 > /dev/null; do sleep 10; done
-python -m marvin.deployDataCenter -i setup/dev/advanced.cfg 2>&1 || true
+while ! nc -vzw 5 localhost 8096 2>&1 > /dev/null; do grep Exception /tmp/jetty-log; sleep 10; done
+echo -e "\nStarting DataCenter deployment"
+python tools/marvin/marvin/deployDataCenter.py -i setup/dev/advanced.cfg 2>&1 || true

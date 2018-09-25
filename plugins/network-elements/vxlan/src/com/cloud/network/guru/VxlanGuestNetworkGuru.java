@@ -16,12 +16,6 @@
 // under the License.
 package com.cloud.network.guru;
 
-import javax.ejb.Local;
-
-import org.apache.log4j.Logger;
-import org.springframework.stereotype.Component;
-
-import org.apache.cloudstack.context.CallContext;
 
 import com.cloud.dc.DataCenter;
 import com.cloud.dc.DataCenter.NetworkType;
@@ -45,25 +39,28 @@ import com.cloud.user.Account;
 import com.cloud.vm.NicProfile;
 import com.cloud.vm.ReservationContext;
 import com.cloud.vm.VirtualMachineProfile;
+import org.apache.cloudstack.context.CallContext;
+import org.apache.log4j.Logger;
+import org.springframework.stereotype.Component;
 
 @Component
-@Local(value = NetworkGuru.class)
 public class VxlanGuestNetworkGuru extends GuestNetworkGuru {
     private static final Logger s_logger = Logger.getLogger(VxlanGuestNetworkGuru.class);
 
     public VxlanGuestNetworkGuru() {
         super();
-        _isolationMethods = new IsolationMethod[] {IsolationMethod.VXLAN};
+        _isolationMethods = new IsolationMethod[] {new IsolationMethod("VXLAN")};
     }
 
     @Override
     protected boolean canHandle(NetworkOffering offering, final NetworkType networkType, final PhysicalNetwork physicalNetwork) {
         // This guru handles only Guest Isolated network that supports Source nat service
-        if (networkType == NetworkType.Advanced && isMyTrafficType(offering.getTrafficType()) && offering.getGuestType() == Network.GuestType.Isolated &&
-            isMyIsolationMethod(physicalNetwork)) {
+        if (networkType == NetworkType.Advanced && isMyTrafficType(offering.getTrafficType()) &&
+                (offering.getGuestType() == Network.GuestType.Isolated || offering.getGuestType() == Network.GuestType.L2) &&
+                isMyIsolationMethod(physicalNetwork)) {
             return true;
         } else {
-            s_logger.trace("We only take care of Guest networks of type   " + GuestType.Isolated + " in zone of type " + NetworkType.Advanced);
+            s_logger.trace("We only take care of Guest networks of type   " + GuestType.Isolated + " or " + GuestType.L2 + " in zone of type " + NetworkType.Advanced);
             return false;
         }
     }
@@ -76,6 +73,10 @@ public class VxlanGuestNetworkGuru extends GuestNetworkGuru {
             return null;
         }
 
+        if (offering.getGuestType() == GuestType.L2 && network.getBroadcastUri() != null) {
+            String vxlan = BroadcastDomainType.getValue(network.getBroadcastUri());
+            network.setBroadcastUri(BroadcastDomainType.Vxlan.toUri(vxlan));
+        }
         network.setBroadcastDomainType(BroadcastDomainType.Vxlan);
 
         return network;
@@ -121,7 +122,7 @@ public class VxlanGuestNetworkGuru extends GuestNetworkGuru {
 
         NetworkVO implemented =
             new NetworkVO(network.getTrafficType(), network.getMode(), network.getBroadcastDomainType(), network.getNetworkOfferingId(), State.Allocated,
-                network.getDataCenterId(), physicalNetworkId);
+                network.getDataCenterId(), physicalNetworkId, offering.getRedundantRouter());
 
         allocateVnet(network, implemented, dcId, physicalNetworkId, context.getReservationId());
 

@@ -16,7 +16,6 @@
 */
 package com.globo.globodns.cloudstack.dao;
 
-import javax.ejb.Local;
 
 import org.springframework.stereotype.Component;
 
@@ -28,7 +27,6 @@ import com.cloud.utils.db.SearchCriteria.Op;
 import com.globo.globodns.cloudstack.GloboDnsVirtualMachineVO;
 
 @Component
-@Local(value = GloboDnsVirtualMachineDao.class)
 @DB
 public class GloboDnsVirtualMachineDaoImpl extends GenericDaoBase<GloboDnsVirtualMachineVO, Long> implements GloboDnsVirtualMachineDao {
 

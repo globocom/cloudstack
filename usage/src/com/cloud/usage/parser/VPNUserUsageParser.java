@@ -95,6 +95,7 @@ public class VPNUserUsageParser {
             }
 
             if (vuCreateDate.after(endDate)) {
+                //Ignore records created after endDate
                 continue;
             }
 

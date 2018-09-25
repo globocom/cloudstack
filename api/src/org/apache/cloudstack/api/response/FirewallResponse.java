@@ -37,11 +37,11 @@ public class FirewallResponse extends BaseResponse {
 
     @SerializedName(ApiConstants.START_PORT)
     @Param(description = "the starting port of firewall rule's port range")
-    private String startPort;
+    private Integer startPort;
 
     @SerializedName(ApiConstants.END_PORT)
     @Param(description = "the ending port of firewall rule's port range")
-    private String endPort;
+    private Integer endPort;
 
     @SerializedName(ApiConstants.IP_ADDRESS_ID)
     @Param(description = "the public ip address id for the firewall rule")
@@ -79,6 +79,10 @@ public class FirewallResponse extends BaseResponse {
     @Param(description = "is rule for display to the regular user", since = "4.4", authorized = {RoleType.Admin})
     private Boolean forDisplay;
 
+    @SerializedName(ApiConstants.DEST_CIDR_LIST)
+    @Param(description = "the cidr list to forward traffic to")
+    private String destCidr;
+
     public void setId(String id) {
         this.id = id;
     }
@@ -87,11 +91,11 @@ public class FirewallResponse extends BaseResponse {
         this.protocol = protocol;
     }
 
-    public void setStartPort(String startPort) {
+    public void setStartPort(Integer startPort) {
         this.startPort = startPort;
     }
 
-    public void setEndPort(String endPort) {
+    public void setEndPort(Integer endPort) {
         this.endPort = endPort;
     }
 
@@ -129,5 +133,9 @@ public class FirewallResponse extends BaseResponse {
 
     public void setForDisplay(Boolean forDisplay) {
         this.forDisplay = forDisplay;
+    }
+
+    public void setDestCidr(String cidrList){
+        this.destCidr = cidrList;
     }
 }

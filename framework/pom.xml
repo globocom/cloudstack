@@ -24,7 +24,7 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.1.0</version>
   </parent>
   <build>
     <defaultGoal>install</defaultGoal>
@@ -44,15 +44,19 @@
   </build>
   <modules>
     <module>ipc</module>
+    <module>ca</module>
     <module>rest</module>
     <module>events</module>
     <module>jobs</module>
+    <module>quota</module>
     <module>cluster</module>
     <module>db</module>
     <module>config</module>
     <module>managed-context</module>
     <module>spring/lifecycle</module>
     <module>spring/module</module>
-	<module>security</module>
+    <module>security</module>
+    <module>agent-lb</module>
+    <module>direct-download</module>
   </modules>
 </project>

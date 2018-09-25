@@ -2,10 +2,9 @@ package com.cloud.tags;
 
 import com.cloud.exception.InsufficientCapacityException;
 import com.cloud.exception.ResourceUnavailableException;
+import com.cloud.network.router.NetworkHelper;
 import com.cloud.server.ResourceTag;
 import com.cloud.tags.dao.ResourceTagDao;
-import com.cloud.vm.UserVmManager;
-import com.cloud.vm.UserVmManagerImpl;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,9 +12,9 @@ import java.util.Map;
 import junit.framework.TestCase;
 import org.mockito.Mockito;
 
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.mockito.internal.verification.VerificationModeFactory.times;
 
 public class TaggedResourceManagerImplTest extends TestCase {
@@ -110,15 +109,15 @@ public class TaggedResourceManagerImplTest extends TestCase {
         tags2.put(TagKeysBuilder.TAGKEYS_METADATA_KEY, "TAG_TEST,TAG_TEST_2");
         vmsIdResourceTagToRemove.put(3l, tags3);
 
-        UserVmManager userVmManager = mock(UserVmManagerImpl.class);
-        doNothing().when(userVmManager).updateVMData(2l, tags2);
-        doNothing().when(userVmManager).updateVMData(3l, tags3);
-        manager._userVmManager = userVmManager;
+        NetworkHelper networkHelper = mock(NetworkHelper.class);
+        when(networkHelper.updateVMMetadaInVrouter(2l, tags2)).thenReturn(true);
+        when(networkHelper.updateVMMetadaInVrouter(3l, tags3)).thenReturn(true);
+        manager._networkHelper = networkHelper;
 
         manager.updateVMMetaData(vmsIdResourceTagToRemove);
 
-        verify(userVmManager, times(1)).updateVMData(2l, tags2);
-        verify(userVmManager, times(1)).updateVMData(3l, tags3);
+        verify(networkHelper, times(1)).updateVMMetadaInVrouter(2l, tags2);
+        verify(networkHelper, times(1)).updateVMMetadaInVrouter(3l, tags3);
     }
 
 

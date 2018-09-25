@@ -26,6 +26,14 @@
         title: 'label.menu.service.offerings',
         id: 'configuration',
         sectionSelect: {
+            preFilter: function(args) {
+               if(isAdmin())
+                   return ["serviceOfferings", "systemServiceOfferings", "diskOfferings", "networkOfferings", "vpcOfferings"];
+               else if(isDomainAdmin())
+                   return ["serviceOfferings", "diskOfferings"];
+               else
+                   return null;
+            },
             label: 'label.select.offering'
         },
         sections: {
@@ -62,6 +70,17 @@
 
                             createForm: {
                                 title: 'label.add.compute.offering',
+                                preFilter: function(args) {
+                                    if (isAdmin()) {
+                                    } else {
+                                        args.$form.find('.form-item[rel=isPublic]').hide();
+                                        args.$form.find('.form-item[rel=domainId]').css('display', 'inline-block'); //shown
+                                        args.$form.find('.form-item[rel=deploymentPlanner]').hide();
+                                        args.$form.find('.form-item[rel=plannerMode]').hide();
+                                        args.$form.find('.form-item[rel=storageTags]').hide();
+                                        args.$form.find('.form-item[rel=hostTags]').hide();
+                                    }
+                                },
                                 fields: {
                                     name: {
                                         label: 'label.name',
@@ -118,7 +137,7 @@
                                         }
                                     },
                                     isCustomized: {
-                                        label: 'label.custom',                                       
+                                        label: 'label.custom',
                                         isBoolean: true,
                                         isReverse: true,
                                         isChecked: false
@@ -327,8 +346,8 @@
 
                                                     args.response.success({
                                                         data: tags,
-                                                        hintText: "Type in part of a storage tag",
-                                                        noResultsText: "No storage tags found"
+                                                        hintText: _l('hint.type.part.storage.tag'),
+                                                        noResultsText: _l('hint.no.storage.tags')
                                                     });
                                                 },
                                                 error: function(XMLHttpResponse) {
@@ -340,9 +359,9 @@
                                         }
                                     },
                                     hostTags: { //Only one single host tag is supported at server-side. Multiple host tags are NOT supported at server-side.
-                                        label: 'Host Tag',
-                                        docID: 'helpComputeOfferingHostTags'                                        
-                                   },
+                                        label: 'label.host.tag',
+                                        docID: 'helpComputeOfferingHostTags'
+                                    },
                                     cpuCap: {
                                         label: 'label.CPU.cap',
                                         isBoolean: true,
@@ -353,7 +372,7 @@
                                         label: 'label.public',
                                         isBoolean: true,
                                         isReverse: true,
-                                        isChecked: true,
+                                        isChecked: false,
                                         docID: 'helpComputeOfferingPublic'
                                     },
 
@@ -367,6 +386,7 @@
                                     deploymentPlanner: {
                                         label: 'label.deployment.planner',
                                         select: function(args) {
+                                          if (isAdmin()) {
                                             $.ajax({
                                                 url: createURL('listDeploymentPlanners'),
                                                 dataType: 'json',
@@ -390,12 +410,13 @@
                                                         var $fields = $form.find('.field');
                                                         if ($(this).val() == "ImplicitDedicationPlanner") {
                                                             $form.find('[rel=plannerMode]').css('display', 'block');
-                                                        } else {	
+                                                        } else {
                                                             $form.find('[rel=plannerMode]').hide();
                                                         }
                                                     });
                                                 }
                                             });
+                                          }
                                         }
                                     },
 
@@ -575,9 +596,9 @@
                                     provisioningType :args.data.provisioningType,
                                     customized: (args.data.isCustomized == "on")
                                 };
-                                
+
                                 //custom fields (begin)
-                                if (args.data.isCustomized != "on") {      
+                                if (args.data.isCustomized != "on") {
                                     $.extend(data, {
                                         cpuNumber: args.data.cpuNumber
                                     });
@@ -587,9 +608,9 @@
                                     $.extend(data, {
                                         memory: args.data.memory
                                     });
-                                }      
+                                }
                                 //custom fields (end)
-                                
+
                                 if (args.data.deploymentPlanner != null && args.data.deploymentPlanner.length > 0) {
                                     $.extend(data, {
                                         deploymentplanner: args.data.deploymentPlanner
@@ -732,7 +753,7 @@
                         });
 
                         $.ajax({
-                            url: createURL('listServiceOfferings'),
+                            url: createURL('listServiceOfferings&isrecursive=true'),
                             data: data,
                             success: function(json) {
                                 var items = json.listserviceofferingsresponse.serviceoffering;
@@ -748,7 +769,7 @@
                     },
 
                     detailView: {
-                        name: 'Service offering details',
+                        name: 'label.service.offering.details',
                         actions: {
                             edit: {
                                 label: 'label.edit',
@@ -851,7 +872,7 @@
                                         converter: function(args) {
                                             if (args == undefined)
                                                 return '';
-                                            else                                        
+                                            else
                                                 return cloudStack.converters.convertBytes(args * 1024 * 1024);
                                         }
                                     },
@@ -915,10 +936,10 @@
                                     },
                                     deploymentplanner: {
                                         label: 'label.deployment.planner'
-                                    },                                    
+                                    },
                                     plannerMode: {
                                         label: 'label.planner.mode'
-                                    },                                    
+                                    },
                                     pciDevice: {
                                         label: 'label.gpu'
                                     },
@@ -929,7 +950,7 @@
                                         label: 'label.storage.tags'
                                     },
                                     hosttags: {
-                                        label: 'Host Tag'
+                                        label: 'label.host.tag'
                                     },
                                     domain: {
                                         label: 'label.domain'
@@ -946,18 +967,18 @@
                                         id: args.context.serviceOfferings[0].id
                                     };
                                     $.ajax({
-                                        url: createURL('listServiceOfferings'),
+                                        url: createURL('listServiceOfferings&isrecursive=true'),
                                         data: data,
                                         async: true,
                                         success: function(json) {
                                             var item = json.listserviceofferingsresponse.serviceoffering[0];
-                                            
+
                                             if (item.deploymentplanner != null && item.serviceofferingdetails != null) {
                                                 if (item.deploymentplanner == 'ImplicitDedicationPlanner' && item.serviceofferingdetails.ImplicitDedicationMode != null) {
                                                     item.plannerMode = item.serviceofferingdetails.ImplicitDedicationMode;
                                                 }
                                             }
-                                                                                       
+
                                             if (item.serviceofferingdetails != null) {
                                                 item.pciDevice = item.serviceofferingdetails.pciDevice;
                                                 item.vgpuType = item.serviceofferingdetails.vgpuType;
@@ -1009,6 +1030,13 @@
 
                             createForm: {
                                 title: 'label.add.system.service.offering',
+                                preFilter: function(args) {
+                                    if (isAdmin()) {
+                                    } else {
+                                        args.$form.find('.form-item[rel=isPublic]').hide();
+                                        args.$form.find('.form-item[rel=domainId]').css('display', 'inline-block'); //shown
+                                    }
+                                },
                                 fields: {
                                     name: {
                                         label: 'label.name',
@@ -1031,15 +1059,15 @@
                                             var items = [];
                                             items.push({
                                                 id: 'domainrouter',
-                                                description: dictionary['label.domain.router']
+                                                description: _l('label.domain.router')
                                             });
                                             items.push({
                                                 id: 'consoleproxy',
-                                                description: dictionary['label.console.proxy']
+                                                description: _l('label.console.proxy')
                                             });
                                             items.push({
                                                 id: 'secondarystoragevm',
-                                                description: dictionary['label.secondary.storage.vm']
+                                                description: _l('label.secondary.storage.vm')
                                             });
                                             args.response.success({
                                                 data: items
@@ -1118,6 +1146,82 @@
                                             number: true
                                         }
                                     },
+                                    qosType: {
+                                        label: 'label.qos.type',
+                                        docID: 'helpDiskOfferingQoSType',
+                                        select: function(args) {
+                                            var items = [];
+                                            items.push({
+                                                id: '',
+                                                description: ''
+                                            });
+                                            items.push({
+                                                id: 'hypervisor',
+                                                description: 'hypervisor'
+                                            });
+                                            items.push({
+                                                id: 'storage',
+                                                description: 'storage'
+                                            });
+                                            args.response.success({
+                                                data: items
+                                            });
+
+                                            args.$select.change(function() {
+                                                var $form = $(this).closest('form');
+                                                var $isCustomizedIops = $form.find('.form-item[rel=isCustomizedIops]');
+                                                var $minIops = $form.find('.form-item[rel=minIops]');
+                                                var $maxIops = $form.find('.form-item[rel=maxIops]');
+                                                var $diskBytesReadRate = $form.find('.form-item[rel=diskBytesReadRate]');
+                                                var $diskBytesWriteRate = $form.find('.form-item[rel=diskBytesWriteRate]');
+                                                var $diskIopsReadRate = $form.find('.form-item[rel=diskIopsReadRate]');
+                                                var $diskIopsWriteRate = $form.find('.form-item[rel=diskIopsWriteRate]');
+
+                                                var qosId = $(this).val();
+
+                                                if (qosId == 'storage') { // Storage QoS
+                                                    $diskBytesReadRate.hide();
+                                                    $diskBytesWriteRate.hide();
+                                                    $diskIopsReadRate.hide();
+                                                    $diskIopsWriteRate.hide();
+
+                                                    $minIops.css('display', 'inline-block');
+                                                    $maxIops.css('display', 'inline-block');
+                                                } else if (qosId == 'hypervisor') { // Hypervisor Qos
+                                                    $minIops.hide();
+                                                    $maxIops.hide();
+
+                                                    $diskBytesReadRate.css('display', 'inline-block');
+                                                    $diskBytesWriteRate.css('display', 'inline-block');
+                                                    $diskIopsReadRate.css('display', 'inline-block');
+                                                    $diskIopsWriteRate.css('display', 'inline-block');
+                                                } else { // No Qos
+                                                    $diskBytesReadRate.hide();
+                                                    $diskBytesWriteRate.hide();
+                                                    $diskIopsReadRate.hide();
+                                                    $diskIopsWriteRate.hide();
+                                                    $minIops.hide();
+                                                    $maxIops.hide();
+                                                }
+                                            });
+                                        }
+                                    },
+                                    minIops: {
+                                        label: 'label.disk.iops.min',
+                                        docID: 'helpDiskOfferingDiskIopsMin',
+                                        validation: {
+                                            required: false,
+                                            number: true
+                                        }
+                                    },
+                                    maxIops: {
+                                        label: 'label.disk.iops.max',
+                                        docID: 'helpDiskOfferingDiskIopsMax',
+                                        validation: {
+                                            required: false,
+                                            number: true
+                                        }
+                                    },
                                     diskBytesReadRate: {
                                         label: 'label.disk.bytes.read.rate',
                                         docID: 'helpSystemOfferingDiskBytesReadRate',
@@ -1174,7 +1278,7 @@
                                         label: 'label.public',
                                         isBoolean: true,
                                         isReverse: true,
-                                        isChecked: true,
+                                        isChecked: false,
                                         docID: 'helpSystemOfferingPublic'
                                     },
                                     domainId: {
@@ -1183,7 +1287,11 @@
                                         dependsOn: 'isPublic',
                                         select: function(args) {
                                             $.ajax({
-                                                url: createURL("listDomains&listAll=true"),
+                                                url: createURL('listDomains'),
+                                                data: {
+                                                    listAll: true,
+                                                    details: 'min'
+                                                },
                                                 dataType: "json",
                                                 async: false,
                                                 success: function(json) {
@@ -1227,25 +1335,43 @@
                                         networkrate: args.data.networkRate
                                     });
                                 }
-                                if (args.data.diskBytesReadRate != null && args.data.diskBytesReadRate.length > 0) {
-                                    $.extend(data, {
-                                        bytesreadrate: args.data.diskBytesReadRate
-                                    });
-                                }
-                                if (args.data.diskBytesWriteRate != null && args.data.diskBytesWriteRate.length > 0) {
-                                    $.extend(data, {
-                                        byteswriterate: args.data.diskBytesWriteRate
-                                    });
-                                }
-                                if (args.data.diskIopsReadRate != null && args.data.diskIopsReadRate.length > 0) {
-                                    $.extend(data, {
-                                        iopsreadrate: args.data.diskIopsReadRate
-                                    });
-                                }
-                                if (args.data.diskIopsWriteRate != null && args.data.diskIopsWriteRate.length > 0) {
-                                    $.extend(data, {
-                                        iopswriterate: args.data.diskIopsWriteRate
-                                    });
+
+                                if (args.data.qosType == 'storage') {
+                                    if (args.data.minIops != null && args.data.minIops.length > 0) {
+                                        $.extend(data, {
+                                            miniops: args.data.minIops
+                                        });
+                                    }
+
+                                    if (args.data.maxIops != null && args.data.maxIops.length > 0) {
+                                        $.extend(data, {
+                                            maxiops: args.data.maxIops
+                                        });
+                                    }
+                                } else if (args.data.qosType == 'hypervisor') {
+                                    if (args.data.diskBytesReadRate != null && args.data.diskBytesReadRate.length > 0) {
+                                        $.extend(data, {
+                                            bytesreadrate: args.data.diskBytesReadRate
+                                        });
+                                    }
+
+                                    if (args.data.diskBytesWriteRate != null && args.data.diskBytesWriteRate.length > 0) {
+                                        $.extend(data, {
+                                            byteswriterate: args.data.diskBytesWriteRate
+                                        });
+                                    }
+
+                                    if (args.data.diskIopsReadRate != null && args.data.diskIopsReadRate.length > 0) {
+                                        $.extend(data, {
+                                            iopsreadrate: args.data.diskIopsReadRate
+                                        });
+                                    }
+
+                                    if (args.data.diskIopsWriteRate != null && args.data.diskIopsWriteRate.length > 0) {
+                                        $.extend(data, {
+                                            iopswriterate: args.data.diskIopsWriteRate
+                                        });
+                                    }
                                 }
 
                                 $.extend(data, {
@@ -1306,7 +1432,7 @@
                         });
 
                         $.ajax({
-                            url: createURL('listServiceOfferings'),
+                            url: createURL('listServiceOfferings&isrecursive=true'),
                             data: data,
                             success: function(json) {
                                 var items = json.listserviceofferingsresponse.serviceoffering;
@@ -1321,7 +1447,7 @@
                     },
 
                     detailView: {
-                        name: 'System service offering details',
+                        name: 'label.system.service.offering.details',
                         actions: {
                             edit: {
                                 label: 'label.edit',
@@ -1409,13 +1535,13 @@
                                             var text = '';
                                             switch (args) {
                                                 case 'domainrouter':
-                                                    text = dictionary['label.domain.router'];
+                                                    text = _l('label.domain.router');
                                                     break;
                                                 case 'consoleproxy':
-                                                    text = dictionary['label.console.proxy'];
+                                                    text = _l('label.console.proxy');
                                                     break;
                                                 case 'secondarystoragevm':
-                                                    text = dictionary['label.secondary.storage.vm'];
+                                                    text = _l('label.secondary.storage.vm');
                                                     break;
                                             }
                                             return text;
@@ -1441,12 +1567,30 @@
                                         converter: function(args) {
                                             if (args == undefined)
                                                 return '';
-                                            else 
+                                            else
                                                 return cloudStack.converters.convertBytes(args * 1024 * 1024);
                                         }
                                     },
                                     networkrate: {
                                         label: 'label.network.rate'
+                                    },
+                                    miniops: {
+                                        label: 'label.disk.iops.min',
+                                        converter: function(args) {
+                                            if (args > 0)
+                                                return args;
+                                            else
+                                                return "N/A";
+                                        }
+                                    },
+                                    maxiops: {
+                                        label: 'label.disk.iops.max',
+                                        converter: function(args) {
+                                            if (args > 0)
+                                                return args;
+                                            else
+                                                return "N/A";
+                                        }
                                     },
                                     diskBytesReadRate: {
                                         label: 'label.disk.bytes.read.rate'
@@ -1489,7 +1633,7 @@
                                         id: args.context.systemServiceOfferings[0].id
                                     };
                                     $.ajax({
-                                        url: createURL('listServiceOfferings'),
+                                        url: createURL('listServiceOfferings&isrecursive=true'),
                                         data: data,
                                         success: function(json) {
                                             var item = json.listserviceofferingsresponse.serviceoffering[0];
@@ -1541,7 +1685,7 @@
                         listViewDataProvider(args, data);
 
                         $.ajax({
-                            url: createURL('listDiskOfferings'),
+                            url: createURL('listDiskOfferings&isrecursive=true'),
                             data: data,
                             success: function(json) {
                                 var items = json.listdiskofferingsresponse.diskoffering;
@@ -1570,6 +1714,14 @@
 
                             createForm: {
                                 title: 'label.add.disk.offering',
+                                preFilter: function(args) {
+                                    if (isAdmin()) {
+                                    } else {
+                                        args.$form.find('.form-item[rel=isPublic]').hide();
+                                        args.$form.find('.form-item[rel=domainId]').css('display', 'inline-block'); //shown
+                                        args.$form.find('.form-item[rel=tags]').hide();
+                                    }
+                                },
                                 fields: {
                                     name: {
                                         label: 'label.name',
@@ -1826,8 +1978,8 @@
 
                                                     args.response.success({
                                                         data: tags,
-                                                        hintText: "Type in part of a storage tag",
-                                                        noResultsText: "No storage tags found"
+                                                        hintText: _l('hint.type.part.storage.tag'),
+                                                        noResultsText: _l('hint.no.storage.tags')
                                                     });
                                                 },
                                                 error: function(XMLHttpResponse) {
@@ -1842,7 +1994,7 @@
                                         label: 'label.public',
                                         isBoolean: true,
                                         isReverse: true,
-                                        isChecked: true,
+                                        isChecked: false,
                                         docID: 'helpDiskOfferingPublic'
                                     },
                                     domainId: {
@@ -1851,7 +2003,11 @@
                                         dependsOn: 'isPublic',
                                         select: function(args) {
                                             $.ajax({
-                                                url: createURL("listDomains&listAll=true"),
+                                                url: createURL('listDomains'),
+                                                data: {
+                                                    listAll: true,
+                                                    details: 'min'
+                                                },
                                                 dataType: "json",
                                                 async: false,
                                                 success: function(json) {
@@ -1888,7 +2044,7 @@
                                     customized: (args.data.isCustomized == "on")
                                 };
 
-                                if (args.data.isCustomized != "on") {  
+                                if (args.data.isCustomized != "on") {
                                     $.extend(data, {
                                         disksize: args.data.disksize
                                     });
@@ -1982,7 +2138,7 @@
                     },
 
                     detailView: {
-                        name: 'Disk offering details',
+                        name: 'label.disk.offering.details',
                         actions: {
                             edit: {
                                 label: 'label.edit',
@@ -2121,7 +2277,7 @@
                                         label: 'label.disk.iops.write.rate'
                                     },
                                     cacheMode: {
-                                        label: 'label.cache.mode',
+                                        label: 'label.cache.mode'
                                     },
                                     tags: {
                                         label: 'label.storage.tags'
@@ -2142,7 +2298,7 @@
                                         id: args.context.diskOfferings[0].id
                                     };
                                     $.ajax({
-                                        url: createURL('listDiskOfferings'),
+                                        url: createURL('listDiskOfferings&isrecursive=true'),
                                         data: data,
                                         success: function(json) {
                                             var item = json.listdiskofferingsresponse.diskoffering[0];
@@ -2219,6 +2375,7 @@
                                     var $serviceofferingid = args.$form.find('.form-item[rel=serviceofferingid]');
                                     var $conservemode = args.$form.find('.form-item[rel=conservemode]');
                                     var $supportsstrechedl2subnet = args.$form.find('.form-item[rel=supportsstrechedl2subnet]');
+                                    var $supportspublicaccess = args.$form.find('.form-item[rel=supportspublicaccess]');
                                     var $serviceSourceNatRedundantRouterCapabilityCheckbox = args.$form.find('.form-item[rel="service.SourceNat.redundantRouterCapabilityCheckbox"]');
                                     var hasAdvancedZones = false;
 
@@ -2246,20 +2403,33 @@
                                         //*** VPC checkbox ***
                                         var $useVpc = args.$form.find('.form-item[rel=\"useVpc\"]');
                                         var $useVpcCb = $useVpc.find("input[type=checkbox]");
+                                        var $supportedServices = args.$form.find('.form-item[rel=\"supportedServices\"]');
+                                        var $userDataL2 = args.$form.find('.form-item[rel=\"userDataL2\"]');
                                         if ($guestTypeField.val() == 'Shared') { //Shared network offering
                                             $useVpc.hide();
+                                            $userDataL2.hide();
+                                            $supportedServices.css('display', 'inline-block');
                                             if ($useVpcCb.is(':checked')) { //if useVpc is checked,
                                                 $useVpcCb.removeAttr("checked"); //remove "checked" attribute in useVpc
                                             }
-                                        } else { //Isolated network offering
+                                            $conservemode.css('display', 'inline-block');
+                                        } else if ($guestTypeField.val() == 'Isolated') { //Isolated network offering
                                             $useVpc.css('display', 'inline-block');
+                                            $supportedServices.css('display', 'inline-block');
+                                            $userDataL2.hide();
+                                            $conservemode.css('display', 'inline-block');
+                                        } else if ($guestTypeField.val() == 'L2') {
+                                            $useVpc.hide();
+                                            $supportedServices.hide();
+                                            $userDataL2.css('display', 'inline-block');
+                                            $conservemode.hide();
                                         }
                                         var $providers = $useVpcCb.closest('form').find('.dynamic-input select[name!="service.Connectivity.provider"]');
                                         var $optionsOfProviders = $providers.find('option');
                                         //p.s. Netscaler is supported in both vpc and non-vpc
                                         if ($useVpc.is(':visible') && $useVpcCb.is(':checked')) { //*** vpc ***
                                             $optionsOfProviders.each(function(index) {
-                                                if ($(this).val() == 'InternalLbVm' || $(this).val() == 'VpcVirtualRouter' || $(this).val() == 'Netscaler'  || $(this).val() == 'NuageVsp' || $(this).val() == 'NuageVspVpc') {
+                                                if ($(this).val() == 'InternalLbVm' || $(this).val() == 'VpcVirtualRouter' || $(this).val() == 'Netscaler'  || $(this).val() == 'NuageVsp' || $(this).val() == 'NuageVspVpc' || $(this).val() == 'BigSwitchBcf' || $(this).val() == 'ConfigDrive') {
                                                     $(this).attr('disabled', false);
                                                 } else {
                                                     $(this).attr('disabled', true);
@@ -2477,7 +2647,7 @@
                                         //hide/show service fields ***** (end) *****
 
                                         //show LB InlineMode dropdown only when (1)LB service is checked and LB service provider is F5BigIp (2)Firewall service is checked and Firewall service provider is JuniperSRX
-                                        if ((args.$form.find('.form-item[rel=\"service.Lb.isEnabled\"]').find('input[type=checkbox]').is(':checked') == true) && (args.$form.find('.form-item[rel=\"service.Lb.provider\"]').find('select').val() == 'F5BigIp') &&
+                                        if ((args.$form.find('.form-item[rel=\"service.Lb.isEnabled\"]').find('input[type=checkbox]').is(':checked') == true) && ((args.$form.find('.form-item[rel=\"service.Lb.provider\"]').find('select').val() == 'F5BigIp') || (args.$form.find('.form-item[rel=\"service.Lb.provider\"]').find('select').val() == 'Netscaler')) &&
                                             (args.$form.find('.form-item[rel=\"service.Firewall.isEnabled\"]').find('input[type=checkbox]').is(':checked') == true) && (args.$form.find('.form-item[rel=\"service.Firewall.provider\"]').find('select').val() == 'JuniperSRX')) {
                                             args.$form.find('.form-item[rel=\"service.Lb.inlineModeDropdown\"]').css('display', 'inline-block');
                                         } else {
@@ -2490,11 +2660,17 @@
                                             args.$form.find('.form-item[rel=\"egressdefaultpolicy\"]').css('display', 'none');
                                         }
 
-                                        //show LB Isolation dropdown only when (1)LB Service is checked (2)Service Provider is Netscaler OR F5
-                                        if ((args.$form.find('.form-item[rel=\"service.Lb.isEnabled\"]').find('input[type=checkbox]').is(':checked') == true) && (args.$form.find('.form-item[rel=\"service.Lb.provider\"]').find('select').val() == 'Netscaler' || args.$form.find('.form-item[rel=\"service.Lb.provider\"]').find('select').val() == 'F5BigIp')) {
-                                            args.$form.find('.form-item[rel=\"service.Lb.lbIsolationDropdown\"]').css('display', 'inline-block');
+                                        //show Netscaler service packages only when (1)LB Service is checked (2)Service Provider is Netscaler
+                                        if ((args.$form.find('.form-item[rel=\"service.Lb.isEnabled\"]').find('input[type=checkbox]').is(':checked') == true) && (args.$form.find('.form-item[rel=\"service.Lb.provider\"]').find('select').val() == 'Netscaler')) {
+                                            args.$form.find('.form-item[rel=\"service.Lb.Netscaler.servicePackages\"]').css('display', 'inline-block');
+                                            args.$form.find('.form-item[rel=\"service.Lb.Netscaler.servicePackages.description\"]').css('display', 'inline-block');
+                                            args.$form.find('.form-item[rel=\"service.Lb.Netscaler.servicePackages.description\"]').find("#label_netscaler_service_packages_description").attr("disabled", "disabled");
+                                            args.$form.find('.form-item[rel=\"service.Lb.Netscaler.servicePackages.description\"]').find("#label_netscaler_service_packages_description").text(args.$form.find('.form-item[rel=\"service.Lb.Netscaler.servicePackages\"]').find('#label_netscaler_service_packages option:selected').data("json-obj").desc);
                                         } else {
-                                            args.$form.find('.form-item[rel=\"service.Lb.lbIsolationDropdown\"]').hide();
+                                            args.$form.find('.form-item[rel=\"service.Lb.Netscaler.servicePackages\"]').hide();
+                                            args.$form.find('.form-item[rel=\"service.Lb.Netscaler.servicePackages.description\"]').hide();
+                                            args.$form.find('.form-item[rel=\"service.Lb.Netscaler.servicePackages.description\"]').find("#label_netscaler_service_packages_description").attr("disabled", "disabled");
+                                            args.$form.find('.form-item[rel=\"service.Lb.Netscaler.servicePackages.description\"]').find("#label_netscaler_service_packages_description").text("");
                                         }
 
                                         //show Elastic LB checkbox only when (1)LB Service is checked (2)Service Provider is Netscaler (3)Guest IP Type is Shared
@@ -2520,12 +2696,26 @@
                                             args.$form.find('.form-item[rel=\"service.StaticNat.associatePublicIP\"]').hide();
                                             args.$form.find('.form-item[rel=\"service.StaticNat.associatePublicIP\"]').find('input[type=checkbox]').attr('checked', false);
                                         }
-                                        
+
                                         //StretchedL2Subnet checkbox should be displayed only when 'Connectivity' service is checked
                                         if (args.$form.find('.form-item[rel=\"service.Connectivity.isEnabled\"]').find('input[type=checkbox]').is(':checked')) {
                                             $supportsstrechedl2subnet.css('display', 'inline-block');
                                         } else {
                                             $supportsstrechedl2subnet.hide();
+                                        }
+
+                                        //PublicAccess checkbox should be displayed only when 'Connectivity' service is checked
+                                        if (args.$form.find('.form-item[rel=\"service.Connectivity.isEnabled\"]').find('input[type=checkbox]').is(':checked') && $guestTypeField.val() == 'Shared' &&
+                                            args.$form.find('.form-item[rel=\"service.Connectivity.provider\"]').find('select').val() == 'NuageVsp') {
+                                            $supportspublicaccess.css('display', 'inline-block');
+                                        } else {
+                                            $supportspublicaccess.hide();
+                                        }
+
+                                        //Uncheck specifyVlan checkbox when (1)guest type is Shared and (2)NuageVsp is selected as a Connectivity provider
+                                        if ($guestTypeField.val() == 'Shared') {
+                                            var $specifyVlanCheckbox = args.$form.find('.form-item[rel=specifyVlan]').find('input[type=checkbox]');
+                                            $specifyVlanCheckbox.attr('checked', args.$form.find('.form-item[rel=\"service.Connectivity.provider\"]').find('select').val() != 'NuageVsp')
                                         }
                                     });
 
@@ -2577,6 +2767,9 @@
                                                 }, {
                                                     id: 'Shared',
                                                     description: 'Shared'
+                                                }, {
+                                                    id: 'L2',
+                                                    description: 'L2'
                                                 }]
                                             });
 
@@ -2589,10 +2782,9 @@
                                                     $form.find('.form-item[rel=isPersistent]').find('input[type=checkbox]').attr("disabled", "disabled");
 
 
-                                                } else { //$(this).val() == "Isolated"
+                                                } else if ($(this).val() == "Isolated" || $(this).val() == "L2") {
                                                     $form.find('.form-item[rel=specifyVlan]').find('input[type=checkbox]').removeAttr("disabled"); //make it editable
                                                     $form.find('.form-item[rel=isPersistent]').find('input[type=checkbox]').removeAttr("disabled");
-
                                                 }
                                             });
                                         }
@@ -2618,6 +2810,13 @@
                                         isBoolean: true
                                     },
 
+                                    userDataL2: {
+                                        label: 'label.user.data',
+                                        docID: 'helpL2UserData',
+                                        isBoolean: true,
+                                        isHidden: true
+                                    },
+
                                     lbType: { //only shown when VPC is checked and LB service is checked
                                         label: 'label.load.balancer.type',
                                         isHidden: true,
@@ -2629,6 +2828,60 @@
                                                 }, {
                                                     id: 'internalLb',
                                                     description: 'Internal LB'
+                                                }]
+                                            });
+                                        }
+                                    },
+
+                                    promiscuousMode: {
+                                        label: 'label.promiscuous.mode',
+                                        select: function(args) {
+                                            args.response.success({
+                                                data: [{
+                                                    id: '',
+                                                    description: ''
+                                                }, {
+                                                    id: 'true',
+                                                    description: 'Accept'
+                                                }, {
+                                                    id: 'false',
+                                                    description: 'Reject'
+                                                }]
+                                            });
+                                        }
+                                    },
+
+                                    macAddressChanges: {
+                                        label: 'label.mac.address.changes',
+                                        select: function(args) {
+                                            args.response.success({
+                                                data: [{
+                                                    id: '',
+                                                    description: ''
+                                                }, {
+                                                    id: 'true',
+                                                    description: 'Accept'
+                                                }, {
+                                                    id: 'false',
+                                                    description: 'Reject'
+                                                }]
+                                            });
+                                        }
+                                    },
+
+                                    forgedTransmits: {
+                                        label: 'label.forged.transmits',
+                                        select: function(args) {
+                                            args.response.success({
+                                                data: [{
+                                                    id: '',
+                                                    description: ''
+                                                }, {
+                                                    id: 'true',
+                                                    description: 'Accept'
+                                                }, {
+                                                    id: 'false',
+                                                    description: 'Reject'
                                                 }]
                                             });
                                         }
@@ -2654,34 +2907,34 @@
                                                         // Sanitize names
                                                         switch (serviceName) {
                                                             case 'Vpn':
-                                                                serviceDisplayName = dictionary['label.vpn'];
+                                                                serviceDisplayName = _l('label.vpn');
                                                                 break;
                                                             case 'Dhcp':
-                                                                serviceDisplayName = dictionary['label.dhcp'];
+                                                                serviceDisplayName = _l('label.dhcp');
                                                                 break;
                                                             case 'Dns':
-                                                                serviceDisplayName = dictionary['label.dns'];
+                                                                serviceDisplayName = _l('label.dns');
                                                                 break;
                                                             case 'Lb':
-                                                                serviceDisplayName = dictionary['label.load.balancer'];
+                                                                serviceDisplayName = _l('label.load.balancer');
                                                                 break;
                                                             case 'SourceNat':
-                                                                serviceDisplayName = dictionary['label.source.nat'];
+                                                                serviceDisplayName = _l('label.source.nat');
                                                                 break;
                                                             case 'StaticNat':
-                                                                serviceDisplayName = dictionary['label.static.nat'];
+                                                                serviceDisplayName = _l('label.static.nat');
                                                                 break;
                                                             case 'PortForwarding':
-                                                                serviceDisplayName = dictionary['label.port.forwarding'];
+                                                                serviceDisplayName = _l('label.port.forwarding');
                                                                 break;
                                                             case 'SecurityGroup':
-                                                                serviceDisplayName = dictionary['label.security.groups'];
+                                                                serviceDisplayName = _l('label.security.groups');
                                                                 break;
                                                             case 'UserData':
-                                                                serviceDisplayName = dictionary['label.user.data'];
+                                                                serviceDisplayName = _l('label.user.data');
                                                                 break;
                                                             case 'Connectivity':
-                                                                serviceDisplayName = dictionary['label.virtual.networking'];
+                                                                serviceDisplayName = _l('label.virtual.networking');
                                                                 break;
                                                             default:
                                                                 serviceDisplayName = serviceName;
@@ -2851,22 +3104,7 @@
                                         isHidden: true,
                                         isBoolean: true
                                     },
-                                    "service.Lb.lbIsolationDropdown": {
-                                        label: 'label.LB.isolation',
-                                        docID: 'helpNetworkOfferingLBIsolation',
-                                        isHidden: true,
-                                        select: function(args) {
-                                            args.response.success({
-                                                data: [{
-                                                    id: 'dedicated',
-                                                    description: 'Dedicated'
-                                                }, {
-                                                    id: 'shared',
-                                                    description: 'Shared'
-                                                }]
-                                            })
-                                        }
-                                    },
+
                                     "service.Lb.inlineModeDropdown": {
                                         label: 'label.mode',
                                         docID: 'helpNetworkOfferingMode',
@@ -2886,6 +3124,62 @@
                                         }
                                     },
 
+                                    "service.Lb.Netscaler.servicePackages": {
+                                        label: 'label.netscaler.service.packages',
+                                        docID: 'helpNetscalerServicePackages',
+                                        isHidden: true,
+                                        select: function(args) {
+                                            $.ajax({
+                                                url: createURL('listRegisteredServicePackages'),
+                                                dataType: 'json',
+                                                async: true,
+                                                success: function(data) {
+                                                    var servicePackages = data.listregisteredservicepackage.registeredServicepackage;
+
+                                                    if (servicePackages == undefined || servicePackages == null || !servicePackages) {
+                                                        servicePackages = data.listregisteredservicepackage;
+                                                    }
+
+                                                    args.response.success({
+                                                        data:   $.map(servicePackages, function(elem) {
+                                                            return {
+                                                                id: elem.id,
+                                                                description: elem.name,
+                                                                desc: elem.description
+                                                            };
+                                                        })
+                                                    });
+                                                },
+                                                error: function(data) {
+                                                    args.response.error(parseXMLHttpResponse(data));
+                                                }
+                                            });
+                                        }
+                                    },
+
+                                    "service.Lb.Netscaler.servicePackages.description": {
+                                        label: 'label.netscaler.service.packages.description',
+                                        isHidden: true,
+                                        isTextarea: true
+                                    },
+
+                                    "service.Lb.lbIsolationDropdown": {
+                                        label: 'label.LB.isolation',
+                                        docID: 'helpNetworkOfferingLBIsolation',
+                                        isHidden: true,
+                                        select: function(args) {
+                                            args.response.success({
+                                                data: [{
+                                                    id: 'dedicated',
+                                                    description: 'Dedicated'
+                                                }, {
+                                                    id: 'shared',
+                                                    description: 'Shared'
+                                                }]
+                                            })
+                                        }
+                                    },
+
                                     "service.StaticNat.elasticIpCheckbox": {
                                         label: "label.elastic.IP",
                                         isHidden: true,
@@ -2902,6 +3196,13 @@
 
                                     supportsstrechedl2subnet: {
                                         label: 'label.supportsstrechedl2subnet',
+                                        isBoolean: true,
+                                        isChecked: false,
+                                        isHidden: true
+                                    },
+
+                                    supportspublicaccess: {
+                                        label: 'label.supportspublicaccess',
                                         isBoolean: true,
                                         isChecked: false,
                                         isHidden: true
@@ -2959,6 +3260,12 @@
                                 $.each(formData, function(key, value) {
                                     var serviceData = key.split('.');
 
+                                    if (key == 'service.Lb.Netscaler.servicePackages' && value != "") {
+                                       inputData['details[' + 0 + '].servicepackageuuid'] = value;
+                                       inputData['details[' + 1 + '].servicepackagedescription'] = args.$form.find('#label_netscaler_service_packages option:selected').data().jsonObj.desc;
+                                    }
+
+
                                     if (serviceData.length > 1) {
                                         if (serviceData[0] == 'service' &&
                                             serviceData[2] == 'isEnabled' &&
@@ -2982,7 +3289,7 @@
                                             inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilitytype'] = 'ElasticLb';
                                             inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilityvalue'] = true; //because this checkbox's value == "on"
                                             serviceCapabilityIndex++;
-                                        } else if ((key == 'service.Lb.inlineModeDropdown') && ("Lb" in serviceProviderMap) && (serviceProviderMap.Lb == "F5BigIp")) {
+                                        } else if ((key == 'service.Lb.inlineModeDropdown') && ("Lb" in serviceProviderMap) && ((serviceProviderMap.Lb == "F5BigIp") || (serviceProviderMap.Lb == "Netscaler"))) {
                                             if (value == 'true') { //CS-16605 do not pass parameter if value is 'false'(side by side)
                                                 inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].service'] = 'lb';
                                                 inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilitytype'] = 'InlineMode';
@@ -3009,11 +3316,13 @@
                                             inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilitytype'] = 'lbSchemes';
                                             inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilityvalue'] = 'internal';
                                             serviceCapabilityIndex++;
-                                        } 
-                                    } else if (value != '') { // normal data (serviceData.length ==1), e.g. "name", "displayText", "networkRate", "guestIpType", "lbType" (unwanted), "availability" (unwated when value is "Optional"), "egressdefaultpolicy", "state" (unwanted), "status" (unwanted), "allocationstate" (unwanted) 
-                                        if (!(key ==  "lbType"  || (key == "availability" && value == "Optional") || key == "state" || key == "status" || key == "allocationstate" || key == "useVpc" )) {
-                                        inputData[key] = value;
-                                    }
+                                        }
+                                    } else if (value != '') { // normal data (serviceData.length ==1), e.g. "name", "displayText", "networkRate", "guestIpType", "lbType" (unwanted), "availability" (unwated when value is "Optional"), "egressdefaultpolicy", "state" (unwanted), "status" (unwanted), "allocationstate" (unwanted)
+                                        if (key == "useVpc") {
+                                            inputData['forvpc'] = value;
+                                        } else if (!(key ==  "lbType"  || (key == "availability" && value == "Optional") || key == "state" || key == "status" || key == "allocationstate" || key == "useVpc" )) {
+                                            inputData[key] = value;
+                                        }
                                     }
                                 });
 
@@ -3039,18 +3348,23 @@
                                     }
                                 }
 
-                                //passing supportsstrechedl2subnet's value as capability
+                                //passing supportsstrechedl2subnet and supportspublicaccess's value as capability
                                 for (var k in inputData) {
                                     if (k == 'supportsstrechedl2subnet' && ("Connectivity" in serviceProviderMap)) {
-                                            inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].service'] = 'Connectivity';
-                                            inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilitytype'] = 'StretchedL2Subnet';
-                                            inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilityvalue'] = true;
-                                            serviceCapabilityIndex++;
-                                            break;
+                                        inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].service'] = 'Connectivity';
+                                        inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilitytype'] = 'StretchedL2Subnet';
+                                        inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilityvalue'] = true;
+                                        serviceCapabilityIndex++;
+                                    } else if (k == 'supportspublicaccess' && ("Connectivity" in serviceProviderMap) && serviceProviderMap['Connectivity'] == 'NuageVsp') {
+                                        inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].service'] = 'Connectivity';
+                                        inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilitytype'] = 'PublicAccess';
+                                        inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilityvalue'] = true;
+                                        serviceCapabilityIndex++;
                                     }
                                 }
-                                //removing supportsstrechedl2subnet from parameters, it has been set as capability
+                                //removing supportsstrechedl2subnet and supportspublicaccess from parameters, it has been set as capability
                                 delete inputData['supportsstrechedl2subnet'];
+                                delete inputData['supportspublicaccess'];
 
                                 // Make supported services list
                                 inputData['supportedServices'] = $.map(serviceProviderMap, function(value, key) {
@@ -3059,31 +3373,56 @@
 
 
                                 if (inputData['guestIpType'] == "Shared") { //specifyVlan checkbox is disabled, so inputData won't include specifyVlan
-                                    inputData['specifyVlan'] = true; //hardcode inputData['specifyVlan']
+                                    var $specifyVlanCheckbox = args.$form.find('.form-item[rel=specifyVlan]').find('input[type=checkbox]');
+                                    inputData['specifyVlan'] = $specifyVlanCheckbox.is(':checked'); //hardcode inputData['specifyVlan']
                                     inputData['specifyIpRanges'] = true;
-                                    delete inputData.isPersistent; //if Persistent checkbox is unchecked, do not pass isPersistent parameter to API call since we need to keep API call's size as small as possible (p.s. isPersistent is defaulted as false at server-side)                                          
+                                    delete inputData.isPersistent; //if Persistent checkbox is unchecked, do not pass isPersistent parameter to API call since we need to keep API call's size as small as possible (p.s. isPersistent is defaulted as false at server-side)
                                 } else if (inputData['guestIpType'] == "Isolated") { //specifyVlan checkbox is shown
                                     //inputData['specifyIpRanges'] = false;
-                                    delete inputData.specifyIpRanges; //if specifyIpRanges should be false, do not pass specifyIpRanges parameter to API call since we need to keep API call's size as small as possible (p.s. specifyIpRanges is defaulted as false at server-side)                                          
+                                    delete inputData.specifyIpRanges; //if specifyIpRanges should be false, do not pass specifyIpRanges parameter to API call since we need to keep API call's size as small as possible (p.s. specifyIpRanges is defaulted as false at server-side)
 
                                     if (inputData['specifyVlan'] == 'on') { //specifyVlan checkbox is checked
-                                        inputData['specifyVlan'] = true;                                        
+                                        inputData['specifyVlan'] = true;
                                     } else { //specifyVlan checkbox is unchecked
-                                        delete inputData.specifyVlan; //if specifyVlan checkbox is unchecked, do not pass specifyVlan parameter to API call since we need to keep API call's size as small as possible (p.s. specifyVlan is defaulted as false at server-side)                                        
+                                        delete inputData.specifyVlan; //if specifyVlan checkbox is unchecked, do not pass specifyVlan parameter to API call since we need to keep API call's size as small as possible (p.s. specifyVlan is defaulted as false at server-side)
                                     }
 
                                     if (inputData['isPersistent'] == 'on') { //It is a persistent network
                                         inputData['isPersistent'] = true;
                                     } else { //Isolated Network with Non-persistent network
-                                        delete inputData.isPersistent; //if Persistent checkbox is unchecked, do not pass isPersistent parameter to API call since we need to keep API call's size as small as possible (p.s. isPersistent is defaulted as false at server-side)                                          
+                                        delete inputData.isPersistent; //if Persistent checkbox is unchecked, do not pass isPersistent parameter to API call since we need to keep API call's size as small as possible (p.s. isPersistent is defaulted as false at server-side)
                                     }
+                                } else if (inputData['guestIpType'] == "L2") {
+                                    if (inputData['specifyVlan'] == 'on') { //specifyVlan checkbox is checked
+                                        inputData['specifyVlan'] = true;
+                                    } else { //specifyVlan checkbox is unchecked
+                                        delete inputData.specifyVlan; //if specifyVlan checkbox is unchecked, do not pass specifyVlan parameter to API call since we need to keep API call's size as small as possible (p.s. specifyVlan is defaulted as false at server-side)
+                                    }
+
+                                    if (inputData['userDataL2'] == 'on') {
+                                        inputData['serviceProviderList[0].service'] = 'UserData';
+                                        inputData['serviceProviderList[0].provider'] = 'ConfigDrive';
+                                        inputData['supportedServices'] = 'UserData';
+                                    } else {
+                                        delete inputData.serviceProviderList;
+                                    }
+
+                                    //Conserve mode is irrelevant on L2 network offerings as there are no resources to conserve, do not pass it, true by default on server side
+                                    delete inputData.conservemode;
                                 }
 
+                                if (inputData['forvpc'] == 'on') {
+                                    inputData['forvpc'] = true;
+                                   } else {
+                                    delete inputData.forvpc; //if forVpc checkbox is unchecked, do not pass forVpc parameter to API call since we need to keep API call's size as small as possible (p.s. forVpc is defaulted as false at server-side)
+                                }
 
-                                if (inputData['conservemode'] == 'on') {
-                                    delete inputData.conservemode; //if ConserveMode checkbox is checked, do not pass conservemode parameter to API call since we need to keep API call's size as small as possible (p.s. conservemode is defaulted as true at server-side)
-                                } else {
-                                    inputData['conservemode'] = false;
+                                if (inputData['guestIpType'] == "Shared" || inputData['guestIpType'] == "Isolated") {
+                                    if (inputData['conservemode'] == 'on') {
+                                        delete inputData.conservemode; //if ConserveMode checkbox is checked, do not pass conservemode parameter to API call since we need to keep API call's size as small as possible (p.s. conservemode is defaulted as true at server-side)
+                                    } else {
+                                        inputData['conservemode'] = false;
+                                    }
                                 }
 
                                 // Make service provider map
@@ -3103,6 +3442,22 @@
                                 } else {
                                     delete inputData.egressdefaultpolicy;
                                 }
+
+                                if ("promiscuousMode" in inputData) {
+                                    inputData['details[0].promiscuousMode'] = inputData.promiscuousMode;
+                                    delete inputData.promiscuousMode;
+                                }
+
+                                if ("macAddressChanges" in inputData) {
+                                    inputData['details[0].macAddressChanges'] = inputData.macAddressChanges;
+                                    delete inputData.macAddressChanges;
+                                }
+
+                                if ("forgedTransmits" in inputData) {
+                                    inputData['details[0].forgedTransmits'] = inputData.forgedTransmits;
+                                    delete inputData.forgedTransmits;
+                                }
+
 
                                 if (args.$form.find('.form-item[rel=serviceofferingid]').css("display") == "none")
                                     delete inputData.serviceofferingid;
@@ -3150,7 +3505,7 @@
                     reorder: cloudStack.api.actions.sort('updateNetworkOffering', 'networkOfferings'),
 
                     detailView: {
-                        name: 'Network offering details',
+                        name: 'label.network.offering.details',
                         actions: {
                             edit: {
                                 label: 'label.edit',
@@ -3390,6 +3745,10 @@
                                         label: 'label.supportsstrechedl2subnet',
                                         converter: cloudStack.converters.toBooleanText
                                     },
+                                    supportspublicaccess: {
+                                        label: 'label.supportspublicaccess',
+                                        converter: cloudStack.converters.toBooleanText
+                                    },
                                     supportedServices: {
                                         label: 'label.supported.services'
                                     },
@@ -3398,6 +3757,9 @@
                                     },
                                     tags: {
                                         label: 'label.tags'
+                                    },
+                                    details: {
+                                        label: 'label.details'
                                     }
                                 }],
 
@@ -3408,9 +3770,16 @@
                                         async: true,
                                         success: function(json) {
                                             var item = json.listnetworkofferingsresponse.networkoffering[0];
+                                            if (!item.hasOwnProperty('details')) {
+                                                item.details = {};
+                                            }
                                             args.response.success({
                                                 actionFilter: networkOfferingActionfilter,
                                                 data: $.extend(item, {
+                                                    details: $.map(item.details, function(val, key) {
+                                                        return key + "=" + val;
+                                                    }).join(', '),
+
                                                     supportedServices: $.map(item.service, function(service) {
                                                         return service.name;
                                                     }).join(', '),
@@ -3547,29 +3916,36 @@
                                             });
                                             networkServiceObjs.push({
                                                 name: 'Lb',
-                                                provider: [{name: 'VpcVirtualRouter'}]
+                                                provider: [
+                                                       {name: 'VpcVirtualRouter'},
+                                                       {name: 'InternalLbVm'}
+                                                ]
                                             });
                                             networkServiceObjs.push({
                                                 name: 'Gateway',
-                                                provider: [{name: 'VpcVirtualRouter'}]
+                                                provider: [{name: 'VpcVirtualRouter'},
+                                                           {name: 'BigSwitchBcf'}]
                                             });
                                             networkServiceObjs.push({
                                                 name: 'StaticNat',
                                                 provider: [
                                                        {name: 'VpcVirtualRouter'},
-                                                       {name: 'NuageVsp'}]
+                                                       {name: 'NuageVsp'},
+                                                       {name: 'BigSwitchBcf'}]
                                             });
                                             networkServiceObjs.push({
                                                 name: 'SourceNat',
                                                 provider: [
                                                        {name: 'VpcVirtualRouter'},
-                                                       {name: 'NuageVsp'}]
+                                                       {name: 'NuageVsp'},
+                                                       {name: 'BigSwitchBcf'}]
                                             });
                                             networkServiceObjs.push({
                                                 name: 'NetworkACL',
                                                 provider: [
                                                        {name: 'VpcVirtualRouter'},
-                                                       {name: 'NuageVsp'}]
+                                                       {name: 'NuageVsp'},
+                                                       {name: 'BigSwitchBcf'}]
                                             });
                                             networkServiceObjs.push({
                                                 name: 'PortForwarding',
@@ -3577,16 +3953,19 @@
                                             });
                                             networkServiceObjs.push({
                                                 name: 'UserData',
-                                                provider: [{name: 'VpcVirtualRouter'}]
+                                                provider: [{name: 'VpcVirtualRouter'},
+                                                           {name: 'ConfigDrive'}]
                                             });
                                             networkServiceObjs.push({
                                                 name: 'Vpn',
-                                                provider: [{name: 'VpcVirtualRouter'}]
+                                                provider: [{name: 'VpcVirtualRouter'},
+                                                           {name: 'BigSwitchBcf'}]
                                             });
 
                                             networkServiceObjs.push({
                                                 name: 'Connectivity',
                                                 provider: [
+                                                    {name: 'BigSwitchBcf'},
                                                     {name: 'NiciraNvp'},
                                                     {name: 'Ovs'},
                                                     {name: 'JuniperContrailVpcRouter'},
@@ -3604,28 +3983,28 @@
                                                 // Sanitize names
                                                 switch (serviceName) {
                                                     case 'Vpn':
-                                                        serviceDisplayName = dictionary['label.vpn'];
+                                                        serviceDisplayName = _l('label.vpn');
                                                         break;
                                                     case 'Dhcp':
-                                                        serviceDisplayName = dictionary['label.dhcp'];
+                                                        serviceDisplayName = _l('label.dhcp');
                                                         break;
                                                     case 'Dns':
-                                                        serviceDisplayName = dictionary['label.dns'];
+                                                        serviceDisplayName = _l('label.dns');
                                                         break;
                                                     case 'Lb':
-                                                        serviceDisplayName = dictionary['label.load.balancer'];
+                                                        serviceDisplayName = _l('label.load.balancer');
                                                         break;
                                                     case 'SourceNat':
-                                                        serviceDisplayName = dictionary['label.source.nat'];
+                                                        serviceDisplayName = _l('label.source.nat');
                                                         break;
                                                     case 'StaticNat':
-                                                        serviceDisplayName = dictionary['label.static.nat'];
+                                                        serviceDisplayName = _l('label.static.nat');
                                                         break;
                                                     case 'PortForwarding':
-                                                        serviceDisplayName = dictionary['label.port.forwarding'];
+                                                        serviceDisplayName = _l('label.port.forwarding');
                                                         break;
                                                     case 'UserData':
-                                                        serviceDisplayName = dictionary['label.user.data'];
+                                                        serviceDisplayName = _l('label.user.data');
                                                         break;
                                                     default:
                                                         serviceDisplayName = serviceName;
@@ -3642,7 +4021,7 @@
 
                                                 fields[id.isEnabled] = {
                                                     label: serviceDisplayName,
-                                                    isBoolean: true,
+                                                    isBoolean: true
                                                 };
 
                                                 serviceFields.push(id.isEnabled);
@@ -3684,8 +4063,15 @@
                                         isHidden: true,
                                         dependsOn: 'service.Connectivity.isEnabled',
                                         isBoolean: true
+                                    },
+
+                                    "service.SourceNat.redundantRouterCapabilityCheckbox": {
+                                        label: 'label.redundant.router.capability',
+                                        isHidden: true,
+                                        dependsOn: 'service.SourceNat.isEnabled',
+                                        isBoolean: true
                                     }
-                                },//end of fields
+                                }//end of fields
                             }, //end of createForm
 
                             action: function(args) {
@@ -3693,10 +4079,8 @@
                                 var inputData = {};
                                 var serviceProviderMap = {};
                                 var serviceCapabilityIndex = 0;
-
                                 $.each(formData, function(key, value) {
                                     var serviceData = key.split('.');
-
                                     if (serviceData.length > 1) {
                                         if (serviceData[0] == 'service' &&
                                             serviceData[2] == 'isEnabled' &&
@@ -3715,7 +4099,13 @@
                                             inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilitytype'] = 'DistributedRouter';
                                             inputData['servicecapabilitylist[' + serviceCapabilityIndex + '].capabilityvalue'] = true;
                                             serviceCapabilityIndex++;
+                                        } else if ((key == 'service.SourceNat.redundantRouterCapabilityCheckbox') && ("SourceNat" in serviceProviderMap)) {
+                                            inputData['serviceCapabilityList[' + serviceCapabilityIndex + '].service'] = 'SourceNat';
+                                            inputData['serviceCapabilityList[' + serviceCapabilityIndex + '].capabilitytype'] = "RedundantRouter";
+                                            inputData['serviceCapabilityList[' + serviceCapabilityIndex + '].capabilityvalue'] = true;
+                                            serviceCapabilityIndex++;
                                         }
+
                                     } else if (value != '') { // Normal data
                                         inputData[key] = value;
                                     }
@@ -3765,7 +4155,7 @@
 
                             messages: {
                                 notification: function(args) {
-                                    return 'Added VPC offering';
+                                    return 'message.added.vpc.offering';
                                 }
                             }
                         }
@@ -4059,5 +4449,5 @@
 
         return allowedActions;
     };
-    
+
 })(cloudStack, jQuery);

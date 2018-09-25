@@ -38,7 +38,7 @@ import com.cloud.network.rules.LoadBalancer;
 import com.cloud.user.Account;
 
 @APICommand(name = "createLBHealthCheckPolicy",
-            description = "Creates a Load Balancer healthcheck policy ",
+            description = "Creates a load balancer health check policy",
             responseObject = LBHealthCheckResponse.class,
             since = "4.2.0",
             requestHasSensitiveInfo = false,
@@ -60,10 +60,10 @@ public class CreateLBHealthCheckPolicyCmd extends BaseAsyncCreateCmd {
                description = "the ID of the load balancer rule")
     private Long lbRuleId;
 
-    @Parameter(name = ApiConstants.DESCRIPTION, type = CommandType.STRING, description = "the description of the load balancer HealthCheck policy")
+    @Parameter(name = ApiConstants.DESCRIPTION, type = CommandType.STRING, description = "the description of the load balancer health check policy")
     private String description;
 
-    @Parameter(name = ApiConstants.HEALTHCHECK_PINGPATH, type = CommandType.STRING, required = false, description = "HTTP Ping Path")
+    @Parameter(name = ApiConstants.HEALTHCHECK_PINGPATH, type = CommandType.STRING, required = false, description = "HTTP ping path")
     private String pingPath;
 
     @Parameter(name = ApiConstants.HEALTHCHECK_RESPONSE_TIMEOUT,
@@ -194,7 +194,7 @@ public class CreateLBHealthCheckPolicyCmd extends BaseAsyncCreateCmd {
 
     @Override
     public String getEventDescription() {
-        return "Create Load Balancer HealthCheck policy";
+        return "Create load balancer health check policy";
     }
 
 

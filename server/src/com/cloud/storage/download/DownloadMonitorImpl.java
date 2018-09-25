@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
@@ -49,7 +48,7 @@ import org.apache.cloudstack.storage.to.VolumeObjectTO;
 
 import com.cloud.agent.AgentManager;
 import com.cloud.agent.api.storage.DownloadAnswer;
-import com.cloud.agent.api.storage.Proxy;
+import com.cloud.utils.net.Proxy;
 import com.cloud.configuration.Config;
 import com.cloud.storage.RegisterVolumePayload;
 import com.cloud.storage.Storage.ImageFormat;
@@ -65,7 +64,6 @@ import com.cloud.utils.component.ManagerBase;
 import com.cloud.utils.exception.CloudRuntimeException;
 
 @Component
-@Local(value = {DownloadMonitor.class})
 public class DownloadMonitorImpl extends ManagerBase implements DownloadMonitor {
     static final Logger s_logger = Logger.getLogger(DownloadMonitorImpl.class);
 

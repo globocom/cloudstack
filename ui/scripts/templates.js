@@ -15,8 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 (function(cloudStack, $) {
-	var ostypeObjs;
-	
+    var ostypeObjs;
+    var previousCollection = [];
+    var previousFilterType = null;
+
     cloudStack.sections.templates = {
         title: 'label.menu.templates',
         id: 'templates',
@@ -33,7 +35,7 @@
                     filters: {
                         all: {
                             preFilter: function(args) {
-                                if (isAdmin()) //"listTemplates&templatefilter=all" only works for root-admin, but no domain-admin. Domain-admin is unable to see all templates until listTemplates API supports a new type of templatefilter for domain-admin to see all templates in his domain.
+                                if (isAdmin()|| isDomainAdmin()) //"listTemplates&templatefilter=all" only for root-admin and domain-admin. Domain-admin is able to see all templates in his domain.
                                     return true;
                                 else
                                     return false;
@@ -53,12 +55,24 @@
                             label: 'label.community'
                         }
                     },
+                    preFilter: function() {
+                        if (isAdmin()||isDomainAdmin()) {
+                            return []
+                        }
+                        return ['account']
+                    },
                     fields: {
                         name: {
                             label: 'label.name'
                         },
                         hypervisor: {
                             label: 'label.hypervisor'
+                        },
+                        ostypename: {
+                            label: 'label.os.type'
+                        },
+                        account: {
+                            label: 'label.account'
                         }
                     },
 
@@ -100,7 +114,7 @@
                     reorder: cloudStack.api.actions.sort('updateTemplate', 'templates'),
                     actions: {
                         add: {
-                            label: 'label.action.register.template',
+                            label: 'label.add',
                             messages: {
                                 notification: function(args) {
                                     return 'label.action.register.template';
@@ -111,6 +125,13 @@
                                 docID: 'helpNetworkOfferingName',
                                 preFilter: cloudStack.preFilter.createTemplate,
                                 fields: {
+                                    url: {
+                                        label: 'label.url',
+                                        docID: 'helpRegisterTemplateURL',
+                                        validation: {
+                                            required: true
+                                        }
+                                    },
                                     name: {
                                         label: 'label.name',
                                         docID: 'helpRegisterTemplateName',
@@ -125,52 +146,49 @@
                                             required: true
                                         }
                                     },
-                                    url: {
-                                        label: 'label.url',
-                                        docID: 'helpRegisterTemplateURL',
-                                        validation: {
-                                            required: true
-                                        }
-                                    },
                                     zone: {
                                         label: 'label.zone',
                                         docID: 'helpRegisterTemplateZone',
-                                        select: function(args) {                                        	
-                                        	if(g_regionsecondaryenabled == true) {
-                                        		args.response.success({
+                                        isMultiple: true,
+                                        validation: {
+                                            allzonesonly: true
+                                        },
+                                        select: function(args) {
+                                            if(g_regionsecondaryenabled == true) {
+                                                args.response.success({
                                                     data: [{
                                                         id: -1,
                                                         description: "All Zones"
                                                     }]
-                                                });                                        		
-                                        	} else {                                        	
-	                                            $.ajax({
-	                                                url: createURL("listZones&available=true"),
-	                                                dataType: "json",
-	                                                async: true,
-	                                                success: function(json) {
-	                                                    var zoneObjs = [];
-	                                                    var items = json.listzonesresponse.zone;
-	                                                    if (items != null) {
-	                                                        for (var i = 0; i < items.length; i++) {
-	                                                            zoneObjs.push({
-	                                                                id: items[i].id,
-	                                                                description: items[i].name
-	                                                            });
-	                                                        }
-	                                                    }
-	                                                    if (isAdmin() && !(cloudStack.context.projects && cloudStack.context.projects[0])) {
-	                                                        zoneObjs.unshift({
-	                                                            id: -1,
-	                                                            description: "All Zones"
-	                                                        });
-	                                                    }
-	                                                    args.response.success({
-	                                                        data: zoneObjs
-	                                                    });
-	                                                }
-	                                            });
-                                        	}
+                                                });
+                                            } else {
+                                                $.ajax({
+                                                    url: createURL("listZones&available=true"),
+                                                    dataType: "json",
+                                                    async: true,
+                                                    success: function(json) {
+                                                        var zoneObjs = [];
+                                                        var items = json.listzonesresponse.zone;
+                                                        if (items != null) {
+                                                            for (var i = 0; i < items.length; i++) {
+                                                                zoneObjs.push({
+                                                                    id: items[i].id,
+                                                                    description: items[i].name
+                                                                });
+                                                            }
+                                                        }
+                                                        if (isAdmin() && !(cloudStack.context.projects && cloudStack.context.projects[0])) {
+                                                            zoneObjs.unshift({
+                                                                id: -1,
+                                                                description: "All Zones"
+                                                            });
+                                                        }
+                                                        args.response.success({
+                                                            data: zoneObjs
+                                                        });
+                                                    }
+                                                });
+                                            }
                                         }
                                     },
                                     hypervisor: {
@@ -180,68 +198,120 @@
                                         select: function(args) {
                                             if (args.zone == null)
                                                 return;
+                                            // We want only distinct Hypervisor entries to be visible to the user
+                                            var items = [];
+                                            var distinctHVNames = [];
+                                            var length = 1;
+                                            // When only one zone is selected, args.zone is NOT an array.
+                                            if (Object.prototype.toString.call( args.zone ) === '[object Array]')
+                                                length = args.zone.length;
+                                            for (var index = 0; index < length; index++)
+                                            {
+                                                var zoneId;
+                                                if (length == 1)
+                                                        zoneId = args.zone;
+                                                else
+                                                        zoneId = args.zone[index];
 
-                                            var apiCmd;
-                                            if (args.zone == -1) { //All Zones
-                                                //apiCmd = "listHypervisors&zoneid=-1"; //"listHypervisors&zoneid=-1" has been changed to return only hypervisors available in all zones (bug 8809)
-                                            	apiCmd = "listHypervisors"; 
-                                            }
-                                            else {
-                                                apiCmd = "listHypervisors&zoneid=" + args.zone;
-                                            }
-
-                                            $.ajax({
-                                                url: createURL(apiCmd),
-                                                dataType: "json",
-                                                async: false,
-                                                success: function(json) {
-                                                    var hypervisorObjs = json.listhypervisorsresponse.hypervisor;
-                                                    var items = [];
-                                                    $(hypervisorObjs).each(function() {
-                                                        items.push({
-                                                            id: this.name,
-                                                            description: this.name
-                                                        });
-                                                    });
-                                                    args.response.success({
-                                                        data: items
-                                                    });
+                                                var apiCmd;
+                                                if (zoneId == -1) { //All Zones
+                                                    apiCmd = "listHypervisors";
                                                 }
-                                            });
+                                                else {
+                                                    apiCmd = "listHypervisors&zoneid=" + zoneId;
+                                                }
 
+                                                $.ajax({
+                                                    url: createURL(apiCmd),
+                                                    dataType: "json",
+                                                    async: false,
+                                                    success: function(json) {
+                                                        var hypervisorObjs = json.listhypervisorsresponse.hypervisor;
+
+                                                        $(hypervisorObjs).each(function() {
+                                                        // Only if this hypervisor isn't already part of this
+                                                        // list, then add to the drop down
+                                                           if (distinctHVNames.indexOf(this.name) < 0 ){
+                                                               distinctHVNames.push(this.name);
+                                                               items.push({
+                                                                   id: this.name,
+                                                                   description: this.name
+                                                               });
+                                                           }
+                                                        });
+                                                    }
+                                                });
+                                            }
                                             args.$select.change(function() {
                                                 var $form = $(this).closest('form');
                                                 if ($(this).val() == "VMware") {
                                                     $form.find('.form-item[rel=rootDiskControllerType]').css('display', 'inline-block');
                                                     $form.find('.form-item[rel=nicAdapterType]').css('display', 'inline-block');
                                                     $form.find('.form-item[rel=keyboardType]').css('display', 'inline-block');
-                                                    
                                                     $form.find('.form-item[rel=xenserverToolsVersion61plus]').hide();
+                                                    $form.find('.form-item[rel=rootDiskControllerTypeKVM]').hide();
+                                                    $form.find('.form-item[rel=directdownload]').hide();
                                                 } else if ($(this).val() == "XenServer") {
-                                                	$form.find('.form-item[rel=rootDiskControllerType]').hide();
+                                                    $form.find('.form-item[rel=rootDiskControllerType]').hide();
                                                     $form.find('.form-item[rel=nicAdapterType]').hide();
-                                                    $form.find('.form-item[rel=keyboardType]').hide();	
-                                                    
-                                                    if (isAdmin())
-                                                        $form.find('.form-item[rel=xenserverToolsVersion61plus]').css('display', 'inline-block');    
+                                                    $form.find('.form-item[rel=keyboardType]').hide();
+                                                    $form.find('.form-item[rel=rootDiskControllerTypeKVM]').hide();
+                                                    $form.find('.form-item[rel=directdownload]').hide();
+
+                                                    if (isAdmin()) {
+                                                        $form.find('.form-item[rel=xenserverToolsVersion61plus]').css('display', 'inline-block');
+                                                    }
+                                                } else if ($(this).val() == "KVM") {
+                                                    $form.find('.form-item[rel=rootDiskControllerType]').hide();
+                                                    $form.find('.form-item[rel=nicAdapterType]').hide();
+                                                    $form.find('.form-item[rel=keyboardType]').hide();
+                                                    $form.find('.form-item[rel=xenserverToolsVersion61plus]').hide();
+                                                    $form.find('.form-item[rel=rootDiskControllerTypeKVM]').css('display', 'inline-block');
+                                                    $form.find('.form-item[rel=xenserverToolsVersion61plus]').css('display', 'inline-block');
+                                                    if (isAdmin()) {
+                                                      $form.find('.form-item[rel=directdownload]').css('display', 'inline-block');
+                                                    }
                                                 } else {
                                                     $form.find('.form-item[rel=rootDiskControllerType]').hide();
                                                     $form.find('.form-item[rel=nicAdapterType]').hide();
                                                     $form.find('.form-item[rel=keyboardType]').hide();
-                                                    
                                                     $form.find('.form-item[rel=xenserverToolsVersion61plus]').hide();
+                                                    $form.find('.form-item[rel=rootDiskControllerTypeKVM]').hide();
+                                                    $form.find('.form-item[rel=directdownload]').hide();
                                                 }
                                             });
 
+                                            items.push({
+                                                id: "Any",
+                                                description: "Any"
+                                            });
+                                            args.response.success({
+                                                data: items
+                                            });
                                             args.$select.trigger('change');
+
                                         }
                                     },
+                                    // For KVM only: Direct Download
+                                    directdownload : {
+                                        label: 'label.direct.download',
+                                        docID: 'helpRegisterTemplateDirectDownload',
+                                        isBoolean: true,
+                                        dependsOn: 'hypervisor',
+                                        isHidden: true
+                                    },
+                                    checksum: {
+                                        label: 'label.checksum',
+                                        dependsOn: 'directdownload',
+                                        isHidden: true
+                                    },
+                                    // Direct Download - End
 
                                     xenserverToolsVersion61plus: {
                                         label: 'label.xenserver.tools.version.61.plus',
                                         isBoolean: true,
                                         isChecked: function (args) {
-                                            var b = false;
+                                             var b = true;
                                             if (isAdmin()) {
                                                 $.ajax({
                                                     url: createURL('listConfigurations'),
@@ -250,8 +320,8 @@
                                                     },
                                                     async: false,
                                                     success: function (json) {
-                                                        if (json.listconfigurationsresponse.configuration != null && json.listconfigurationsresponse.configuration[0].value == 'xenserver61') {
-                                                            b = true;
+                                                        if (json.listconfigurationsresponse.configuration != null && json.listconfigurationsresponse.configuration[0].value != 'xenserver61') {
+                                                            b = false;
                                                         }
                                                     }
                                                 });
@@ -260,7 +330,39 @@
                                         },
                                         isHidden: true
                                     },
-                                    
+
+                                    //fields for hypervisor == "KVM" (starts here)
+                                    rootDiskControllerTypeKVM: {
+                                        label: 'label.root.disk.controller',
+                                        isHidden: true,
+                                        select: function(args) {
+                                            var items = []
+                                            items.push({
+                                                id: "",
+                                                description: ""
+                                            });
+                                            items.push({
+                                                id: "ide",
+                                                description: "ide"
+                                            });
+                                            items.push({
+                                                id: "osdefault",
+                                                description: "osdefault"
+                                            });
+                                            items.push({
+                                                id: "scsi",
+                                                description: "virtio-scsi"
+                                            });
+                                            items.push({
+                                                id: "virtio",
+                                                description: "virtio"
+                                            });
+                                            args.response.success({
+                                                data: items
+                                            });
+                                        }
+                                    },
+
                                     //fields for hypervisor == "VMware" (starts here)
                                     rootDiskControllerType: {
                                         label: 'label.root.disk.controller',
@@ -278,6 +380,26 @@
                                             items.push({
                                                 id: "ide",
                                                 description: "ide"
+                                            });
+                                            items.push({
+                                                id: "osdefault",
+                                                description: "osdefault"
+                                            });
+                                            items.push({
+                                                id: "pvscsi",
+                                                description: "pvscsi"
+                                            });
+                                            items.push({
+                                                id: "lsilogic",
+                                                description: "lsilogic"
+                                            });
+                                            items.push({
+                                                id: "lsisas1068",
+                                                description: "lsilogicsas"
+                                            });
+                                            items.push({
+                                                id: "buslogic",
+                                                description: "buslogic"
                                             });
                                             args.response.success({
                                                 data: items
@@ -401,7 +523,7 @@
                                                     description: 'TAR'
                                                 });
                                             } else if (args.hypervisor == "Hyperv") {
-                                            	items.push({
+                                                items.push({
                                                     id: 'VHD',
                                                     description: 'VHD'
                                                 });
@@ -419,18 +541,18 @@
                                     osTypeId: {
                                         label: 'label.os.type',
                                         docID: 'helpRegisterTemplateOSType',
-                                        select: function(args) {    
+                                        select: function(args) {
                                             $.ajax({
                                                 url: createURL("listOsTypes"),
                                                 dataType: "json",
                                                 async: true,
-                                                success: function(json) {	                                                	
-                                                	var ostypeObjs = json.listostypesresponse.ostype;
-                                                	args.response.success({
+                                                success: function(json) {
+                                                    var ostypeObjs = json.listostypesresponse.ostype;
+                                                    args.response.success({
                                                         data: ostypeObjs
                                                     });
                                                 }
-                                            });                                        	    
+                                            });
                                         }
                                     },
 
@@ -482,11 +604,17 @@
                             },
 
                             action: function(args) {
+                                var zones = "";
+                                if (Object.prototype.toString.call( args.data.zone ) === '[object Array]'){
+                                    zones = args.data.zone.join(",");
+                                }
+                                else
+                                    zones = args.data.zone;
                                 var data = {
                                     name: args.data.name,
                                     displayText: args.data.description,
                                     url: args.data.url,
-                                    zoneid: args.data.zone,
+                                    zoneids: zones,
                                     format: args.data.format,
                                     isextractable: (args.data.isExtractable == "on"),
                                     passwordEnabled: (args.data.isPasswordEnabled == "on"),
@@ -519,16 +647,29 @@
                                     });
                                 }
 
-                                
-                                //XenServer only (starts here)                  
+                                //XenServer only (starts here)
                                 if (args.$form.find('.form-item[rel=xenserverToolsVersion61plus]').css("display") != "none") {
                                     $.extend(data, {
                                         'details[0].hypervisortoolsversion': (args.data.xenserverToolsVersion61plus == "on") ? "xenserver61" : "xenserver56"
                                     });
                                 }
                                 //XenServer only (ends here)
-                                
-                                
+
+                                // KVM only (starts here)
+                                if (args.$form.find('.form-item[rel=rootDiskControllerTypeKVM]').css("display") != "none" && args.data.rootDiskControllerTypeKVM != "") {
+                                    $.extend(data, {
+                                        'details[0].rootDiskController': args.data.rootDiskControllerTypeKVM
+                                    });
+                                }
+
+                                if (args.$form.find('.form-item[rel=directdownload]').css("display") != "none" && args.data.directdownload != "") {
+                                    $.extend(data, {
+                                        'directdownload': (args.data.directdownload == "on") ? "true" : "false",
+                                        'checksum': args.data.checksum
+                                    });
+                                }
+                                // KVM only (ends here)
+
                                 //VMware only (starts here)
                                 if (args.$form.find('.form-item[rel=rootDiskControllerType]').css("display") != "none" && args.data.rootDiskControllerType != "") {
                                     $.extend(data, {
@@ -555,16 +696,6 @@
                                         args.response.success({
                                             data: items[0]
                                         });
-                                        /*
-                     if(items.length > 1) {
-                     for(var i=1; i<items.length; i++) {
-                     var $midmenuItem2 = $("#midmenu_item").clone();
-                     templateToMidmenu(items[i], $midmenuItem2);
-                     bindClickToMidMenu($midmenuItem2, templateToRightPanel, templateGetMidmenuId);
-                     $("#midmenu_container").append($midmenuItem2.show());
-                     }
-                     }
-                     */
                                     },
                                     error: function(XMLHttpResponse) {
                                         var errorMsg = parseXMLHttpResponse(XMLHttpResponse);
@@ -578,16 +709,329 @@
                                     args.complete();
                                 }
                             }
+                        },
+
+                        uploadTemplateFromLocal: {
+                            isHeader: true,
+                            label: 'label.upload.from.local',
+                            messages: {
+                                notification: function(args) {
+                                    return 'label.upload.template.from.local';
+                                }
+                            },
+                            createForm: {
+                                title: 'label.upload.template.from.local',
+                                preFilter: cloudStack.preFilter.createTemplate,
+                                fileUpload: {
+                                    getURL: function(args) {
+                                        args.data = args.formData;
+
+                                        var data = {
+                                            name: args.data.name,
+                                            displayText: args.data.description,
+                                            zoneid: args.data.zone,
+                                            format: args.data.format,
+                                            isextractable: (args.data.isExtractable == "on"),
+                                            passwordEnabled: (args.data.isPasswordEnabled == "on"),
+                                            isdynamicallyscalable: (args.data.isdynamicallyscalable == "on"),
+                                            osTypeId: args.data.osTypeId,
+                                            hypervisor: args.data.hypervisor
+                                        };
+
+                                        if (args.$form.find('.form-item[rel=isPublic]').css("display") != "none") {
+                                            $.extend(data, {
+                                                ispublic: (args.data.isPublic == "on")
+                                            });
+                                        }
+
+                                        if (args.$form.find('.form-item[rel=requireshvm]').css("display") != "none") {
+                                            $.extend(data, {
+                                                requireshvm: (args.data.requireshvm == "on")
+                                            });
+                                        }
+
+                                        if (args.$form.find('.form-item[rel=isFeatured]').css("display") != "none") {
+                                            $.extend(data, {
+                                                isfeatured: (args.data.isFeatured == "on")
+                                            });
+                                        }
+
+                                        if (args.$form.find('.form-item[rel=isrouting]').is(':visible')) {
+                                            $.extend(data, {
+                                                isrouting: (args.data.isrouting === 'on')
+                                            });
+                                        }
+
+                                        $.ajax({
+                                            url: createURL('getUploadParamsForTemplate'),
+                                            data: data,
+                                            async: false,
+                                            success: function(json) {
+                                                var uploadparams = json.postuploadtemplateresponse.getuploadparams;
+                                                var templateId = uploadparams.id;
+
+                                                args.response.success({
+                                                    url: uploadparams.postURL,
+                                                    ajaxPost: true,
+                                                    data: {
+                                                        'X-signature': uploadparams.signature,
+                                                        'X-expires': uploadparams.expires,
+                                                        'X-metadata': uploadparams.metadata
+                                                    }
+                                                });
+                                            }
+                                        });
+                                    },
+                                    postUpload: function(args) {
+                                        if(args.error) {
+                                            args.response.error(args.errorMsg);
+                                        } else {
+                                            cloudStack.dialog.notice({
+                                                message: "This template file has been uploaded. Please check its status at Templates menu > " + args.data.name + " > Zones tab > click a zone > Status field and Ready field."
+                                            });
+                                            args.response.success();
+                                        }
+                                    }
+                                },
+                                fields: {
+                                    templateFileUpload: {
+                                        label: 'label.local.file',
+                                        isFileUpload: true,
+                                        validation: {
+                                            required: true
+                                        }
+                                    },
+
+                                    name: {
+                                        label: 'label.name',
+                                        docID: 'helpRegisterTemplateName',
+                                        validation: {
+                                            required: true
+                                        }
+                                    },
+
+                                    description: {
+                                        label: 'label.description',
+                                        docID: 'helpRegisterTemplateDescription',
+                                        validation: {
+                                            required: true
+                                        }
+                                    },
+
+                                    zone: {
+                                        label: 'label.zone',
+                                        docID: 'helpRegisterTemplateZone',
+                                        select: function(args) {
+                                            $.ajax({
+                                                url: createURL("listZones&available=true"),
+                                                dataType: "json",
+                                                async: true,
+                                                success: function(json) {
+                                                    var zoneObjs = json.listzonesresponse.zone;
+                                                    args.response.success({
+                                                        descriptionField: 'name',
+                                                        data: zoneObjs
+                                                    });
+                                                }
+                                            });
+                                        }
+                                    },
+
+                                    hypervisor: {
+                                        label: 'label.hypervisor',
+                                        docID: 'helpRegisterTemplateHypervisor',
+                                        dependsOn: 'zone',
+                                        select: function(args) {
+                                            if (args.zone == null)
+                                                return;
+
+                                            var apiCmd;
+                                            if (args.zone == -1) { //All Zones
+                                                //apiCmd = "listHypervisors&zoneid=-1"; //"listHypervisors&zoneid=-1" has been changed to return only hypervisors available in all zones (bug 8809)
+                                                apiCmd = "listHypervisors";
+                                            } else {
+                                                apiCmd = "listHypervisors&zoneid=" + args.zone;
+                                            }
+
+                                            $.ajax({
+                                                url: createURL(apiCmd),
+                                                dataType: "json",
+                                                async: false,
+                                                success: function(json) {
+                                                    var hypervisorObjs = json.listhypervisorsresponse.hypervisor;
+                                                    var items = [];
+                                                    $(hypervisorObjs).each(function() {
+                                                        items.push({
+                                                            id: this.name,
+                                                            description: this.name
+                                                        });
+                                                    });
+                                                    args.response.success({
+                                                        data: items
+                                                    });
+                                                }
+                                            });
+                                        }
+                                    },
+
+                                    format: {
+                                        label: 'label.format',
+                                        docID: 'helpRegisterTemplateFormat',
+                                        dependsOn: 'hypervisor',
+                                        select: function(args) {
+                                            var items = [];
+                                            if (args.hypervisor == "XenServer") {
+                                                items.push({
+                                                    id: 'VHD',
+                                                    description: 'VHD'
+                                                });
+                                            } else if (args.hypervisor == "VMware") {
+                                                items.push({
+                                                    id: 'OVA',
+                                                    description: 'OVA'
+                                                });
+                                            } else if (args.hypervisor == "KVM") {
+                                                items.push({
+                                                    id: 'QCOW2',
+                                                    description: 'QCOW2'
+                                                });
+                                                items.push({
+                                                    id: 'RAW',
+                                                    description: 'RAW'
+                                                });
+                                                items.push({
+                                                    id: 'VHD',
+                                                    description: 'VHD'
+                                                });
+                                                items.push({
+                                                    id: 'VMDK',
+                                                    description: 'VMDK'
+                                                });
+                                            } else if (args.hypervisor == "BareMetal") {
+                                                items.push({
+                                                    id: 'BareMetal',
+                                                    description: 'BareMetal'
+                                                });
+                                            } else if (args.hypervisor == "Ovm") {
+                                                items.push({
+                                                    id: 'RAW',
+                                                    description: 'RAW'
+                                                });
+                                            } else if (args.hypervisor == "LXC") {
+                                                items.push({
+                                                    id: 'TAR',
+                                                    description: 'TAR'
+                                                });
+                                            } else if (args.hypervisor == "Hyperv") {
+                                                items.push({
+                                                    id: 'VHD',
+                                                    description: 'VHD'
+                                                });
+                                                items.push({
+                                                    id: 'VHDX',
+                                                    description: 'VHDX'
+                                                });
+                                            }
+                                            args.response.success({
+                                                data: items
+                                            });
+                                        }
+                                    },
+
+                                    osTypeId: {
+                                        label: 'label.os.type',
+                                        docID: 'helpRegisterTemplateOSType',
+                                        select: function(args) {
+                                            $.ajax({
+                                                url: createURL("listOsTypes"),
+                                                dataType: "json",
+                                                async: true,
+                                                success: function(json) {
+                                                    var ostypeObjs = json.listostypesresponse.ostype;
+                                                    args.response.success({
+                                                        data: ostypeObjs
+                                                    });
+                                                }
+                                            });
+                                        }
+                                    },
+
+                                    isExtractable: {
+                                        label: "label.extractable",
+                                        docID: 'helpRegisterTemplateExtractable',
+                                        isBoolean: true
+                                    },
+
+                                    isPasswordEnabled: {
+                                        label: "label.password.enabled",
+                                        docID: 'helpRegisterTemplatePasswordEnabled',
+                                        isBoolean: true
+                                    },
+
+                                    isdynamicallyscalable: {
+                                        label: "label.dynamically.scalable",
+                                        docID: 'helpRegisterTemplateDynamicallyScalable',
+                                        isBoolean: true
+                                    },
+
+                                    isPublic: {
+                                        label: "label.public",
+                                        docID: 'helpRegisterTemplatePublic',
+                                        isBoolean: true,
+                                        isHidden: true
+                                    },
+
+                                    isFeatured: {
+                                        label: "label.featured",
+                                        docID: 'helpRegisterTemplateFeatured',
+                                        isBoolean: true,
+                                        isHidden: true
+                                    },
+
+                                    isrouting: {
+                                        label: 'label.routing',
+                                        docID: 'helpRegisterTemplateRouting',
+                                        isBoolean: true,
+                                        isHidden: true
+                                    },
+
+                                    requireshvm: {
+                                        label: 'label.hvm',
+                                        docID: 'helpRegisterTemplateHvm',
+                                        isBoolean: true,
+                                        isHidden: false,
+                                        isChecked: true
+                                    }
+                                }
+                            },
+
+                            action: function(args) {
+                                return; //createForm.fileUpload.getURL() has executed the whole action. Therefore, nothing needs to be done here.
+                            },
+
+                            notification: {
+                                poll: function(args) {
+                                    args.complete();
+                                }
+                            }
                         }
                     },
 
                     dataProvider: function(args) {
                         var data = {};
                         listViewDataProvider(args, data);
+                        // Due to zonal grouping, low pagesize can result lower
+                        // aggregated items, resulting in no scroll shown
+                        // So, use maximum pagesize
+                        data.pagesize = 200;
 
                         var ignoreProject = false;
                         if (args.filterBy != null) { //filter dropdown
                             if (args.filterBy.kind != null) {
+                                if (previousFilterType != args.filterBy.kind || args.page == 1) {
+                                    previousFilterType = args.filterBy.kind;
+                                    previousCollection = [];
+                                }
                                 switch (args.filterBy.kind) {
                                     case "all":
                                         ignoreProject = true;
@@ -629,23 +1073,23 @@
                             success: function(json) {
                                 var items = json.listtemplatesresponse.template;
                                 var itemsView = [];
-								
+
                                 $(items).each(function(index, item) {
-                                    var existing = $.grep(itemsView, function(it){
+                                    var existing = $.grep(previousCollection, function(it){
                                         return it != null && it.id !=null && it.id == item.id;
                                     });
-								
-                                    if (existing.length == 0) {
-                                        itemsView.push($.extend(item, {                                            
+
+                                    if (existing.length > 0) {
+                                        return true; // skip adding this entry
+                                    } else {
+                                        var templateItem = $.extend(item, {
                                             zones: item.zonename,
                                             zoneids: [item.zoneid]
-                                        }));
+                                        });
+                                        itemsView.push(templateItem);
+                                        previousCollection.push(templateItem);
                                     }
-                                    else {
-                                        existing[0].zones = 'label.multiplezones';
-                                        existing[0].zoneids.push(item.zoneid);
-                                    }
-                                });								
+                                });
 
                                 args.response.success({
                                     actionFilter: templateActionfilter,
@@ -657,6 +1101,10 @@
 
                     detailView: {
                         name: 'Template details',
+                        viewAll: {
+                            label: 'label.instances',
+                            path: 'instances'
+                        },
                         actions: {
                             edit: {
                                 label: 'label.edit',
@@ -683,7 +1131,7 @@
 
                                     //***** updateTemplatePermissions *****
                                     var data = {
-                                        id: args.context.templates[0].id,
+                                        id: args.context.templates[0].id
                                         //zoneid: args.context.templates[0].zoneid //can't update template/ISO in only one zone. It always get updated in all zones.
                                     };
 
@@ -726,53 +1174,53 @@
                                         }
                                     });
 
-                                    
-                                    //***** addResourceDetail *****
-                                    //XenServer only (starts here)                                       
-  					                if(args.$detailView.find('form').find('div .detail-group').find('.xenserverToolsVersion61plus').length > 0) {	  					                	
-  					                	$.ajax({
-  					                		url: createURL('addResourceDetail'),
-  					                		data: {
-  					                			resourceType: 'template',
-  					                			resourceId: args.context.templates[0].id,
-  					                			'details[0].key': 'hypervisortoolsversion',
-  					                			'details[0].value': (args.data.xenserverToolsVersion61plus == "on") ? 'xenserver61' : 'xenserver56'
-  					                		},
-  					                		success: function(json) {
-  					                			 var jobId = json.addResourceDetailresponse.jobid;
-  		                                         var addResourceDetailIntervalID = setInterval(function() {
-  		                                             $.ajax({
-  		                                                 url: createURL("queryAsyncJobResult&jobid=" + jobId),
-  		                                                 dataType: "json",
-  		                                                 success: function(json) {
-  		                                                     var result = json.queryasyncjobresultresponse;
-  		                                                     
-  		                                                     if (result.jobstatus == 0) {
-  		                                                         return; //Job has not completed
-  		                                                     } else {
-  		                                                         clearInterval(addResourceDetailIntervalID);
 
-  		                                                         if (result.jobstatus == 1) {                                                        	 
-  		                                                        	 //do nothing                                                        	 
-  		                                                         } else if (result.jobstatus == 2) {
-  		                                                        	 cloudStack.dialog.notice({
-  		                                                                 message: "message.XSTools61plus.update.failed" + " " + _s(result.jobresult.errortext)
-  		                                                             });                                                             
-  		                                                         }
-  		                                                     }
-  		                                                 },
-  		                                                 error: function(XMLHttpResponse) {                                                    
-  		                                                     cloudStack.dialog.notice({
-  		                                                         message: "message.XSTools61plus.update.failed" + " " + parseXMLHttpResponse(XMLHttpResponse)
-  		                                                     });                                                          
-  		                                                 }
-  		                                             });
-  		                                         }, g_queryAsyncJobResultInterval);		 					                			
-  					                		}
-  					                	});  					                					                	               
-  								    }				      
-  							        //XenServer only (ends here)  	
-                                    
+                                    //***** addResourceDetail *****
+                                    //XenServer only (starts here)
+                                      if(args.$detailView.find('form').find('div .detail-group').find('.xenserverToolsVersion61plus').length > 0) {
+                                          $.ajax({
+                                              url: createURL('addResourceDetail'),
+                                              data: {
+                                                  resourceType: 'template',
+                                                  resourceId: args.context.templates[0].id,
+                                                  'details[0].key': 'hypervisortoolsversion',
+                                                  'details[0].value': (args.data.xenserverToolsVersion61plus == "on") ? 'xenserver61' : 'xenserver56'
+                                              },
+                                              success: function(json) {
+                                                   var jobId = json.addResourceDetailresponse.jobid;
+                                                   var addResourceDetailIntervalID = setInterval(function() {
+                                                       $.ajax({
+                                                           url: createURL("queryAsyncJobResult&jobid=" + jobId),
+                                                           dataType: "json",
+                                                           success: function(json) {
+                                                               var result = json.queryasyncjobresultresponse;
+
+                                                               if (result.jobstatus == 0) {
+                                                                   return; //Job has not completed
+                                                               } else {
+                                                                   clearInterval(addResourceDetailIntervalID);
+
+                                                                   if (result.jobstatus == 1) {
+                                                                       //do nothing
+                                                                   } else if (result.jobstatus == 2) {
+                                                                       cloudStack.dialog.notice({
+                                                                           message: "message.XSTools61plus.update.failed" + " " + _s(result.jobresult.errortext)
+                                                                       });
+                                                                   }
+                                                               }
+                                                           },
+                                                           error: function(XMLHttpResponse) {
+                                                               cloudStack.dialog.notice({
+                                                                   message: "message.XSTools61plus.update.failed" + " " + parseXMLHttpResponse(XMLHttpResponse)
+                                                               });
+                                                           }
+                                                       });
+                                                   }, g_queryAsyncJobResultInterval);
+                                              }
+                                          });
+                                      }
+                                      //XenServer only (ends here)
+
 
                                     //***** listTemplates *****
                                     //So, we call listTemplates API to get a complete template object
@@ -839,7 +1287,7 @@
                                 notification: {
                                     poll: pollAsyncJobResult
                                 }
-                            },
+                            }
 
                         },
                         tabs: {
@@ -853,36 +1301,36 @@
                                     } else {
                                         hiddenFields = ["hypervisor", 'xenserverToolsVersion61plus'];
                                     }
-                                    
+
                                     if ('templates' in args.context && args.context.templates[0].hypervisor != 'XenServer') {
                                         hiddenFields.push('xenserverToolsVersion61plus');
                                     }
-                                                                      
+
                                     if ('templates' in args.context && args.context.templates[0].ostypeid != undefined) {
-                                    	var ostypeObjs;
-    	                            	$.ajax({
-    	                                    url: createURL("listOsTypes"),
-    	                                    dataType: "json",
-    	                                    async: false,
-    	                                    success: function(json) {	                                    	
-    	                                    	var ostypeObjs = json.listostypesresponse.ostype;		                                    	
-    	                                    }
-    	                                });
-                                    	                           	
-                                    	if (ostypeObjs != undefined) {
-                                    		var ostypeName;
-                                    		for (var i = 0; i < ostypeObjs.length; i++) {
-                                    			if (ostypeObjs[i].id == args.context.templates[0].ostypeid) {                            				
-                                    				ostypeName = ostypeObjs[i].description;
-                                    				break;
-                                    			}
-                                    		}                            		
-                                    		if (ostypeName == undefined || ostypeName.indexOf("Win") == -1) {                            			
-                                    			hiddenFields.push('xenserverToolsVersion61plus');
-                                    		}                            		
-                                    	}
+                                        var ostypeObjs;
+                                        $.ajax({
+                                            url: createURL("listOsTypes"),
+                                            dataType: "json",
+                                            async: false,
+                                            success: function(json) {
+                                                var ostypeObjs = json.listostypesresponse.ostype;
+                                            }
+                                        });
+
+                                        if (ostypeObjs != undefined) {
+                                            var ostypeName;
+                                            for (var i = 0; i < ostypeObjs.length; i++) {
+                                                if (ostypeObjs[i].id == args.context.templates[0].ostypeid) {
+                                                    ostypeName = ostypeObjs[i].description;
+                                                    break;
+                                                }
+                                            }
+                                            if (ostypeName == undefined || ostypeName.indexOf("Win") == -1) {
+                                                hiddenFields.push('xenserverToolsVersion61plus');
+                                            }
+                                        }
                                     }
-                                                                       
+
                                     return hiddenFields;
                                 },
 
@@ -894,7 +1342,7 @@
                                             required: true
                                         }
                                     }
-                                }, { 
+                                }, {
                                     hypervisor: {
                                         label: 'label.hypervisor'
                                     },
@@ -908,8 +1356,8 @@
                                                 return false;
                                         },
                                         converter: cloudStack.converters.toBooleanText
-                                    },   
-                                                                                                    
+                                    },
+
                                     size: {
                                         label: 'label.size',
                                         converter: function(args) {
@@ -919,8 +1367,13 @@
                                                 return cloudStack.converters.convertBytes(args);
                                         }
                                     },
+                                    directdownload: {
+                                        label: 'label.direct.download',
+                                        isBoolean: true,
+                                        converter: cloudStack.converters.toBooleanText
+                                    },
                                     isextractable: {
-                                        label: 'label.extractable',
+                                        label: 'label.extractable.lower',
                                         isBoolean: true,
                                         isEditable: function() {
                                             if (isAdmin())
@@ -967,23 +1420,23 @@
                                                 return false;
                                         },
                                         converter: cloudStack.converters.toBooleanText
-                                    },                                    
-                                    
+                                    },
+
                                     ostypeid: {
                                         label: 'label.os.type',
                                         isEditable: true,
                                         select: function(args) {
-                                        	var ostypeObjs;
+                                            var ostypeObjs;
                                             $.ajax({
                                                 url: createURL("listOsTypes"),
                                                 dataType: "json",
                                                 async: false,
-                                                success: function(json) {	                                                	
-                                                	ostypeObjs = json.listostypesresponse.ostype;	                                                   
+                                                success: function(json) {
+                                                    ostypeObjs = json.listostypesresponse.ostype;
                                                 }
                                             });
-                                        	                                        	
-                                        	var items = [];
+
+                                            var items = [];
                                             $(ostypeObjs).each(function() {
                                                 items.push({
                                                     id: this.id,
@@ -1006,8 +1459,8 @@
                                         validation: {
                                             required: true
                                         }
-                                    },        
-                                    
+                                    },
+
                                     domain: {
                                         label: 'label.domain'
                                     },
@@ -1018,11 +1471,11 @@
                                         label: 'label.created',
                                         converter: cloudStack.converters.toLocalDate
                                     },
-                                    
+
                                     templatetype: {
                                         label: 'label.type'
                                     },
-                                    
+
                                     id: {
                                         label: 'label.id'
                                     }
@@ -1034,27 +1487,27 @@
                                 }),
 
 
-                                dataProvider: function(args) {  // UI > Templates menu (listing) > select a template from listing > Details tab                               
+                                dataProvider: function(args) {  // UI > Templates menu (listing) > select a template from listing > Details tab
                                     $.ajax({
                                         url: createURL("listTemplates"),
                                         data: {
-                                        	templatefilter: "self",
-                                        	id: args.context.templates[0].id
+                                            templatefilter: "self",
+                                            id: args.context.templates[0].id
                                         },
                                         success: function(json) {
-                                        	var jsonObj = json.listtemplatesresponse.template[0];
-                                        	
-                                        	if ('details' in jsonObj && 'hypervisortoolsversion' in jsonObj.details) {
-                                        	    if (jsonObj.details.hypervisortoolsversion == 'xenserver61')
-                                        	        jsonObj.xenserverToolsVersion61plus = true;
-                                        	    else
-                                        	        jsonObj.xenserverToolsVersion61plus = false;
-                                        	}
-                                        	
-                                        	args.response.success({
-                                        	    actionFilter: templateActionfilter,
-                                        	    data: jsonObj
-                                        	});
+                                            var jsonObj = json.listtemplatesresponse.template[0];
+
+                                            if ('details' in jsonObj && 'hypervisortoolsversion' in jsonObj.details) {
+                                                if (jsonObj.details.hypervisortoolsversion == 'xenserver61')
+                                                    jsonObj.xenserverToolsVersion61plus = true;
+                                                else
+                                                    jsonObj.xenserverToolsVersion61plus = false;
+                                            }
+
+                                            args.response.success({
+                                                actionFilter: templateActionfilter,
+                                                data: jsonObj
+                                            });
                                         }
                                     });
                                 }
@@ -1072,58 +1525,81 @@
                                             label: 'label.status'
                                         },
                                         isready: {
-                                            label: 'state.ready',
+                                            label: 'state.Ready',
                                             converter: cloudStack.converters.toBooleanText
                                         }
                                     },
                                     hideSearchBar: true,
 
 
-                                    dataProvider: function(args) {  // UI > Templates menu (listing) > select a template from listing > Details tab > Zones tab (listing) 
-                                    	$.ajax({
+                                    dataProvider: function(args) {  // UI > Templates menu (listing) > select a template from listing > Details tab > Zones tab (listing)
+                                        var data = { templatefilter: "self",
+                                                     id: args.context.templates[0].id
+                                                   };
+                                        listViewDataProvider(args, data);
+                                        $.ajax({
                                             url: createURL("listTemplates"),
-                                            data: {
-                                            	templatefilter: "self",
-                                            	id: args.context.templates[0].id
-                                            },
+                                            data: data,
                                             success: function(json) {
-                                            	var jsonObjs = json.listtemplatesresponse.template;
-                                            	                                            	
-                                            	if (jsonObjs != undefined) {
-                                            		for (var i = 0; i < jsonObjs.length; i++) {
-                                            			var jsonObj = jsonObjs[i];
-                                            			if ('details' in jsonObj && 'hypervisortoolsversion' in jsonObj.details) {
-                                                    	    if (jsonObj.details.hypervisortoolsversion == 'xenserver61')
-                                                    	        jsonObj.xenserverToolsVersion61plus = true;
-                                                    	    else
-                                                    	        jsonObj.xenserverToolsVersion61plus = false;
-                                                    	}
-                                            		}
-                                            	}                                            	
-                                            	
-                                            	args.response.success({
-                                            	    actionFilter: templateActionfilter,
-                                            	    data: jsonObjs
-                                            	});
+                                                var jsonObjs = json.listtemplatesresponse.template;
+
+                                                if (jsonObjs != undefined) {
+                                                    for (var i = 0; i < jsonObjs.length; i++) {
+                                                        var jsonObj = jsonObjs[i];
+                                                        if ('details' in jsonObj && 'hypervisortoolsversion' in jsonObj.details) {
+                                                            if (jsonObj.details.hypervisortoolsversion == 'xenserver61')
+                                                                jsonObj.xenserverToolsVersion61plus = true;
+                                                            else
+                                                                jsonObj.xenserverToolsVersion61plus = false;
+                                                        }
+                                                    }
+                                                    if (!'zonename' in jsonObj) {
+                                                        jsonObj.zonename = 'All Zones';
+                                                    }
+                                                }
+
+                                                args.response.success({
+                                                    actionFilter: templateActionfilter,
+                                                    data: jsonObjs
+                                                });
                                             }
-                                        });                                      	                        
+                                        });
                                     },
-                                    
+
                                     detailView: {
+                                        noCompact: true,
                                         actions: {
                                              remove: {
                                                  label: 'label.action.delete.template',
+                                                 createForm: {
+                                                    title: 'label.action.delete.template',
+                                                    desc: function(args) {
+                                                       if(args.context.templates[0].crossZones == true) {
+                                                          return 'message.action.delete.template.for.all.zones';
+                                                       } else {
+                                                          return 'message.action.delete.template';
+                                                       }
+                                                      },
+                                                    fields: {
+                                                        forced: {
+                                                            label: 'force.delete',
+                                                            isBoolean: true,
+                                                            isChecked: false
+                                                        }
+                                                    }
+                                                 },
                                                  messages: {
-                                                     confirm: function(args) {
-                                                         return 'message.action.delete.template';
-                                                     },
                                                      notification: function(args) {
                                                          return 'label.action.delete.template';
                                                      }
                                                  },
                                                  action: function(args) {
+                                                     var queryParams = "deleteTemplate&id=" + args.context.templates[0].id;
+                                                     if (!args.context.templates[0].crossZones){
+                                                        queryParams += "&zoneid=" + args.context.zones[0].zoneid;
+                                                     }
                                                      $.ajax({
-                                                         url: createURL("deleteTemplate&id=" + args.context.templates[0].id + "&zoneid=" + args.context.zones[0].zoneid),
+                                                         url: createURL(queryParams + "&forced=" + (args.data.forced == "on")),
                                                          dataType: "json",
                                                          async: true,
                                                          success: function(json) {
@@ -1143,9 +1619,6 @@
                                              copyTemplate: {
                                                  label: 'label.action.copy.template',
                                                  messages: {
-                                                     confirm: function(args) {
-                                                         return 'message.copy.template.confirm';
-                                                     },
                                                      success: function(args) {
                                                          return 'message.template.copying';
                                                      },
@@ -1153,76 +1626,102 @@
                                                          return 'label.action.copy.template';
                                                      }
                                                  },
-                                                 createForm: {
-                                                     title: 'label.action.copy.template',
-                                                     desc: '',
-                                                     fields: {
-                                                         destinationZoneId: {
-                                                             label: 'label.destination.zone',
-                                                             docID: 'helpCopyTemplateDestination',
-                                                             validation: {
-                                                                 required: true
-                                                             },
-                                                             select: function(args) {
-                                                                 $.ajax({
-                                                                     url: createURL("listZones&available=true"),
-                                                                     dataType: "json",
-                                                                     async: true,
-                                                                     success: function(json) {
-                                                                         var zoneObjs = [];
-                                                                         var items = json.listzonesresponse.zone;
-                                                                         if (items != null) {
-                                                                             for (var i = 0; i < items.length; i++) {
-                                                                                 if (args.context.zones[0].zoneid != items[i].id) {
-                                                                                     zoneObjs.push({
-                                                                                         id: items[i].id,
-                                                                                         description: items[i].name
+                                                action: {
+                                                    custom: cloudStack.uiCustom.copyTemplate({
+                                                        listView: {
+                                                            listView: {
+                                                                id: 'destinationZones',
+                                                                fields: {
+                                                                    destinationZoneName: {
+                                                                        label: 'label.name'
+                                                                    }
+                                                                },
+                                                                dataProvider: function(args) {
+                                                                     var data = {
+                                                                        page: args.page,
+                                                                        pagesize: pageSize
+                                                                    };
+                                                                    if (args.filterBy.search.value) {
+                                                                        data.keyword = args.filterBy.search.value;
+                                                                    }
+                                                                     $.ajax({
+                                                                             url: createURL("listZones&available=true"),
+                                                                             dataType: "json",
+                                                                             data: data,
+                                                                             async: true,
+                                                                             success: function(json) {
+                                                                                 var zoneObjs = [];
+                                                                                 var items = json.listzonesresponse.zone;
+                                                                                 if (items != null) {
+                                                                                     for (var i = 0; i < items.length; i++) {
+                                                                                         if (args.context.zones[0].zoneid != items[i].id) {
+                                                                                             zoneObjs.push({
+                                                                                                 id: items[i].id,
+                                                                                                 destinationZoneName: items[i].name
+                                                                                             });
+                                                                                         }
+                                                                                     }
+                                                                                     args.response.success({
+                                                                                         data: zoneObjs
                                                                                      });
-                                                                                 }
+                                                                                }else if(args.page == 1) {
+							                             args.response.success({
+                                                                                         data: []
+                                                                                     }); 
+                                                                            } else {
+							                             args.response.success({
+                                                                                         data: []
+                                                                                     }); 
+                                                                            }
+                                                                        }
+                                                                    });
+                                                                }
+                                                            }
+                                                        },
+                                                        action: function(args) {
+                                                            var zoneids = "";
+                                                            if (args.context.selectedZone != null &&
+                                                                    args.context.selectedZone.length > 0) {
+                                                                for (var i = 0; i < args.context.selectedZone.length; i++){
+                                                                    if (i != 0 )
+                                                                        zoneids += ",";
+                                                                    zoneids += args.context.selectedZone[i].id;
+                                                                }
+                                                            }
+                                                            if (zoneids == "")
+                                                                return;
+                                                            var data = {
+                                                                 id: args.context.templates[0].id,
+                                                                 destzoneids: zoneids,
+                                                                 sourcezoneid: args.context.zones[0].zoneid
+                                                            };
+
+                                                             $.ajax({
+                                                                 url: createURL('copyTemplate'),
+                                                                 data: data,
+                                                                 success: function(json) {
+                                                                     var jid = json.copytemplateresponse.jobid;
+                                                                     args.response.success({
+                                                                         _custom: {
+                                                                             jobId: jid,
+                                                                             getUpdatedItem: function(json) {
+                                                                                 return {}; //nothing in this template needs to be updated
+                                                                             },
+                                                                             getActionFilter: function() {
+                                                                                 return templateActionfilter;
                                                                              }
                                                                          }
-                                                                         args.response.success({
-                                                                             data: zoneObjs
-                                                                         });
-                                                                     }
-                                                                 });
-                                                             }
-                                                         }
-                                                     }
-                                                 },
-                                                 action: function(args) {                                    
-                                                     var data = {
-                                                     	id: args.context.templates[0].id,
-                                                     	destzoneid: args.data.destinationZoneId
-                                                     };                                	
-                                                     $.extend(data, {
-                                                         sourcezoneid: args.context.zones[0].zoneid
-                                                     });	
-                                                     
-                                                 	$.ajax({
-                                                         url: createURL('copyTemplate'),
-                                                         data: data,                                        
-                                                         success: function(json) {
-                                                             var jid = json.copytemplateresponse.jobid;
-                                                             args.response.success({
-                                                                 _custom: {
-                                                                     jobId: jid,
-                                                                     getUpdatedItem: function(json) {
-                                                                         return {}; //nothing in this template needs to be updated
-                                                                     },
-                                                                     getActionFilter: function() {
-                                                                         return templateActionfilter;
-                                                                     }
+                                                                     });
                                                                  }
                                                              });
                                                          }
-                                                     });
+                                                    })
                                                  },
                                                  notification: {
                                                      poll: pollAsyncJobResult
                                                  }
-                                             }
-                                    },                                        
+                                            }
+                                        },
 
                                     tabs: {
                                         details: {
@@ -1234,36 +1733,36 @@
                                                 } else {
                                                     hiddenFields = ["hypervisor", 'xenserverToolsVersion61plus'];
                                                 }
-                                                
+
                                                 if ('templates' in args.context && args.context.templates[0].hypervisor != 'XenServer') {
                                                     hiddenFields.push('xenserverToolsVersion61plus');
                                                 }
-                                                                                               
+
                                                 if ('templates' in args.context && args.context.templates[0].ostypeid != undefined) {
-                                                	var ostypeObjs;
-                	                            	$.ajax({
-                	                                    url: createURL("listOsTypes"),
-                	                                    dataType: "json",
-                	                                    async: false,
-                	                                    success: function(json) {	                                    	
-                	                                    	ostypeObjs = json.listostypesresponse.ostype;		                                    	
-                	                                    }
-                	                                });
-                                                	                           	
-                                                	if (ostypeObjs != undefined) {
-                                                		var ostypeName;
-                                                		for (var i = 0; i < ostypeObjs.length; i++) {
-                                                			if (ostypeObjs[i].id == args.context.templates[0].ostypeid) {                            				
-                                                				ostypeName = ostypeObjs[i].description;
-                                                				break;
-                                                			}
-                                                		}                            		
-                                                		if (ostypeName == undefined || ostypeName.indexOf("Win") == -1) {                            			
-                                                			hiddenFields.push('xenserverToolsVersion61plus');
-                                                		}                            		
-                                                	}
-                                                }                                         
-                                                
+                                                    var ostypeObjs;
+                                                    $.ajax({
+                                                        url: createURL("listOsTypes"),
+                                                        dataType: "json",
+                                                        async: false,
+                                                        success: function(json) {
+                                                            ostypeObjs = json.listostypesresponse.ostype;
+                                                        }
+                                                    });
+
+                                                    if (ostypeObjs != undefined) {
+                                                        var ostypeName;
+                                                        for (var i = 0; i < ostypeObjs.length; i++) {
+                                                            if (ostypeObjs[i].id == args.context.templates[0].ostypeid) {
+                                                                ostypeName = ostypeObjs[i].description;
+                                                                break;
+                                                            }
+                                                        }
+                                                        if (ostypeName == undefined || ostypeName.indexOf("Win") == -1) {
+                                                            hiddenFields.push('xenserverToolsVersion61plus');
+                                                        }
+                                                    }
+                                                }
+
                                                 return hiddenFields;
                                             },
 
@@ -1275,18 +1774,18 @@
                                                         required: true
                                                     }
                                                 }
-                                            }, { 
+                                            }, {
                                                 id: {
                                                     label: 'label.id'
                                                 },
                                                 zonename: {
                                                     label: 'label.zone.name'
-                                                },  
+                                                },
                                                 zoneid: {
                                                     label: 'label.zone.id'
                                                 },
-                                            	isready: {
-                                                    label: 'state.ready',
+                                                isready: {
+                                                    label: 'state.Ready',
                                                     converter: cloudStack.converters.toBooleanText
                                                 },
                                                 status: {
@@ -1306,8 +1805,8 @@
                                                             return false;
                                                     },
                                                     converter: cloudStack.converters.toBooleanText
-                                                },   
-                                                                                                                
+                                                },
+
                                                 size: {
                                                     label: 'label.size',
                                                     converter: function(args) {
@@ -1318,7 +1817,7 @@
                                                     }
                                                 },
                                                 isextractable: {
-                                                    label: 'label.extractable',
+                                                    label: 'label.extractable.lower',
                                                     isBoolean: true,
                                                     isEditable: function() {
                                                         if (isAdmin())
@@ -1365,23 +1864,23 @@
                                                             return false;
                                                     },
                                                     converter: cloudStack.converters.toBooleanText
-                                                },                                    
-                                                
+                                                },
+
                                                 ostypeid: {
                                                     label: 'label.os.type',
                                                     isEditable: true,
-                                                    select: function(args) {                                                    
-                                                    	var ostypeObjs;
+                                                    select: function(args) {
+                                                        var ostypeObjs;
                                                         $.ajax({
                                                             url: createURL("listOsTypes"),
                                                             dataType: "json",
                                                             async: false,
                                                             success: function(json) {
-                                                            	ostypeObjs = json.listostypesresponse.ostype;	                                                                
+                                                                ostypeObjs = json.listostypesresponse.ostype;
                                                             }
                                                         });
-                                                    	                                                    
-                                                    	var items = [];
+
+                                                        var items = [];
                                                         $(ostypeObjs).each(function() {
                                                             items.push({
                                                                 id: this.id,
@@ -1401,8 +1900,8 @@
                                                     validation: {
                                                         required: true
                                                     }
-                                                },        
-                                                
+                                                },
+
                                                 domain: {
                                                     label: 'label.domain'
                                                 },
@@ -1413,11 +1912,10 @@
                                                     label: 'label.created',
                                                     converter: cloudStack.converters.toLocalDate
                                                 },
-                                                
+
                                                 templatetype: {
                                                     label: 'label.type'
-                                                },
-                                                
+                                                }
 
                                             }],
 
@@ -1427,26 +1925,143 @@
                                             }),
 
 
-                                            dataProvider: function(args) {  // UI > Templates menu (listing) > select a template from listing > Details tab > Zones tab (listing) > select a zone from listing > Details tab  
-                                            	var jsonObj = args.context.zones[0];
+                                            dataProvider: function(args) {  // UI > Templates menu (listing) > select a template from listing > Details tab > Zones tab (listing) > select a zone from listing > Details tab
+                                                var jsonObj = args.context.zones[0];
 
-                                            	if ('details' in jsonObj && 'hypervisortoolsversion' in jsonObj.details) {
-                                            	    if (jsonObj.details.hypervisortoolsversion == 'xenserver61')
-                                            	        jsonObj.xenserverToolsVersion61plus = true;
-                                            	    else
-                                            	        jsonObj.xenserverToolsVersion61plus = false;
-                                            	}
+                                                if ('details' in jsonObj && 'hypervisortoolsversion' in jsonObj.details) {
+                                                    if (jsonObj.details.hypervisortoolsversion == 'xenserver61')
+                                                        jsonObj.xenserverToolsVersion61plus = true;
+                                                    else
+                                                        jsonObj.xenserverToolsVersion61plus = false;
+                                                }
 
-                                            	args.response.success({
-                                            	    actionFilter: templateActionfilter,
-                                            	    data: jsonObj
-                                            	});                        	
+                                                args.response.success({
+                                                    actionFilter: templateActionfilter,
+                                                    data: jsonObj
+                                                });
                                             }
                                         }
                                     }}
-                                }			
-                            }
-                        }
+                                }
+                            },
+                            /**
+							 * Settings tab
+							 */
+							settings: {
+								title: 'label.settings',
+								custom: cloudStack.uiCustom.granularDetails({
+									dataProvider: function(args) {
+										$.ajax({
+											url: createURL('listTemplates'),
+											data: {
+												templatefilter: "self",
+												id: args.context.templates[0].id
+											},
+											success: function(json) {
+												var details = json.listtemplatesresponse.template[0].details;
+												var listDetails = [];
+												for (detail in details){
+													var det = {};
+													det["name"] = detail;
+													det["value"] = details[detail];
+													listDetails.push(det);
+												}
+												args.response.success({
+													data: listDetails
+												});
+											},
+
+											error: function(json) {
+												args.response.error(parseXMLHttpResponse(json));
+											}
+										});
+
+									},
+									actions: {
+										edit: function(args) {
+											var data = {
+												name: args.data.jsonObj.name,
+												value: args.data.value
+											};
+											var existingDetails = args.context.templates[0].details;
+											var newDetails = '';
+											for (d in existingDetails) {
+												if (d != data.name) {
+													newDetails += 'details[0].' + d + '=' + existingDetails[d] + '&';
+												}
+											}
+											newDetails += 'details[0].' + data.name + '=' + data.value;
+											
+											$.ajax({
+												url: createURL('updateTemplate&id=' + args.context.templates[0].id + '&' + newDetails),
+												success: function(json) {
+													var template = json.updatetemplateresponse.template;
+													args.context.templates[0].details = template.details;
+													args.response.success({
+														data: template.details
+													});
+												},
+
+												error: function(json) {
+													args.response.error(parseXMLHttpResponse(json));
+												}
+											});
+										},
+										remove: function(args) {
+											var existingDetails = args.context.templates[0].details;
+											var detailToDelete = args.data.jsonObj.name;
+											var newDetails = ''
+											for (detail in existingDetails) {
+												if (detail != detailToDelete) {
+													newDetails += 'details[0].' + detail + '=' + existingDetails[detail] + '&';
+												}
+											}
+											if (newDetails != '') {
+												newDetails = newDetails.substring(0, newDetails.length - 1);
+											}
+											else {
+												newDetails += 'cleanupdetails=true';
+											}
+											$.ajax({
+												url: createURL('updateTemplate&id=' + args.context.templates[0].id + '&' + newDetails),
+												success: function(json) {
+													var template = json.updatetemplateresponse.template;
+													args.context.templates[0].details = template.details;
+													args.response.success({
+														data: template.details
+													});
+												},
+												error: function(json) {
+													args.response.error(parseXMLHttpResponse(json));
+												}
+											});
+										},
+										add: function(args) {
+											var name = args.data.name;
+											var value = args.data.value;
+											var details = args.context.templates[0].details;
+											var detailsFormat = '';
+											for (key in details) {
+												detailsFormat += "details[0]." + key + "=" + details[key] + "&";
+											}
+											// Add new detail to the existing ones
+											detailsFormat += "details[0]." + name + "=" + value;
+											$.ajax({
+												url: createURL('updateTemplate&id=' + args.context.templates[0].id + "&" + detailsFormat),
+												async: false,
+												success: function(json) {
+													var template = json.updatetemplateresponse.template;
+													args.context.templates[0].details = template.details;
+													args.response.success({
+														data: template.details
+													});
+												}
+											});
+										}
+									}
+								})
+							}
+						}
                     }
                 }
             },
@@ -1458,7 +2073,7 @@
                     filters: {
                         all: {
                             preFilter: function(args) {
-                                if (isAdmin()) //"listIsos&filter=all" only works for root-admin, but no domain-admin. Domain-admin is unable to see all Isos until listIsos API supports a new type of isofilter for domain-admin to see all Isos in his domain.
+                                if (isAdmin()||isDomainAdmin()) //"listIsos&filter=all" works for root-admin and domain-admin. Domain-admin is able to see all Isos in his domain.
                                     return true;
                                 else
                                     return false;
@@ -1478,9 +2093,21 @@
                             label: 'label.community'
                         }
                     },
+                    preFilter: function() {
+                        if (isAdmin()||isDomainAdmin()) {
+                            return []
+                        }
+                        return ['account']
+                    },
                     fields: {
                         name: {
                             label: 'label.name'
+                        },
+                        ostypename: {
+                            label: 'label.os.type'
+                        },
+                        account: {
+                            label: 'label.account'
                         }
                     },
 
@@ -1519,45 +2146,57 @@
                                             required: true
                                         }
                                     },
+                                    // For KVM only: Direct Download
+                                    directdownload : {
+                                        label: 'label.direct.download',
+                                        docID: 'helpRegisterTemplateDirectDownload',
+                                        isBoolean: true
+                                    },
+                                    checksum: {
+                                        label: 'label.checksum',
+                                        dependsOn: 'directdownload',
+                                        isHidden: true
+                                    },
+                                    // Direct Download - End
                                     zone: {
                                         label: 'label.zone',
                                         docID: 'helpRegisterISOZone',
                                         select: function(args) {
-                                        	if(g_regionsecondaryenabled == true) {
-                                        		args.response.success({
+                                            if(g_regionsecondaryenabled == true) {
+                                                args.response.success({
                                                     data: [{
                                                         id: -1,
                                                         description: "All Zones"
                                                     }]
-                                                });                                        		
-                                        	} else {                                               	
-	                                            $.ajax({
-	                                                url: createURL("listZones&available=true"),
-	                                                dataType: "json",
-	                                                async: true,
-	                                                success: function(json) {
-	                                                    var zoneObjs = [];
-	                                                    var items = json.listzonesresponse.zone;
-	                                                    if (items != null) {
-	                                                        for (var i = 0; i < items.length; i++) {
-	                                                            zoneObjs.push({
-	                                                                id: items[i].id,
-	                                                                description: items[i].name
-	                                                            });
-	                                                        }
-	                                                    }
-	                                                    if (isAdmin() && !(cloudStack.context.projects && cloudStack.context.projects[0])) {
-	                                                        zoneObjs.unshift({
-	                                                            id: -1,
-	                                                            description: "All Zones"
-	                                                        });
-	                                                    }
-	                                                    args.response.success({
-	                                                        data: zoneObjs
-	                                                    });
-	                                                }
-	                                            });
-                                        	}
+                                                });
+                                            } else {
+                                                $.ajax({
+                                                    url: createURL("listZones&available=true"),
+                                                    dataType: "json",
+                                                    async: true,
+                                                    success: function(json) {
+                                                        var zoneObjs = [];
+                                                        var items = json.listzonesresponse.zone;
+                                                        if (items != null) {
+                                                            for (var i = 0; i < items.length; i++) {
+                                                                zoneObjs.push({
+                                                                    id: items[i].id,
+                                                                    description: items[i].name
+                                                                });
+                                                            }
+                                                        }
+                                                        if (isAdmin() && !(cloudStack.context.projects && cloudStack.context.projects[0])) {
+                                                            zoneObjs.unshift({
+                                                                id: -1,
+                                                                description: "All Zones"
+                                                            });
+                                                        }
+                                                        args.response.success({
+                                                            data: zoneObjs
+                                                        });
+                                                    }
+                                                });
+                                            }
                                         }
                                     },
 
@@ -1577,12 +2216,12 @@
                                             required: true
                                         },
                                         select: function(args) {
-                                        	$.ajax({
+                                            $.ajax({
                                                 url: createURL("listOsTypes"),
                                                 dataType: "json",
                                                 async: true,
                                                 success: function(json) {
-                                                    var ostypeObjs = json.listostypesresponse.ostype;	
+                                                    var ostypeObjs = json.listostypesresponse.ostype;
                                                     var items = [];
                                                     //items.push({id: "", description: "None"}); //shouldn't have None option when bootable is checked
                                                     $(ostypeObjs).each(function() {
@@ -1595,7 +2234,7 @@
                                                         data: items
                                                     });
                                                 }
-                                            });                                        	                                        	
+                                            });
                                         }
                                     },
 
@@ -1629,7 +2268,8 @@
                                     url: args.data.url,
                                     zoneid: args.data.zone,
                                     isextractable: (args.data.isExtractable == "on"),
-                                    bootable: (args.data.isBootable == "on")
+                                    bootable: (args.data.isBootable == "on"),
+                                    directdownload: (args.data.directdownload == "on")
                                 };
 
                                 if (args.$form.find('.form-item[rel=osTypeId]').css("display") != "none") {
@@ -1645,6 +2285,11 @@
                                 if (args.$form.find('.form-item[rel=isFeatured]').css("display") != "none") {
                                     $.extend(data, {
                                         isfeatured: (args.data.isFeatured == "on")
+                                    });
+                                }
+                                if (args.$form.find('.form-item[rel=checksum]').css("display") != "none") {
+                                    $.extend(data, {
+                                        checksum: args.data.checksum
                                     });
                                 }
 
@@ -1720,10 +2365,18 @@
                     dataProvider: function(args) {
                         var data = {};
                         listViewDataProvider(args, data);
+                        // Due to zonal grouping, low pagesize can result lower
+                        // aggregated items, resulting in no scroll shown
+                        // So, use maximum pagesize
+                        data.pagesize = 200;
 
                         var ignoreProject = false;
                         if (args.filterBy != null) { //filter dropdown
                             if (args.filterBy.kind != null) {
+                                if (previousFilterType != args.filterBy.kind || args.page == 1) {
+                                    previousFilterType = args.filterBy.kind;
+                                    previousCollection = [];
+                                }
                                 switch (args.filterBy.kind) {
                                     case "all":
                                         ignoreProject = true;
@@ -1738,7 +2391,7 @@
                                         break;
                                     case "shared":
                                         $.extend(data, {
-                                        	isofilter: 'shared'
+                                            isofilter: 'shared'
                                         });
                                         break;
                                     case "featured":
@@ -1767,22 +2420,27 @@
 
                                 var itemsView = [];
                                 $(items).each(function(index, item) {
-                                    var existing = $.grep(itemsView, function(it){
+                                    var existing = $.grep(previousCollection, function(it){
                                         return it != null && it.id !=null && it.id == item.id;
                                     });
-                                    if (existing.length == 0) {
-                                        itemsView.push({
+
+
+                                    if (existing.length > 0) {
+                                        return true; // skip adding this entry
+                                    } else {
+                                        var isoItem = {
                                             id: item.id,
                                             name: item.name,
                                             description: item.description,
+                                            ostypename: item.ostypename,
                                             ostypeid: item.ostypeid,
+                                            account: item.account,
+                                            domain: item.domain,
                                             zones: item.zonename,
                                             zoneids: [item.zoneid]
-                                        });
-                                    }
-                                    else {
-                                        existing[0].zones = 'Multiple Zones';
-                                        existing[0].zoneids.push(item.zoneid);
+                                        };
+                                        itemsView.push(isoItem);
+                                        previousCollection.push(isoItem);
                                     }
                                 }
 );
@@ -1796,6 +2454,10 @@
 
                     detailView: {
                         name: 'label.details',
+                        viewAll: {
+                            label: 'label.instances',
+                            path: 'instances'
+                        },
                         actions: {
                             edit: {
                                 label: 'label.edit',
@@ -1820,7 +2482,7 @@
 
                                     //***** updateIsoPermissions *****
                                     var data = {
-                                        id: args.context.isos[0].id,
+                                        id: args.context.isos[0].id
                                         //zoneid: args.context.isos[0].zoneid //can't update template/ISO in only one zone. It always get updated in all zones.
                                     };
                                     //if args.data.ispublic is undefined(i.e. checkbox is hidden), do not pass ispublic to API call.
@@ -1953,6 +2615,11 @@
                                             required: true
                                         }
                                     },
+                                    directdownload: {
+                                        label: 'label.direct.download',
+                                        isBoolean: true,
+                                        converter: cloudStack.converters.toBooleanText
+                                    },
                                     size: {
                                         label: 'label.size',
                                         converter: function(args) {
@@ -1963,7 +2630,7 @@
                                         }
                                     },
                                     isextractable: {
-                                        label: 'label.extractable',
+                                        label: 'label.extractable.lower',
                                         isBoolean: true,
                                         isEditable: function() {
                                             if (isAdmin())
@@ -2003,17 +2670,17 @@
                                         label: 'label.os.type',
                                         isEditable: true,
                                         select: function(args) {
-                                        	if (ostypeObjs == undefined) {   
-	                                            $.ajax({
-	                                                url: createURL("listOsTypes"),
-	                                                dataType: "json",
-	                                                async: false,
-	                                                success: function(json) {
-	                                                	ostypeObjs = json.listostypesresponse.ostype;	                                                   
-	                                                }
-	                                            });
-                                        	}
-                                        	var items = [];
+                                            if (ostypeObjs == undefined) {
+                                                $.ajax({
+                                                    url: createURL("listOsTypes"),
+                                                    dataType: "json",
+                                                    async: false,
+                                                    success: function(json) {
+                                                        ostypeObjs = json.listostypesresponse.ostype;
+                                                    }
+                                                });
+                                            }
+                                            var items = [];
                                             $(ostypeObjs).each(function() {
                                                 items.push({
                                                     id: this.id,
@@ -2074,18 +2741,21 @@
                                             label: 'label.status'
                                         },
                                         isready: {
-                                            label: 'state.ready',
+                                            label: 'state.Ready',
                                             converter: cloudStack.converters.toBooleanText
                                         }
                                     },
                                     hideSearchBar: true,
 
                                     dataProvider: function(args) {
-                                                var jsonObj = args.context.isos[0];
-                                                var apiCmd = "listIsos&isofilter=self&id=" + jsonObj.id;
-
+                                                var data = {
+                                                    isofilter: 'self',
+                                                    id: args.context.isos[0].id
+                                                };
+                                                listViewDataProvider(args, data);
                                                 $.ajax({
-                                                    url: createURL(apiCmd),
+                                                    url: createURL('listIsos'),
+                                                    data: data,
                                                     dataType: "json",
                                                     success: function(json) {
                                                             var isos = json.listisosresponse.iso;
@@ -2099,7 +2769,7 @@
                                         }
                                     });
                                 },
-                                
+
                                 detailView: {
                                     actions: {
                                         copyISO: {
@@ -2145,18 +2815,18 @@
                                                     }
                                                 }
                                             },
-                                            action: function(args) {                                    
+                                            action: function(args) {
                                                 var data = {
-                                                	id: args.context.isos[0].id,
-                                                	destzoneid: args.data.destinationZoneId
-                                                };                          	
+                                                    id: args.context.isos[0].id,
+                                                    destzoneid: args.data.destinationZoneId
+                                                };
                                                 if (args.context.zones[0].zoneid != undefined) {
                                                     $.extend(data, {
-                                                    	sourcezoneid: args.context.zones[0].zoneid
-                                                    });	
-                                                }                                    
-                                            	
-                                            	$.ajax({
+                                                        sourcezoneid: args.context.zones[0].zoneid
+                                                    });
+                                                }
+
+                                                $.ajax({
                                                     url: createURL('copyIso'),
                                                     data: data,
                                                     success: function(json) {
@@ -2191,12 +2861,12 @@
                                                 }
                                             },
                                             action: function(args) {
-                                                var array1 = [];
-                                                if (args.context.zones[0].zoneid != null)
-                                                    array1.push("&zoneid=" + args.context.zones[0].zoneid);
-
+                                                var queryParams = "deleteIso&id=" + args.context.isos[0].id;
+                                                if (!args.context.isos[0].crossZones){
+                                                    queryParams += "&zoneid=" + args.context.zones[0].zoneid;
+                                                }
                                                 $.ajax({
-                                                    url: createURL("deleteIso&id=" + args.context.isos[0].id + "&zoneid=" + args.context.zones[0].zoneid),
+                                                    url: createURL(queryParams),
                                                     dataType: "json",
                                                     async: true,
                                                     success: function(json) {
@@ -2261,7 +2931,7 @@
                                                     }
                                                 },
                                                 isextractable: {
-                                                    label: 'label.extractable',
+                                                    label: 'label.extractable.lower',
                                                     isBoolean: true,
                                                     isEditable: function() {
                                                         if (isAdmin())
@@ -2297,17 +2967,17 @@
                                                     label: 'label.os.type',
                                                     isEditable: true,
                                                     select: function(args) {
-                                                    	var ostypeObjs;
+                                                        var ostypeObjs;
                                                         $.ajax({
                                                             url: createURL("listOsTypes"),
                                                             dataType: "json",
                                                             async: false,
                                                             success: function(json) {
-                                                            	ostypeObjs = json.listostypesresponse.ostype;	                                                                
+                                                                ostypeObjs = json.listostypesresponse.ostype;
                                                             }
                                                         });
-                                                	
-                                                    	var items = [];
+
+                                                        var items = [];
                                                         $(ostypeObjs).each(function() {
                                                             items.push({
                                                                 id: this.id,
@@ -2316,7 +2986,7 @@
                                                         });
                                                         args.response.success({
                                                             data: items
-                                                        });                                                    	
+                                                        });
                                                     }
                                                 },
 
@@ -2376,15 +3046,8 @@
             //do nothing
         } else {
             allowedActions.push("edit");
-            
+
             allowedActions.push("copyTemplate");
-            /*
-            if(g_regionsecondaryenabled != true) {
-                allowedActions.push("copyTemplate");
-            }
-            */
-			
-            //allowedActions.push("createVm"); // For Beta2, this simply doesn't work without a network.
         }
 
         // "Download Template"
@@ -2419,11 +3082,6 @@
             allowedActions.push("edit");
 
             allowedActions.push("copyISO");
-            /*
-            if(g_regionsecondaryenabled != true) {
-                allowedActions.push("copyISO");
-			}
-			*/
         }
 
         // "Create VM"
@@ -2433,7 +3091,7 @@
      if (((isAdmin() == false && !(jsonObj.domainid == g_domainid && jsonObj.account == g_account))  //if neither root-admin, nor item owner
      || jsonObj.isready == false)
      || (jsonObj.bootable == false)
-     || (jsonObj.domainid ==	1 && jsonObj.account ==	"system")
+     || (jsonObj.domainid ==    1 && jsonObj.account ==    "system")
      ) {
        //do nothing
      }

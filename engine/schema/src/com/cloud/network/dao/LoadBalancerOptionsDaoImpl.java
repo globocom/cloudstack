@@ -23,11 +23,10 @@ import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.SearchCriteria.Op;
 import org.springframework.stereotype.Component;
 
-import javax.ejb.Local;
+
 import java.util.List;
 
 @Component
-@Local(value = LoadBalancerOptionsDao.class)
 @DB
 public class LoadBalancerOptionsDaoImpl extends GenericDaoBase<LoadBalancerOptionsVO, Long> implements LoadBalancerOptionsDao {
 

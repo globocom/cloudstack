@@ -1,13 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Licensed to the Apache Software Foundation (ASF) under one or more contributor 
-  license agreements. See the NOTICE file distributed with this work for additional 
-  information regarding copyright ownership. The ASF licenses this file to you under 
-  the Apache License, Version 2.0 (the "License"); you may not use this file except 
-  in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 
-  Unless required by applicable law or agreed to in writing, software distributed under 
-  the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS 
-  OF ANY KIND, either express or implied. See the License for the specific language 
-  governing permissions and limitations under the License. -->
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements. See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership. The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License. You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied. See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
@@ -17,7 +26,7 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.1.0</version>
   </parent>
 
   <build>
@@ -41,8 +50,10 @@
     <module>api/solidfire-intg-test</module>
     <module>api/discovery</module>
     <module>acl/static-role-based</module>
+    <module>acl/dynamic-role-based</module>
     <module>affinity-group-processors/host-anti-affinity</module>
     <module>affinity-group-processors/explicit-dedication</module>
+    <module>ca/root-ca</module>
     <module>deployment-planners/user-concentrated-pod</module>
     <module>deployment-planners/user-dispersing</module>
     <module>deployment-planners/implicit-dedication</module>
@@ -54,26 +65,31 @@
     <module>hypervisors/kvm</module>
     <module>event-bus/rabbitmq</module>
     <module>event-bus/inmemory</module>
+    <module>event-bus/kafka</module>
     <module>hypervisors/baremetal</module>
     <module>hypervisors/ucs</module>
     <module>hypervisors/hyperv</module>
+    <module>hypervisors/ovm3</module>
+    <module>metrics</module>
     <module>network-elements/elastic-loadbalancer</module>
     <module>network-elements/ovs</module>
     <module>network-elements/juniper-contrail</module>
     <module>network-elements/palo-alto</module>
     <module>network-elements/netscaler</module>
     <module>network-elements/nicira-nvp</module>
-    <module>network-elements/bigswitch-vns</module>
+    <module>network-elements/nuage-vsp</module>
+    <module>network-elements/bigswitch</module>
     <module>network-elements/brocade-vcs</module>
-    <module>network-elements/midonet</module>
     <module>network-elements/stratosphere-ssp</module>
     <module>network-elements/opendaylight</module>
+    <module>outofbandmanagement-drivers/ipmitool</module>
+    <module>outofbandmanagement-drivers/nested-cloudstack</module>
     <module>storage-allocators/random</module>
     <module>user-authenticators/ldap</module>
     <module>user-authenticators/md5</module>
-    <module>user-authenticators/oauth2</module>
     <module>user-authenticators/pbkdf2</module>
     <module>user-authenticators/plain-text</module>
+    <module>user-authenticators/oauth2</module>
     <module>user-authenticators/saml2</module>
     <module>user-authenticators/sha256salted</module>
     <module>network-elements/dns-notifier</module>
@@ -90,9 +106,13 @@
     <module>alert-handlers/syslog-alerts</module>
     <module>network-elements/internal-loadbalancer</module>
     <module>network-elements/vxlan</module>
-    <module>network-elements/globonetwork</module>
     <module>network-elements/globodns</module>
+    <module>network-elements/globonetwork</module>
     <module>network-elements/globoaclapi</module>
+    <module>database/quota</module>
+    <module>integrations/cloudian</module>
+    <module>integrations/prometheus</module>
+    <module>affinity-group-processors/host-affinity</module>
   </modules>
 
   <dependencies>
@@ -160,17 +180,6 @@
       </modules>
     </profile>
     <profile>
-      <id>nuagevsp</id>
-      <activation>
-        <property>
-          <name>noredist</name>
-        </property>
-      </activation>
-      <modules>
-        <module>network-elements/nuage-vsp</module>
-      </modules>
-    </profile>
-    <profile>
       <id>vmware</id>
       <activation>
         <property>
@@ -180,6 +189,17 @@
       <modules>
         <module>hypervisors/vmware</module>
         <module>network-elements/cisco-vnmc</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>vmware-sioc</id>
+      <activation>
+        <property>
+          <name>noredist</name>
+        </property>
+      </activation>
+      <modules>
+        <module>api/vmware-sioc</module>
       </modules>
     </profile>
     <profile>

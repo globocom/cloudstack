@@ -23,7 +23,7 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.1.0</version>
   </parent>
   <dependencies>
     <dependency>
@@ -37,7 +37,7 @@
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
-      <artifactId>servlet-api</artifactId>
+      <artifactId>javax.servlet-api</artifactId>
       <version>${cs.servlet.version}</version>
     </dependency>
     <dependency>
@@ -50,6 +50,21 @@
       <groupId>org.apache.cloudstack</groupId>
       <artifactId>cloud-framework-config</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.cloudstack</groupId>
+      <artifactId>cloud-framework-ca</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>${cs.commons-lang3.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.cloudstack</groupId>
+        <artifactId>cloud-framework-direct-download</artifactId>
+        <version>${project.version}</version>
     </dependency>
   </dependencies>
   <build>

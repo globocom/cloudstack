@@ -30,7 +30,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import com.cloud.event.ActionEventUtils;
@@ -146,7 +145,7 @@ import com.cloud.vm.UserVmManager;
 import com.cloud.vm.UserVmService;
 import com.cloud.vm.Nic;
 
-@Local(value = {AutoScaleService.class, AutoScaleManager.class})
+
 public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScaleManager, AutoScaleService, Configurable {
     private static final Logger s_logger = Logger.getLogger(AutoScaleManagerImpl.class);
     protected ScheduledExecutorService _executor = Executors.newScheduledThreadPool(1);
@@ -1575,17 +1574,18 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
             UserVm vm = null;
             IpAddresses addrs = new IpAddresses(null, null);
             String instanceName = createInstanceName(asGroup);
+            Map<String, String> customParameters = new HashMap<>();
 
             if (zone.getNetworkType() == NetworkType.Basic) {
                 vm = _userVmService.createBasicSecurityGroupVirtualMachine(zone, serviceOffering, template, null, owner, instanceName,
                         instanceName, null, null, null, HypervisorType.XenServer, HTTPMethod.GET, null, null, null,
-                    null, true, null, null, null, null);
+                    null, true, null, null, null, null, null, null);
             } else {
                 if (zone.isSecurityGroupEnabled()) {
                     vm = _userVmService.createAdvancedSecurityGroupVirtualMachine(zone, serviceOffering, template, null, null,
                         owner, instanceName,
                             instanceName, null, null, null, HypervisorType.XenServer, HTTPMethod.GET, null, null,
-                        null, null, true, null, null, null, null);
+                        null, null, true, null, null, customParameters, null, null, null);
 
                 } else {
                     List<Long> networkIds = new ArrayList<>();
@@ -1594,7 +1594,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
                     networkIds.add(mainNetworkId);
                     networkIds.addAll(getAdditionalNetWorkIds(profileVo, zone));
                     vm = _userVmService.createAdvancedVirtualMachine(zone, serviceOffering, template, networkIds, owner, instanceName, instanceName,
-                        null, null, null, template.getHypervisorType(), HTTPMethod.POST, profileVo.getUserData(), null, null, addrs, true, null, null, null, null);
+                        null, null, null, template.getHypervisorType(), HTTPMethod.POST, profileVo.getUserData(), null, null, addrs, true, null, null, customParameters, null, null, null);
 
                 }
             }
@@ -1930,7 +1930,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
 
     private boolean destroyVM(long vmId) {
         try {
-            _userVmManager.destroyVm(vmId);
+            _userVmManager.destroyVm(vmId, true);
             return true;
         } catch (ResourceUnavailableException | ConcurrentOperationException e) {
             s_logger.error("It was not possible to destroy VM id: " + vmId, e);

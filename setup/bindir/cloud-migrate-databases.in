@@ -20,7 +20,7 @@
 
 import os,logging,sys
 from optparse import OptionParser
-import MySQLdb
+import mysql.connector
 import subprocess
 import glob
 
@@ -39,7 +39,7 @@ from cloud_utils import check_selinux, CheckFailed, resolves_to_ipv6
 import cloud_utils
 
 # RUN ME LIKE THIS
-# python setup/bindir/cloud-migrate-databases.in --config=client/tomcatconf/override/db.properties --resourcedir=setup/db  --dry-run
+# python setup/bindir/cloud-migrate-databases.in --config=client/conf/override/db.properties --resourcedir=setup/db  --dry-run
 # --dry-run makes it so the changes to the database in the context of the migrator are rolled back
 
 # This program / library breaks down as follows:
@@ -72,10 +72,10 @@ class CloudContext(cloud_utils.MigrationContext):
 		self.database = database
 		self.configdir = configdir
 		self.resourcedir = resourcedir
-		self.conn = MySQLdb.connect(host=self.host,
+		self.conn = mysql.connector.connect(host=self.host,
 			user=self.username,
-			passwd=self.password,
-			db=self.database,
+			password=self.password,
+			database=self.database,
 			port=self.port)
 		self.conn.autocommit(False)
 		self.db = self.conn.cursor()

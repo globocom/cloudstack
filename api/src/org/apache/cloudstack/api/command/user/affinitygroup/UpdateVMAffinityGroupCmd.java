@@ -92,10 +92,6 @@ public class UpdateVMAffinityGroupCmd extends BaseAsyncCmd {
     }
 
     public List<Long> getAffinityGroupIdList() {
-        if (affinityGroupNameList != null && affinityGroupIdList != null) {
-            throw new InvalidParameterValueException("affinitygroupids parameter is mutually exclusive with affinitygroupnames parameter");
-        }
-
         // transform group names to ids here
         if (affinityGroupNameList != null) {
             List<Long> affinityGroupIds = new ArrayList<Long>();
@@ -138,7 +134,15 @@ public class UpdateVMAffinityGroupCmd extends BaseAsyncCmd {
 
     @Override
     public void execute() throws ResourceUnavailableException, InsufficientCapacityException, ServerApiException {
-        CallContext.current().setEventDetails("Vm Id: " + getId());
+        if (affinityGroupNameList != null && affinityGroupIdList != null) {
+            throw new InvalidParameterValueException("affinitygroupids parameter is mutually exclusive with affinitygroupnames parameter");
+        }
+
+        if (affinityGroupNameList == null && affinityGroupIdList == null) {
+            throw new InvalidParameterValueException("affinitygroupids parameter or affinitygroupnames parameter must be given");
+        }
+
+        CallContext.current().setEventDetails("VM ID: " + getId());
         UserVm result = _affinityGroupService.updateVMAffinityGroups(getId(), getAffinityGroupIdList());
         ArrayList<VMDetails> dc = new ArrayList<VMDetails>();
         dc.add(VMDetails.valueOf("affgrp"));
@@ -149,7 +153,7 @@ public class UpdateVMAffinityGroupCmd extends BaseAsyncCmd {
             response.setResponseName(getCommandName());
             setResponseObject(response);
         } else {
-            throw new ServerApiException(ApiErrorCode.INTERNAL_ERROR, "Failed to update vm's affinity groups");
+            throw new ServerApiException(ApiErrorCode.INTERNAL_ERROR, "Failed to update VM's affinity groups");
         }
     }
 
@@ -160,7 +164,7 @@ public class UpdateVMAffinityGroupCmd extends BaseAsyncCmd {
 
     @Override
     public String getEventDescription() {
-        return "updating VM Affinity Group";
+        return "updating VM affinity group";
     }
 
     @Override

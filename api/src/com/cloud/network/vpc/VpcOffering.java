@@ -26,6 +26,7 @@ public interface VpcOffering extends InternalIdentity, Identity {
 
     public static final String defaultVPCOfferingName = "Default VPC offering";
     public static final String defaultVPCNSOfferingName = "Default VPC  offering with Netscaler";
+    public static final String redundantVPCOfferingName = "Redundant VPC offering";
 
     /**
      *
@@ -51,7 +52,7 @@ public interface VpcOffering extends InternalIdentity, Identity {
     boolean isDefault();
 
     /**
-     * @return service offering id used by VPC virutal router
+     * @return service offering id used by VPC virtual router
      */
     Long getServiceOfferingId();
 
@@ -64,4 +65,7 @@ public interface VpcOffering extends InternalIdentity, Identity {
      * @return true if VPC created with the offering can span multiple zones in the region
      */
     boolean offersRegionLevelVPC();
+
+    boolean getRedundantRouter();
+
 }

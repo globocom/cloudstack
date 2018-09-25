@@ -19,92 +19,53 @@
 
 package com.cloud.agent.api.guru;
 
+import java.util.Objects;
+
+import net.nuage.vsp.acs.client.api.model.VspDhcpVMOption;
+import net.nuage.vsp.acs.client.api.model.VspNetwork;
+import net.nuage.vsp.acs.client.api.model.VspNic;
+import net.nuage.vsp.acs.client.api.model.VspStaticNat;
+import net.nuage.vsp.acs.client.api.model.VspVm;
+
+import org.apache.commons.lang.builder.HashCodeBuilder;
+
 import com.cloud.agent.api.Command;
 
 public class ReserveVmInterfaceVspCommand extends Command {
 
-    String _nicUuid;
-    String _nicMacAddress;
-    String _networkUuid;
-    boolean _isL3Network;
-    String _vpcUuid;
-    String _networkDomainUuid;
-    String _networksAccountUuid;
-    boolean _isDomainRouter;
-    String _domainRouterIp;
-    String _vmInstanceName;
-    String _vmUuid;
-    String _vmUserName;
-    String _vmUserDomainName;
+    private final VspNetwork _network;
+    private final VspVm _vm;
+    private final VspNic _nic;
+    private final VspStaticNat _staticNat;
+    private final  VspDhcpVMOption _dhcpOption;
 
-    public ReserveVmInterfaceVspCommand(String nicUuid, String nicMacAddress, String networkUuid, boolean isL3Network, String vpcUuid, String networkDomainUuid,
-            String networksAccountUuid, boolean isDomainRouter, String domainRouterIp, String vmInstanceName, String vmUuid, String vmUserName, String vmUserDomainName) {
+    public ReserveVmInterfaceVspCommand(VspNetwork network, VspVm vm, VspNic nic, VspStaticNat staticNat, VspDhcpVMOption dhcpOption) {
         super();
-        this._nicUuid = nicUuid;
-        this._nicMacAddress = nicMacAddress;
-        this._networkUuid = networkUuid;
-        this._isL3Network = isL3Network;
-        this._vpcUuid = vpcUuid;
-        this._networkDomainUuid = networkDomainUuid;
-        this._networksAccountUuid = networksAccountUuid;
-        this._isDomainRouter = isDomainRouter;
-        this._domainRouterIp = domainRouterIp;
-        this._vmInstanceName = vmInstanceName;
-        this._vmUuid = vmUuid;
-        this._vmUserName = vmUserName;
-        this._vmUserDomainName = vmUserDomainName;
+        this._network = network;
+        this._vm = vm;
+        this._nic = nic;
+        this._staticNat = staticNat;
+        this._dhcpOption = dhcpOption;
     }
 
-    public String getNicUuid() {
-        return _nicUuid;
+    public VspNetwork getNetwork() {
+        return _network;
     }
 
-    public String getNicMacAddress() {
-        return _nicMacAddress;
+    public VspVm getVm() {
+        return _vm;
     }
 
-    public String getNetworkUuid() {
-        return _networkUuid;
+    public VspNic getNic() {
+        return _nic;
     }
 
-    public boolean isL3Network() {
-        return _isL3Network;
+    public VspStaticNat getStaticNat() {
+        return _staticNat;
     }
 
-    public String getVpcUuid() {
-        return _vpcUuid;
-    }
-
-    public String getNetworkDomainUuid() {
-        return _networkDomainUuid;
-    }
-
-    public String getNetworksAccountUuid() {
-        return _networksAccountUuid;
-    }
-
-    public boolean isDomainRouter() {
-        return _isDomainRouter;
-    }
-
-    public String _getDomainRouterIp() {
-        return _domainRouterIp;
-    }
-
-    public String _getVmInstanceName() {
-        return _vmInstanceName;
-    }
-
-    public String _getVmUuid() {
-        return _vmUuid;
-    }
-
-    public String _getVmUserName() {
-        return _vmUserName;
-    }
-
-    public String _getVmUserDomainName() {
-        return _vmUserDomainName;
+    public VspDhcpVMOption getDhcpOption() {
+        return _dhcpOption;
     }
 
     @Override
@@ -112,4 +73,35 @@ public class ReserveVmInterfaceVspCommand extends Command {
         return false;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+
+        if (!(o instanceof ReserveVmInterfaceVspCommand)) {
+            return false;
+        }
+
+        ReserveVmInterfaceVspCommand that = (ReserveVmInterfaceVspCommand) o;
+
+        return super.equals(that)
+                && Objects.equals(_network, that._network)
+                && Objects.equals(_nic, that._nic)
+                && Objects.equals(_dhcpOption, that._dhcpOption)
+                && Objects.equals(_staticNat, that._staticNat)
+                && Objects.equals(_vm, that._vm);
+    }
+
+    @Override
+    public int hashCode() {
+        return new HashCodeBuilder()
+                .appendSuper(super.hashCode())
+                .append(_network)
+                .append(_vm)
+                .append(_nic)
+                .append(_staticNat)
+                .append(_dhcpOption)
+                .toHashCode();
+    }
 }

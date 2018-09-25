@@ -42,7 +42,6 @@ from marvin.lib.common import (get_domain,
                                setSharedNetworkParams,
                                get_free_vlan)
 from marvin.codes import (PASS,
-                          ERROR_NO_HOST_FOR_MIGRATION,
                           ISOLATED_NETWORK,
                           SHARED_NETWORK,
                           VPC_NETWORK)
@@ -131,6 +130,7 @@ def CreateNetwork(self, networktype):
                          account=self.account.name,
                          domainid=self.account.domainid
                          )
+        self.cleanup.append(vpc)
         self.vpcid = vpc.id
         vpcs = VPC.list(self.apiclient, id=vpc.id)
         self.assertEqual(
@@ -149,7 +149,6 @@ def CreateNetwork(self, networktype):
             gateway="10.1.1.1",
             netmask="255.255.255.0")
         self.cleanup.append(network)
-        self.cleanup.append(vpc)
     return network
 
 
@@ -170,6 +169,7 @@ class TestPathVMLC(cloudstackTestCase):
         testClient = super(TestPathVMLC, cls).getClsTestClient()
         cls.apiclient = testClient.getApiClient()
         cls.testdata = testClient.getParsedTestDataConfig()
+        cls.hypervisor = testClient.getHypervisorInfo()
 
         # Get Zone, Domain and templates
         cls.domain = get_domain(cls.apiclient)
@@ -193,9 +193,13 @@ class TestPathVMLC(cloudstackTestCase):
             # Create 3 service offerings with different values for
             # for cpunumber, cpuspeed, and memory
 
-            cls.testdata["service_offering"]["cpunumber"] = "1"
-            cls.testdata["service_offering"]["cpuspeed"] = "128"
-            cls.testdata["service_offering"]["memory"] = "256"
+            cls.testdata["service_offering"]["cpuspeed"] = 128
+            cls.testdata["service_offering"]["memory"] = 256
+
+            cls.testdata["service_offering"]["cpunumber"] = 1
+            if cls.hypervisor.lower() == "hyperv":
+                cls.testdata["service_offering"]["cpuspeed"] = 2048
+                cls.testdata["service_offering"]["memory"] = 2048
 
             cls.service_offering_1 = ServiceOffering.create(
                 cls.apiclient,
@@ -203,10 +207,7 @@ class TestPathVMLC(cloudstackTestCase):
             )
             cls._cleanup.append(cls.service_offering_1)
 
-            cls.testdata["service_offering"]["cpunumber"] = "2"
-            cls.testdata["service_offering"]["cpuspeed"] = "256"
-            cls.testdata["service_offering"]["memory"] = "512"
-
+            cls.testdata["service_offering"]["cpunumber"] = 2
             cls.service_offering_2 = ServiceOffering.create(
                 cls.apiclient,
                 cls.testdata["service_offering"]
@@ -305,17 +306,18 @@ class TestPathVMLC(cloudstackTestCase):
         # Cleanup VM before proceeding the cleanup as networks will be
         # cleaned up properly, continue if VM deletion fails,
         # because in that case VM is already deleted from the test case
+        # try:
+        #     self.virtual_machine.delete(self.apiclient, expunge=True)
+        # except Exception:
+        #     self.debug("Exception while destroying VM")
         try:
-            self.virtual_machine.delete(self.apiclient, expunge=True)
-        except Exception:
-            self.debug("Exception while destroying VM")
-        try:
+            self.cleanup = self.cleanup[::-1]
             cleanup_resources(self.apiclient, self.cleanup)
         except Exception as e:
             raise Exception("Warning: Exception during cleanup : %s" % e)
         return
 
-    @attr(tags=["advanced"], required_hardware="False")
+    @attr(tags=["advanced"], required_hardware="True")
     @data(ISOLATED_NETWORK, VPC_NETWORK)
     def test_01_positive_tests_vm_operations_advanced_zone(self, value):
         """ Positive tests for VMLC test path - Advanced Zone
@@ -336,6 +338,8 @@ class TestPathVMLC(cloudstackTestCase):
         # 13. Find suitable host for VM to migrate and migrate the VM
         # 14. Verify VM accessibility on new host
         """
+        if self.hypervisor.lower() in ['hyperv', 'lxc']  and value == VPC_NETWORK:
+            self.skipTest("cann't be run for {} hypervisor".format(self.hypervisor))
 
         # List created service offering in setUpClass by name
         listServiceOfferings = ServiceOffering.list(
@@ -378,7 +382,7 @@ class TestPathVMLC(cloudstackTestCase):
             networkids=[network.id, ],
             zoneid=self.zone.id
         )
-
+        self.cleanup.append(self.virtual_machine)
         publicip = PublicIPAddress.create(
             self.userapiclient, accountid=self.account.name,
             zoneid=self.zone.id, domainid=self.account.domainid,
@@ -488,24 +492,25 @@ class TestPathVMLC(cloudstackTestCase):
         except Exception as e:
             self.fail("Exception while SSHing to VM: %s" % e)
 
-        # Find suitable host for VM to migrate and migrate the VM
-        # Verify that it is accessible on the new host
-        host = findSuitableHostForMigration(self.apiclient,
-                                            self.virtual_machine.id)
-        if host is None:
-            self.fail(ERROR_NO_HOST_FOR_MIGRATION)
-        self.virtual_machine.migrate(self.apiclient, host.id)
 
-        try:
-            SshClient(host=publicip.ipaddress.ipaddress,
-                      port=22,
-                      user=self.virtual_machine.username,
-                      passwd=self.virtual_machine.password)
-        except Exception as e:
-            self.fail("Exception while SSHing to VM: %s" % e)
+        if not self.hypervisor.lower() == "lxc":
+            # Find suitable host for VM to migrate and migrate the VM
+            # Verify that it is accessible on the new host
+            host = findSuitableHostForMigration(self.apiclient,
+                                            self.virtual_machine.id)
+            if host is not None:
+                self.virtual_machine.migrate(self.apiclient, host.id)
+
+                try:
+                    SshClient(host=publicip.ipaddress.ipaddress,
+                        port=22,
+                        user=self.virtual_machine.username,
+                        passwd=self.virtual_machine.password)
+                except Exception as e:
+                    self.fail("Exception while SSHing to VM: %s" % e)
         return
 
-    @attr(tags=["advanced"], required_hardware="False")
+    @attr(tags=["advanced"], required_hardware="True")
     def test_01_positive_tests_vm_deploy_shared_nw(self):
         """ Positive tests for VMLC test path - Advanced Zone in Shared Network
 
@@ -555,9 +560,10 @@ class TestPathVMLC(cloudstackTestCase):
             networkids=[network.id, ],
             zoneid=self.zone.id
         )
+        self.cleanup.append(self.virtual_machine)
         return
 
-    @attr(tags=["basic"], required_hardware="False")
+    @attr(tags=["basic"], required_hardware="True")
     def test_01_positive_tests_vm_operations_basic_zone(self):
         """ Positive tests for VMLC test path - Basic Zone
 
@@ -634,7 +640,7 @@ class TestPathVMLC(cloudstackTestCase):
             zoneid=self.zone.id,
             securitygroupids=[security_group.id, ]
         )
-
+        self.cleanup.append(self.virtual_machine)
         # Check VM accessibility
         try:
             SshClient(host=self.virtual_machine.ssh_ip,
@@ -702,24 +708,24 @@ class TestPathVMLC(cloudstackTestCase):
         except Exception as e:
             self.fail("Exception while SSHing to VM: %s" % e)
 
-        # Find suitable host for VM to migrate and migrate the VM
-        # Verify that it is accessible on the new host
-        host = findSuitableHostForMigration(self.apiclient,
+        if not self.hypervisor.lower() == "lxc":
+            # Find suitable host for VM to migrate and migrate the VM
+            # Verify that it is accessible on the new host
+            host = findSuitableHostForMigration(self.apiclient,
                                             self.virtual_machine.id)
-        if host is None:
-            self.fail(ERROR_NO_HOST_FOR_MIGRATION)
-        self.virtual_machine.migrate(self.apiclient, host.id)
+            if host is not None:
+                self.virtual_machine.migrate(self.apiclient, host.id)
 
-        try:
-            SshClient(host=self.virtual_machine.ssh_ip,
-                      port=22,
-                      user=self.virtual_machine.username,
-                      passwd=self.virtual_machine.password)
-        except Exception as e:
-            self.fail("Exception while SSHing to VM: %s" % e)
+                try:
+                    SshClient(host=self.virtual_machine.ssh_ip,
+                        port=22,
+                        user=self.virtual_machine.username,
+                        passwd=self.virtual_machine.password)
+                except Exception as e:
+                    self.fail("Exception while SSHing to VM: %s" % e)
         return
 
-    @attr(tags=["advanced"], required_hardware="False")
+    @attr(tags=["advanced"], required_hardware="True")
     @data(ISOLATED_NETWORK, SHARED_NETWORK, VPC_NETWORK)
     def test_02_negative_tests_destroy_VM_operations_advanced_zone(
             self,
@@ -733,6 +739,8 @@ class TestPathVMLC(cloudstackTestCase):
         # 4. Try to stop the VM in destroyed state, operation should fail
         # 5. Try to reboot the VM in destroyed state, operation should fail
         """
+        if self.hypervisor.lower() in ['hyperv', 'lxc'] and value == VPC_NETWORK:
+            self.skipTest("cann't be run for {} hypervisor".format(self.hypervisor))
         network = CreateNetwork(self, value)
         networkid = network.id
 
@@ -747,6 +755,7 @@ class TestPathVMLC(cloudstackTestCase):
             networkids=[networkid, ],
             zoneid=self.zone.id
         )
+        self.cleanup.append(self.virtual_machine)
         # Stop the VM and try to reboot it, it should fail
         self.virtual_machine.stop(self.userapiclient)
         with self.assertRaises(Exception):
@@ -769,7 +778,7 @@ class TestPathVMLC(cloudstackTestCase):
 
         return
 
-    @attr(tags=["basic"], required_hardware="False")
+    @attr(tags=["basic"], required_hardware="True")
     def test_02_negative_tests_destroy_VM_operations_basic_zone(self):
         """ Negative tests for VMLC test path - destroy VM
 
@@ -790,6 +799,7 @@ class TestPathVMLC(cloudstackTestCase):
             serviceofferingid=self.service_offering_1.id,
             zoneid=self.zone.id
         )
+        self.cleanup.append(self.virtual_machine)
         # Stop the VM and try to reboot it, it should fail
         self.virtual_machine.stop(self.userapiclient)
         with self.assertRaises(Exception):
@@ -812,7 +822,7 @@ class TestPathVMLC(cloudstackTestCase):
 
         return
 
-    @attr(tags=["advanced"], required_hardware="False")
+    @attr(tags=["advanced"], required_hardware="True")
     @data(ISOLATED_NETWORK, SHARED_NETWORK, VPC_NETWORK)
     def test_03_negative_tests_expunge_VM_operations_advanced_zone(
             self,
@@ -827,6 +837,9 @@ class TestPathVMLC(cloudstackTestCase):
         # 6. Try to destroy the VM in expunging state, operation should fail
         # 7. Try to recover the VM in expunging state, operation should fail
         """
+
+        if self.hypervisor.lower() in ['hyperv', 'lxc'] and value == VPC_NETWORK:
+            self.skipTest("cann't be run for {} hypervisor".format(self.hypervisor))
         network = CreateNetwork(self, value)
         networkid = network.id
 
@@ -867,7 +880,7 @@ class TestPathVMLC(cloudstackTestCase):
 
         return
 
-    @attr(tags=["basic"], required_hardware="False")
+    @attr(tags=["basic"], required_hardware="True")
     def test_03_negative_tests_expunge_VM_operations_basic_zone(self):
         """ Negative tests for VMLC test path - expunge VM
 

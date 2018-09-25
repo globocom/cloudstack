@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+# http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -31,16 +31,20 @@ from marvin.lib.base import (Account,
                              SSHKeyPair,
                              Volume,
                              VmSnapshot,
-                             Zone)
+                             Zone,
+                             Template,
+                             Host)
 from marvin.lib.common import (get_zone,
                                get_template,
-                               get_domain)
+                               get_domain,
+                               find_storage_pool_type)
 from marvin.codes import PASS
+from marvin.sshClient import SshClient
 from nose.plugins.attrib import attr
-
+import time
+from marvin.cloudstackException import CloudstackAPIException
 
 class TestListInstances(cloudstackTestCase):
-
     @classmethod
     def setUpClass(cls):
         try:
@@ -1706,8 +1710,8 @@ class TestListInstances(cloudstackTestCase):
         if service_offerings_list is not None:
             for i in range(0, len(service_offerings_list)):
                 if ((current_so.id != service_offerings_list[i].id) and (
-                        current_so.storagetype ==
-                        service_offerings_list[i].storagetype)):
+                            current_so.storagetype ==
+                            service_offerings_list[i].storagetype)):
                     so_exists = True
                     new_so = service_offerings_list[i]
                     break
@@ -1777,7 +1781,7 @@ class TestListInstances(cloudstackTestCase):
         Step16: Verifying that VM deployed in step1 has only 1 nic
         """
         if self.hypervisor.lower() in ['hyperv']:
-            raise unittest.SkipTest(
+            self.skipTest(
                 "This feature is not supported on existing hypervisor.\
                         Hence, skipping the test")
 
@@ -2064,10 +2068,98 @@ class TestListInstances(cloudstackTestCase):
                 "VM NIC is not same as expected"
             )
         return
+    @attr(tags=["advanced", "basic"], required_hardware="true")
+    def test_14_Create_vm_with_same_sshkey(self):
+        """
+        @Desc: Test to verify API call Register ssh key pair fails when uses same public key for differnet key name
+        """
+
+
+        # Listing all the SSH Key pairs
+        list_keypairs_before = SSHKeyPair.list(
+            self.userapiclient
+        )
+        list_keypairs_before_size = 0
+        if list_keypairs_before is not None:
+            list_keypairs_before_size = len(list_keypairs_before)
+
+        # Registering first Key pair
+        new_keypair1 = SSHKeyPair.register(
+            self.userapiclient,
+            name="keypair1",
+            publickey="ssh-rsa: e6:9a:1e:b5:98:75:88:5d:56:bc:92:7b:43:48:05:b2")
+        self.assertIsNotNone(
+            new_keypair1,
+            "New Key pair generation failed"
+        )
+        self.assertEquals(
+            "keypair1",
+            new_keypair1.name,
+            "Key Pair not created with given name"
+        )
+        # Listing all the SSH Key pairs again
+        list_keypairs_after = SSHKeyPair.list(
+            self.userapiclient
+        )
+        status = validateList(list_keypairs_after)
+        self.assertEquals(
+            PASS,
+            status[0],
+            "Listing of Key pairs failed"
+        )
+        # Verifying that list size is increased by 1
+        self.assertEquals(
+            list_keypairs_before_size + 1,
+            len(list_keypairs_after),
+            "List count is not matching"
+        )
+
+        # Deploying a VM with keypair 1
+        first_vm_created = VirtualMachine.create(
+            self.userapiclient,
+            self.services["virtual_machine"],
+            accountid=self.account.name,
+            domainid=self.account.domainid,
+            serviceofferingid=self.service_offering.id,
+            keypair=new_keypair1.name
+        )
+        self.assertIsNotNone(
+            first_vm_created,
+            "VM creation failed"
+        )
+        # Listing all the VMs for a user again
+        list_vms_after = VirtualMachine.list(
+            self.userapiclient,id=first_vm_created.id,
+            listall=True,
+        )
+        status = validateList(list_vms_after)
+        self.assertEquals(
+            PASS,
+            status[0],
+            "VM creation failed"
+        )
+        vm = list_vms_after[0]
+        self.assertEqual(
+            vm.state,
+            "Running",
+            "VM state should be running after deployment")
+        self.assertEqual(vm.keypair , new_keypair1.name , "VM keypair name is not keypair1")
+
+        try:
+
+            # Registering second key pair using same public key
+            new_keypair2 = SSHKeyPair.register(
+                self.userapiclient,
+                name="keypair2",
+                publickey="ssh-rsa: e6:9a:1e:b5:98:75:88:5d:56:bc:92:7b:43:48:05:b2")
+            self.fail("SSH Key creation passed using same public key ")
+        except CloudstackAPIException  as e:
+            self.assertRaises("Exception Raised : %s" % e)
+
+        return
 
 
 class TestInstances(cloudstackTestCase):
-
     @classmethod
     def setUpClass(cls):
         try:
@@ -2191,6 +2283,347 @@ class TestInstances(cloudstackTestCase):
                     (exp_val, act_val))
         return return_flag
 
+    @attr(tags=["advanced", "basic"], required_hardware="false")
+    def test_27_VM_restore_ES3467(self):
+        """
+        @Desc:Test to verify  order of root and data disk remains same on Xenserver after VM reset
+        @Steps :
+        1.Create VM with data disk from Windows template
+        5.check disk sequence on hypervisor: 1st = root disk, 2nd = data disk
+        6. Issue "reset VM" command on CCP
+        7. check disk sequence on hypervisor remains same and VM starts successfully
+        """
+        if self.hypervisor.lower() in ['kvm', 'hyperv', 'lxc', 'vmware']:
+            self.skipTest(
+                "This test not applicable on existing hypervisor. Hence,\
+                        skipping the test")
+        try:
+
+            template = Template.register(self.apiClient,
+                                         self.services["Windows 7 (64-bit)"],
+                                         zoneid=self.zone.id,
+                                         account=self.account.name,
+                                         domainid=self.domain.id)
+
+            self.debug(
+                "Registered a template of format: %s with ID: %s" % (
+                    self.services["Windows 7 (64-bit)"]["format"],
+                    template.id
+                ))
+            template.download(self.apiClient)
+            self.cleanup.append(template)
+            # Wait for template status to be changed across
+            time.sleep(self.services["sleep"])
+            timeout = self.services["timeout"]
+            while True:
+                list_template_response = Template.list(
+                    self.apiClient,
+                    templatefilter='all',
+                    id=template.id,
+                    zoneid=self.zone.id,
+                    account=self.account.name,
+                    domainid=self.account.domainid)
+                if isinstance(list_template_response, list):
+                    break
+                elif timeout == 0:
+                    raise Exception("List template failed!")
+
+                time.sleep(5)
+                timeout -= 1
+            # Verify template response to check whether template added successfully
+            status = validateList(list_template_response)
+            self.assertEquals(PASS, status[0], "Template download failed")
+
+            self.assertNotEqual(
+                len(list_template_response),
+                0,
+                "Check template available in List Templates"
+            )
+
+            template_response = list_template_response[0]
+            self.assertEqual(
+                template_response.isready,
+                True,
+                "Template state is not ready, it is %s" % template_response.isready
+            )
+            disk_offering = DiskOffering.create(
+                self.api_client,
+                self.services["disk_offering"]
+            )
+            self.cleanup.append(disk_offering)
+            # Deploy new virtual machine using template
+            virtual_machine = VirtualMachine.create(
+                self.apiClient,
+                self.services["virtual_machine"],
+                templateid=template.id,
+                accountid=self.account.name,
+                domainid=self.account.domainid,
+                serviceofferingid=self.service_offering.id,
+                diskofferingid=disk_offering.id
+            )
+            self.debug("creating an instance with template ID: %s" % template.id)
+            vm_response = VirtualMachine.list(self.apiClient,
+                                              id=virtual_machine.id,
+                                              account=self.account.name,
+                                              domainid=self.account.domainid)
+            self.assertEqual(
+                isinstance(vm_response, list),
+                True,
+                "Check for list VMs response after VM deployment"
+            )
+            # Verify VM response to check whether VM deployment was successful
+            self.assertNotEqual(
+                len(vm_response),
+                0,
+                "Check VMs available in List VMs response"
+            )
+            vm = vm_response[0]
+            self.assertEqual(
+                vm.state,
+                'Running',
+                "Check the state of VM created from Template"
+            )
+            self.cleanup.append(virtual_machine)
+            list_volume_response = Volume.list(
+                self.apiClient,
+                virtualmachineid=virtual_machine.id,
+                type='ROOT',
+                listall=True
+            )
+            cmd = "xe vbd-list  vm-name-label=" + virtual_machine.instancename + " vdi-name-label=" + \
+                  list_volume_response[0].name + " userdevice=0 --minimal"
+            hosts = Host.list(self.apiClient, id=virtual_machine.hostid)
+            self.assertEqual(
+                isinstance(hosts, list),
+                True,
+                "Check list host returns a valid list")
+            host = hosts[0]
+            if self.hypervisor.lower() in 'xenserver':
+                #
+                ssh = SshClient(host.ipaddress, 22, self.services["configurableData"]["host"]["username"],
+                                self.services["configurableData"]["host"]["password"])
+                result = ssh.execute(cmd)
+                res = str(result)
+                self.assertNotEqual(res, "", "root disk should have user device=0")
+
+            self.debug("Restoring  the VM: %s" % virtual_machine.id)
+            # Restore VM
+            virtual_machine.restore(self.apiClient, template.id)
+            vm_response = VirtualMachine.list(
+                self.apiClient,
+                id=virtual_machine.id,
+            )
+            hosts = Host.list(self.apiClient, id=virtual_machine.hostid)
+            self.assertEqual(
+                isinstance(hosts, list),
+                True,
+                "Check list host returns a valid list")
+            host = hosts[0]
+            if self.hypervisor.lower() in 'xenserver':
+                #
+                ssh = SshClient(host.ipaddress, 22, self.services["configurableData"]["host"]["username"],
+                                self.services["configurableData"]["host"]["password"])
+                result = ssh.execute(cmd)
+                res = str(result)
+                self.assertNotEqual(res, "", "root disk should have user device=0")
+
+            #
+            # Verify VM response to check whether VM deployment was successful
+            self.assertNotEqual(
+                len(vm_response),
+                0,
+                "Check VMs available in List VMs response"
+            )
+            self.assertEqual(
+                isinstance(vm_response, list),
+                True,
+                "Check list VM response for valid list"
+            )
+            vm = vm_response[0]
+            self.assertEqual(
+                vm.state,
+                'Running',
+                "Check the state of VM"
+            )
+        except Exception as e:
+            self.fail("Exception occurred: %s" % e)
+        return
+
+    @attr(tags=["advanced", "basic"], required_hardware="false")
+    def test_28_VM_restore_ES3467(self):
+        """
+        @Desc:Test to verify  order of root and data disk remains same on Xenserver after VM reset
+        @Steps :
+        1.Create VM from Centos template
+        3.Add data disk to VM
+        5.check disk sequence on hypervisor: 1st = root disk, 2nd = data disk
+        6. Issue "reset VM" command on CCP
+        7. check disk sequence on hypervisor remains same and VM starts successfully
+        """
+        try:
+            # Deploy new virtual machine using template
+            virtual_machine = VirtualMachine.create(
+                self.apiClient,
+                self.services["virtual_machine"],
+                accountid=self.account.name,
+                domainid=self.account.domainid,
+                serviceofferingid=self.service_offering.id
+
+            )
+            self.debug("creating an instance with template ID: %s" % self.template.id)
+            vm_response = VirtualMachine.list(self.apiClient,
+                                              id=virtual_machine.id,
+                                              account=self.account.name,
+                                              domainid=self.account.domainid)
+            self.assertEqual(
+                isinstance(vm_response, list),
+                True,
+                "Check for list VMs response after VM deployment"
+            )
+            # Verify VM response to check whether VM deployment was successful
+            self.assertNotEqual(
+                len(vm_response),
+                0,
+                "Check VMs available in List VMs response"
+            )
+            vm = vm_response[0]
+            self.assertEqual(
+                vm.state,
+                'Running',
+                "Check the state of VM created from Template"
+            )
+            disk_offering = DiskOffering.create(
+                self.api_client,
+                self.services["disk_offering"]
+            )
+            self.cleanup.append(disk_offering)
+            volume = Volume.create(
+                self.apiClient,
+                self.services["volume"],
+                zoneid=self.zone.id,
+                account=self.account.name,
+                domainid=self.account.domainid,
+                diskofferingid=disk_offering.id
+            )
+            # Check List Volume response for newly created volume
+            list_volume_response = Volume.list(
+                self.apiClient,
+                id=volume.id
+            )
+            self.assertNotEqual(
+                list_volume_response,
+                None,
+                "Check if volume exists in ListVolumes"
+            )
+            # Attach volume to VM
+            virtual_machine.attach_volume(
+                self.apiClient,
+                volume
+            )
+            # Check volumes attached to same VM
+            list_volume_response = Volume.list(
+                self.apiClient,
+                virtualmachineid=virtual_machine.id,
+                type='DATADISK',
+                listall=True
+            )
+
+            self.assertNotEqual(
+                list_volume_response,
+                None,
+                "Check if volume exists in ListVolumes")
+            self.assertEqual(
+                isinstance(list_volume_response, list),
+                True,
+                "Check list volumes response for valid list")
+            list_volume_response = Volume.list(
+                self.apiClient,
+                virtualmachineid=virtual_machine.id,
+                type='ROOT',
+                listall=True
+            )
+            cmd = "xe vbd-list  vm-name-label=" + virtual_machine.instancename + " vdi-name-label=" + \
+                  list_volume_response[0].name + " userdevice=0 --minimal"
+            hosts = Host.list(self.apiClient, id=virtual_machine.hostid)
+            self.assertEqual(
+                isinstance(hosts, list),
+                True,
+                "Check list host returns a valid list")
+            host = hosts[0]
+            if self.hypervisor.lower() in 'xenserver':
+                #
+                # host.user, host.passwd = get_host_credentials(self, host.ipaddress)
+                ssh = SshClient(host.ipaddress, 22, self.services["configurableData"]["host"]["username"],
+                                self.services["configurableData"]["host"]["password"])
+                result = ssh.execute(cmd)
+                res = str(result)
+                self.assertNotEqual(res, "", "root disk should have user device=0")
+
+            # Stop VM
+            virtual_machine.stop(self.apiClient)
+
+            self.debug("Restoring the VM: %s" % virtual_machine.id)
+            # Restore VM
+            virtual_machine.restore(self.apiClient, self.template.id)
+            vm_response = VirtualMachine.list(
+                self.apiClient,
+                id=virtual_machine.id,
+            )
+            # Verify VM response to check whether VM deployment was successful
+            self.assertNotEqual(
+                len(vm_response),
+                0,
+                "Check VMs available in List VMs response"
+            )
+            self.assertEqual(
+                isinstance(vm_response, list),
+                True,
+                "Check list VM response for valid list"
+            )
+            vm = vm_response[0]
+            self.assertEqual(
+                vm.state,
+                'Stopped',
+                "Check the state of VM"
+            )
+            # Start VM
+            virtual_machine.start(self.apiClient)
+            if self.hypervisor.lower() in 'xenserver':
+                #
+                # host.user, host.passwd = get_host_credentials(self, host.ipaddress)
+                ssh = SshClient(host.ipaddress, 22, self.services["configurableData"]["host"]["username"],
+                                self.services["configurableData"]["host"]["password"])
+                result = ssh.execute(cmd)
+                res = str(result)
+                self.assertNotEqual(res, "", "root disk should have user device=0")
+
+            vm_response = VirtualMachine.list(
+                self.apiClient,
+                id=virtual_machine.id,
+            )
+            self.assertEqual(
+                isinstance(vm_response, list),
+                True,
+                "Check list VM response for valid list"
+            )
+            # Verify VM response to check whether VM deployment was successful
+            self.assertNotEqual(
+                len(vm_response),
+                0,
+                "Check VMs available in List VMs response"
+            )
+
+            vm = vm_response[0]
+            self.assertEqual(
+                vm.state,
+                'Running',
+                "Check the state of VM"
+            )
+        except Exception as e:
+            self.fail("Exception occurred: %s" % e)
+        return
+
+
     @attr(tags=["advanced", "basic"], required_hardware="true")
     def test_13_attach_detach_iso(self):
         """
@@ -2208,8 +2641,8 @@ class TestInstances(cloudstackTestCase):
         Step10: Detaching the ISO attached in step8
         Step11: Verifying that detached ISO details are not associated with VM
         """
-        if self.hypervisor.lower() in ['kvm', 'hyperv']:
-            raise unittest.SkipTest(
+        if self.hypervisor.lower() in ['kvm', 'hyperv', 'lxc']:
+            self.skipTest(
                 "This feature is not supported on existing hypervisor. Hence,\
                         skipping the test")
         # Listing all the VM's for a User
@@ -2352,8 +2785,8 @@ class TestInstances(cloudstackTestCase):
         Step12: Listing all the VM snapshots in Page 2 with page size
         Step13: Verifying that size of the list is 0
         """
-        if self.hypervisor.lower() in ['kvm', 'hyperv']:
-            raise unittest.SkipTest(
+        if self.hypervisor.lower() in ['kvm', 'hyperv', 'lxc']:
+            self.skipTest(
                 "This feature is not supported on existing hypervisor. Hence,\
                         skipping the test")
         # Listing all the VM's for a User
@@ -2514,8 +2947,8 @@ class TestInstances(cloudstackTestCase):
         Step11: Verifying that the VM Snapshot with current flag set to true
                 is the reverted snapshot in Step 8
         """
-        if self.hypervisor.lower() in ['kvm', 'hyperv']:
-            raise unittest.SkipTest(
+        if self.hypervisor.lower() in ['kvm', 'hyperv', 'lxc']:
+            self.skipTest(
                 "This feature is not supported on existing hypervisor.\
                         Hence, skipping the test")
         # Listing all the VM's for a User
@@ -2607,7 +3040,7 @@ class TestInstances(cloudstackTestCase):
         # and that snapshot is the latest snapshot created (snapshot2)
         current_count = 0
         for i in range(0, len(list_snapshots_after)):
-            if(list_snapshots_after[i].current is True):
+            if (list_snapshots_after[i].current is True):
                 current_count = current_count + 1
                 current_snapshot = list_snapshots_after[i]
 
@@ -2621,6 +3054,7 @@ class TestInstances(cloudstackTestCase):
             current_snapshot.id,
             "Latest snapshot taken is not marked as current"
         )
+
         # Reverting the VM to Snapshot 1
         VmSnapshot.revertToSnapshot(
             self.userapiclient,
@@ -2647,7 +3081,7 @@ class TestInstances(cloudstackTestCase):
         # and that snapshot is snapshot1
         current_count = 0
         for i in range(0, len(list_snapshots_after)):
-            if(list_snapshots_after[i].current is True):
+            if (list_snapshots_after[i].current is True):
                 current_count = current_count + 1
                 current_snapshot = list_snapshots_after[i]
         self.assertEquals(
@@ -2683,6 +3117,10 @@ class TestInstances(cloudstackTestCase):
         Step13: Listing all the Volumes in Page 2
         Step14: Verifying that list size is 0
         """
+        self.hypervisor = self.testClient.getHypervisorInfo()
+        if self.hypervisor.lower() == 'lxc':
+            if not find_storage_pool_type(self.api_client, storagetype='rbd'):
+                self.skipTest("RBD storage type is required for data volumes for LXC")
         # Listing all the VM's for a User
         list_vms_before = VirtualMachine.list(
             self.userapiclient,
@@ -2903,7 +3341,7 @@ class TestInstances(cloudstackTestCase):
         Step6: Verifying that VM's service offerings is changed
         """
         if self.hypervisor.lower() == 'kvm':
-            raise unittest.SkipTest(
+            self.skipTest(
                 "ScaleVM is not supported on KVM. Hence, skipping the test")
         # Checking if Dynamic scaling of VM is supported or not
         list_config = Configurations.list(
@@ -2919,8 +3357,8 @@ class TestInstances(cloudstackTestCase):
         )
         # Checking if dynamic scaling is allowed in Zone and Template
         if not (
-            (list_config[0].value is True) and (
-                self.template.isdynamicallyscalable)):
+                    (list_config[0].value is True) and (
+                        self.template.isdynamicallyscalable)):
             self.debug(
                 "Scale up of Running VM is not possible as Zone/Template\
                         does not support")
@@ -2985,18 +3423,18 @@ class TestInstances(cloudstackTestCase):
             if service_offerings_list is not None:
                 for i in range(0, len(service_offerings_list)):
                     if not ((current_so.cpunumber >
-                             service_offerings_list[i].cpunumber or
-                             current_so.cpuspeed >
-                             service_offerings_list[i].cpuspeed or
-                             current_so.memory >
-                             service_offerings_list[i].memory) or
-                            (current_so.cpunumber ==
-                                service_offerings_list[i].cpunumber and
-                             current_so.cpuspeed ==
-                                service_offerings_list[i].cpuspeed and
-                             current_so.memory ==
-                                service_offerings_list[i].memory)):
-                        if(current_so.storagetype ==
+                                 service_offerings_list[i].cpunumber or
+                                     current_so.cpuspeed >
+                                     service_offerings_list[i].cpuspeed or
+                                     current_so.memory >
+                                     service_offerings_list[i].memory) or
+                                (current_so.cpunumber ==
+                                     service_offerings_list[i].cpunumber and
+                                         current_so.cpuspeed ==
+                                         service_offerings_list[i].cpuspeed and
+                                         current_so.memory ==
+                                         service_offerings_list[i].memory)):
+                        if (current_so.storagetype ==
                                 service_offerings_list[i].storagetype):
                             so_exists = True
                             new_so = service_offerings_list[i]
@@ -3120,8 +3558,8 @@ class TestInstances(cloudstackTestCase):
         if service_offerings_list is not None:
             for i in range(0, len(service_offerings_list)):
                 if ((current_so.id != service_offerings_list[i].id) and (
-                        current_so.storagetype ==
-                        service_offerings_list[i].storagetype)):
+                            current_so.storagetype ==
+                            service_offerings_list[i].storagetype)):
                     so_exists = True
                     new_so = service_offerings_list[i]
                     break
@@ -3547,7 +3985,7 @@ class TestInstances(cloudstackTestCase):
         )
         # populating network id's
         networkids = networks_list_after[
-            0].id + "," + networks_list_after[1].id
+                         0].id + "," + networks_list_after[1].id
         # Listing all the VM's for a User
         list_vms_before = VirtualMachine.list(
             self.userapiclient,
@@ -4053,3 +4491,6 @@ class TestInstances(cloudstackTestCase):
                 "Warning: Exception in expunging vms vm3 and vm4 : %s" %
                 e)
         return
+
+
+

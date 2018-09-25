@@ -21,6 +21,7 @@ package com.cloud.baremetal.networkservice;
 import com.cloud.baremetal.database.BaremetalPxeVO;
 import com.cloud.baremetal.manager.BaremetalVlanManager;
 import com.cloud.dc.DataCenter;
+import com.cloud.dc.DataCenterVO;
 import com.cloud.dc.Pod;
 import com.cloud.dc.dao.DataCenterDao;
 import com.cloud.deploy.DeployDestination;
@@ -52,13 +53,11 @@ import com.cloud.vm.dao.NicDao;
 import com.cloud.vm.dao.VMInstanceDao;
 import org.apache.log4j.Logger;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-@Local(value = NetworkElement.class)
 public class BaremetalPxeElement extends AdapterBase implements NetworkElement {
     private static final Logger s_logger = Logger.getLogger(BaremetalPxeElement.class);
     private static final Map<Service, Map<Capability, String>> capabilities;
@@ -126,10 +125,10 @@ public class BaremetalPxeElement extends AdapterBase implements NetworkElement {
         }
 
         VMInstanceVO vo = _vmDao.findById(vm.getId());
+        assert vo != null : "Where ths nic " + nic.getId() + " going???";
         if (vo.getLastHostId() == null) {
             nic.setMacAddress(dest.getHost().getPrivateMacAddress());
             NicVO nicVo = _nicDao.findById(nic.getId());
-            assert vo != null : "Where ths nic " + nic.getId() + " going???";
             nicVo.setMacAddress(nic.getMacAddress());
             _nicDao.update(nicVo.getId(), nicVo);
 
@@ -139,11 +138,9 @@ public class BaremetalPxeElement extends AdapterBase implements NetworkElement {
             }
         }
 
-        /*
         if (dest.getDataCenter().getNetworkType() == DataCenter.NetworkType.Advanced){
             prepareVlan(network, dest);
         }
-        */
 
         return true;
     }
@@ -159,12 +156,10 @@ public class BaremetalPxeElement extends AdapterBase implements NetworkElement {
             return false;
         }
 
-        /*
         DataCenterVO dc = zoneDao.findById(vm.getVirtualMachine().getDataCenterId());
         if (dc.getNetworkType() == DataCenter.NetworkType.Advanced) {
             releaseVlan(network, vm);
         }
-        */
         return true;
     }
 

@@ -18,6 +18,7 @@ package org.apache.cloudstack.api.command.user.template;
 
 import org.apache.log4j.Logger;
 
+import java.util.List;
 import org.apache.cloudstack.api.APICommand;
 import org.apache.cloudstack.api.ApiCommandJobType;
 import org.apache.cloudstack.api.ApiConstants;
@@ -50,6 +51,9 @@ public class ListTemplatesCmd extends BaseListTaggedResourcesCmd {
     @Parameter(name = ApiConstants.ID, type = CommandType.UUID, entityType = TemplateResponse.class, description = "the template ID")
     private Long id;
 
+    @Parameter(name=ApiConstants.IDS, type=CommandType.LIST, collectionType=CommandType.UUID, entityType=TemplateResponse.class, description="the IDs of the templates, mutually exclusive with id", since = "4.9")
+    private List<Long> ids;
+
     @Parameter(name = ApiConstants.NAME, type = CommandType.STRING, description = "the template name")
     private String templateName;
 
@@ -68,8 +72,11 @@ public class ListTemplatesCmd extends BaseListTaggedResourcesCmd {
     @Parameter(name = ApiConstants.ZONE_ID, type = CommandType.UUID, entityType = ZoneResponse.class, description = "list templates by zoneId")
     private Long zoneId;
 
-    @Parameter(name=ApiConstants.SHOW_REMOVED, type=CommandType.BOOLEAN, description="show removed templates as well")
+    @Parameter(name = ApiConstants.SHOW_REMOVED, type = CommandType.BOOLEAN, description = "show removed templates as well")
     private Boolean showRemoved;
+
+    @Parameter(name = ApiConstants.PARENT_TEMPLATE_ID, type = CommandType.UUID, entityType = TemplateResponse.class, description = "list datadisk templates by parent template id", since = "4.4")
+    private Long parentTemplateId;
 
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
@@ -97,6 +104,10 @@ public class ListTemplatesCmd extends BaseListTaggedResourcesCmd {
 
     public Boolean getShowRemoved() {
         return (showRemoved != null ? showRemoved : false);
+    }
+
+    public Long getParentTemplateId() {
+        return parentTemplateId;
     }
 
     public boolean listInReadyState() {
@@ -131,5 +142,9 @@ public class ListTemplatesCmd extends BaseListTaggedResourcesCmd {
         ListResponse<TemplateResponse> response = _queryService.listTemplates(this);
         response.setResponseName(getCommandName());
         setResponseObject(response);
+    }
+
+    public List<Long> getIds() {
+        return ids;
     }
 }

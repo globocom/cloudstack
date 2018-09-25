@@ -16,9 +16,19 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloud-tools</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.1.0</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.cloudstack</groupId>
+      <artifactId>cloud-apidoc</artifactId>
+      <version>${project.version}</version>
+      <type>pom</type>
+    </dependency>
+  </dependencies>
+
   <build>
     <defaultGoal>install</defaultGoal>
     <plugins>
@@ -63,8 +73,8 @@
             </configuration>
           </execution>
           <execution>
-            <id>install</id>
-            <phase>install</phase>
+            <id>package</id>
+            <phase>package</phase>
             <goals>
               <goal>exec</goal>
             </goals>

@@ -24,13 +24,13 @@ import java.util.Map;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
-
-import org.apache.cloudstack.framework.config.ConfigKey;
+import com.cloud.configuration.ManagementServiceConfiguration;
 import org.apache.cloudstack.framework.messagebus.MessageBus;
 import org.apache.cloudstack.framework.messagebus.PublishScope;
 
 import com.cloud.agent.api.HostVmStateReportEntry;
 import com.cloud.utils.DateUtil;
+import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.vm.dao.VMInstanceDao;
 
 public class VirtualMachinePowerStateSyncImpl implements VirtualMachinePowerStateSync {
@@ -39,9 +39,7 @@ public class VirtualMachinePowerStateSyncImpl implements VirtualMachinePowerStat
     @Inject MessageBus _messageBus;
     @Inject VMInstanceDao _instanceDao;
     @Inject VirtualMachineManager _vmMgr;
-
-    protected final ConfigKey<Integer> PingInterval = new ConfigKey<Integer>(Integer.class, "ping.interval", "Advanced", "60",
-            "Interval to send application level pings to make sure the connection is still working", false);
+    @Inject ManagementServiceConfiguration mgmtServiceConf;
 
     public VirtualMachinePowerStateSyncImpl() {
     }
@@ -107,11 +105,23 @@ public class VirtualMachinePowerStateSyncImpl implements VirtualMachinePowerStat
                 s_logger.debug("Run missing VM report. current time: " + currentTime.getTime());
 
             // 2 times of sync-update interval for graceful period
-            long milliSecondsGracefullPeriod = PingInterval.value() * 2000L;
+            long milliSecondsGracefullPeriod = mgmtServiceConf.getPingInterval() * 2000L;
 
             for (VMInstanceVO instance : vmsThatAreMissingReport) {
 
-                Date vmStateUpdateTime = instance.getUpdateTime();
+                // Make sure powerState is up to date for missing VMs
+                try {
+                    if (!_instanceDao.isPowerStateUpToDate(instance.getId())) {
+                        s_logger.warn("Detected missing VM but power state is outdated, wait for another process report run for VM id: " + instance.getId());
+                        _instanceDao.resetVmPowerStateTracking(instance.getId());
+                        continue;
+                    }
+                } catch (CloudRuntimeException e) {
+                    s_logger.warn("Checked for missing powerstate of a none existing vm", e);
+                    continue;
+                }
+
+                Date vmStateUpdateTime = instance.getPowerStateUpdateTime();
                 if (vmStateUpdateTime == null) {
                     s_logger.warn("VM state was updated but update time is null?! vm id: " + instance.getId());
                     vmStateUpdateTime = currentTime;

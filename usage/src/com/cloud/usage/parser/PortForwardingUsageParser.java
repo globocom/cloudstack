@@ -99,6 +99,7 @@ public class PortForwardingUsageParser {
             }
 
             if (pfCreateDate.after(endDate)) {
+                //Ignore records created after endDate
                 continue;
             }
 

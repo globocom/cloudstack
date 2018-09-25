@@ -19,103 +19,98 @@
 
 package com.cloud.network.resource;
 
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-import net.nuage.vsp.acs.client.NuageVspApiClient;
-import net.nuage.vsp.acs.client.NuageVspElementClient;
-import net.nuage.vsp.acs.client.NuageVspGuruClient;
-import net.nuage.vsp.acs.client.NuageVspSyncClient;
+import javax.naming.ConfigurationException;
+
+import net.nuage.vsp.acs.client.api.NuageVspApiClient;
+import net.nuage.vsp.acs.client.api.NuageVspElementClient;
+import net.nuage.vsp.acs.client.api.NuageVspGuruClient;
+import net.nuage.vsp.acs.client.api.NuageVspManagerClient;
+import net.nuage.vsp.acs.client.api.NuageVspPluginClientLoader;
+import net.nuage.vsp.acs.client.api.model.VspAclRule;
+import net.nuage.vsp.acs.client.api.model.VspDhcpDomainOption;
+import net.nuage.vsp.acs.client.api.model.VspDhcpVMOption;
+import net.nuage.vsp.acs.client.api.model.VspHost;
+import net.nuage.vsp.acs.client.api.model.VspNetwork;
+import net.nuage.vsp.acs.client.api.model.VspNic;
+import net.nuage.vsp.acs.client.api.model.VspStaticNat;
+import net.nuage.vsp.acs.client.api.model.VspVm;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+
+import com.cloud.NuageTest;
+import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.PingCommand;
 import com.cloud.agent.api.StartupCommand;
-import com.cloud.agent.api.element.ApplyAclRuleVspAnswer;
 import com.cloud.agent.api.element.ApplyAclRuleVspCommand;
-import com.cloud.agent.api.element.ApplyStaticNatVspAnswer;
 import com.cloud.agent.api.element.ApplyStaticNatVspCommand;
-import com.cloud.agent.api.element.ShutDownVpcVspAnswer;
 import com.cloud.agent.api.element.ShutDownVpcVspCommand;
-import com.cloud.agent.api.guru.DeallocateVmVspAnswer;
 import com.cloud.agent.api.guru.DeallocateVmVspCommand;
-import com.cloud.agent.api.guru.ImplementNetworkVspAnswer;
 import com.cloud.agent.api.guru.ImplementNetworkVspCommand;
-import com.cloud.agent.api.guru.ReleaseVmVspAnswer;
-import com.cloud.agent.api.guru.ReleaseVmVspCommand;
-import com.cloud.agent.api.guru.ReserveVmInterfaceVspAnswer;
 import com.cloud.agent.api.guru.ReserveVmInterfaceVspCommand;
-import com.cloud.agent.api.guru.TrashNetworkVspAnswer;
 import com.cloud.agent.api.guru.TrashNetworkVspCommand;
-import com.cloud.agent.api.sync.SyncVspAnswer;
-import com.cloud.agent.api.sync.SyncVspCommand;
+import com.cloud.agent.api.manager.ImplementNetworkVspAnswer;
 import com.cloud.host.Host;
 
-public class NuageVspResourceTest {
-    NuageVspResource _resource;
-    NuageVspApiClient _mockNuageVspApiClient = mock(NuageVspApiClient.class);
-    NuageVspElementClient _mockNuageVspElementClient = mock(NuageVspElementClient.class);
-    NuageVspGuruClient _mockNuageVspGuruClient = mock(NuageVspGuruClient.class);
-    NuageVspSyncClient _mockNuageVspSyncClient = mock(NuageVspSyncClient.class);
-    Map<String, Object> _parameters;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-    Answer<Object> genericAnswer = new Answer<Object>() {
-        public Object answer(InvocationOnMock invocation) {
-            return null;
-        }
-    };
+public class NuageVspResourceTest extends NuageTest {
+    private NuageVspResource _resource;
+    @Mock private NuageVspApiClient _mockNuageVspApiClient;
+    @Mock private NuageVspElementClient _mockNuageVspElementClient;
+    @Mock private NuageVspGuruClient _mockNuageVspGuruClient;
+    @Mock private NuageVspManagerClient _mockNuageVspManagerClient;
+    @Mock private NuageVspPluginClientLoader _mockNuageVspPluginClientLoader;
+    private NuageVspResourceConfiguration _resourceConfiguration;
+    private Map<String, Object> _hostDetails;
 
     @Before
     public void setUp() throws Exception {
+        super.setUp();
+
+        MockitoAnnotations.initMocks(this);
+
+        when(_mockNuageVspPluginClientLoader.getNuageVspApiClient()).thenReturn(_mockNuageVspApiClient);
+        when(_mockNuageVspPluginClientLoader.getNuageVspElementClient()).thenReturn(_mockNuageVspElementClient);
+        when(_mockNuageVspPluginClientLoader.getNuageVspGuruClient()).thenReturn(_mockNuageVspGuruClient);
+        when(_mockNuageVspPluginClientLoader.getNuageVspManagerClient()).thenReturn(_mockNuageVspManagerClient);
+
         _resource = new NuageVspResource() {
-
-            @Override
-            protected void loadNuageClient() {
-                _isNuageVspClientLoaded = true;
-                _nuageVspApiClient = _mockNuageVspApiClient;
-                _nuageVspElementClient = _mockNuageVspElementClient;
-                _nuageVspGuruClient = _mockNuageVspGuruClient;
-                _nuageVspSyncClient = _mockNuageVspSyncClient;
-
+            @Override protected NuageVspPluginClientLoader getClientLoader(VspHost vspHost) {
+                return _mockNuageVspPluginClientLoader;
             }
 
-            protected void isNuageVspApiLoaded() throws Exception {
-            }
-
-            protected void isNuageVspGuruLoaded() throws Exception {
-            }
-
-            protected void isNuageVspElementLoaded() throws Exception {
-            }
-
-            protected void isNuageVspSyncLoaded() throws Exception {
-            }
-
-            protected void login() throws Exception {
+            protected void login() throws ConfigurationException {
             }
 
         };
 
-        _parameters = new HashMap<String, Object>();
-        _parameters.put("name", "nuagevsptestdevice");
-        _parameters.put("guid", "aaaaa-bbbbb-ccccc");
-        _parameters.put("zoneId", "blublub");
-        _parameters.put("hostname", "nuagevsd");
-        _parameters.put("cmsuser", "cmsuser");
-        _parameters.put("cmsuserpass", "cmsuserpass");
-        _parameters.put("port", "8443");
-        _parameters.put("apirelativepath", "nuage/api/v1_0");
-        _parameters.put("retrycount", "3");
-        _parameters.put("retryinterval", "3");
+        _resourceConfiguration = new NuageVspResourceConfiguration()
+                .guid("aaaaa-bbbbb-ccccc")
+                .zoneId("blublub")
+                .hostName("nuagevsd")
+                .cmsUser("cmsuser")
+                .cmsUserPassword("cmsuserpass")
+                .port("8443")
+                .apiVersion("v3_2")
+                .apiRelativePath("nuage/api/v3_2")
+                .retryCount("3")
+                .retryInterval("3");
+        _hostDetails = Maps.<String, Object>newHashMap(_resourceConfiguration.build());
     }
 
     @Test(expected = Exception.class)
@@ -125,128 +120,122 @@ public class NuageVspResourceTest {
 
     @Test
     public void resourceConfigure() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
+        _resource.configure("Nuage VSD - nuagevsd", _hostDetails);
 
-        assertTrue("nuagevsptestdevice".equals(_resource.getName()));
-        assertTrue(_resource.getType() == Host.Type.L2Networking);
+        assertEquals("Nuage VSD - nuagevsd", _resource.getName());
+        assertEquals(Host.Type.L2Networking, _resource.getType());
     }
 
     @Test
     public void testInitialization() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
+        _resource.configure("Nuage VSD - nuagevsd", _hostDetails);
 
         StartupCommand[] sc = _resource.initialize();
-        assertTrue(sc.length == 1);
-        assertTrue("aaaaa-bbbbb-ccccc".equals(sc[0].getGuid()));
-        assertTrue("nuagevsptestdevice".equals(sc[0].getName()));
-        assertTrue("blublub".equals(sc[0].getDataCenter()));
+        assertEquals(1, sc.length);
+        assertEquals("aaaaa-bbbbb-ccccc", sc[0].getGuid());
+        assertEquals("Nuage VSD - nuagevsd", sc[0].getName());
+        assertEquals("blublub", sc[0].getDataCenter());
     }
 
     @Test
     public void testPingCommandStatus() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
+        _resource.configure("NuageVspResource", _hostDetails);
 
         PingCommand ping = _resource.getCurrentStatus(42);
-        assertTrue(ping != null);
-        assertTrue(ping.getHostId() == 42);
-        assertTrue(ping.getHostType() == Host.Type.L2Networking);
+        assertNotNull(ping);
+        assertEquals(42, ping.getHostId());
+        assertEquals(Host.Type.L2Networking, ping.getHostType());
     }
 
     @Test
     public void testImplementNetworkVspCommand() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
+        _resource.configure("NuageVspResource", _hostDetails);
 
-        ImplementNetworkVspCommand impNtwkCmd = new ImplementNetworkVspCommand("networkDomainName", "networkDomainPath", "networkDomainUuid", "networkAccountName",
-                "networkAccountUuid", "networkName", "networkCidr", "networkGateway", "networkUuid", true, "vpcName", "vpcUuid", true, new ArrayList<String>());
-        doAnswer(genericAnswer).when(_mockNuageVspGuruClient).implement("networkDomainName", "networkDomainPath", "networkDomainUuid", "networkAccountName", "networkAccountUuid",
-                "networkName", "networkCidr", "networkGateway", "networkUuid", true, "vpcName", "vpcUuid", true, new ArrayList<String>());
-        ImplementNetworkVspAnswer implNtwkAns = (ImplementNetworkVspAnswer)_resource.executeRequest(impNtwkCmd);
+        VspNetwork vspNetwork = buildVspNetwork();
+        VspDhcpDomainOption vspDhcpOptions = buildspDhcpDomainOption();
+        ImplementNetworkVspCommand cmd = new ImplementNetworkVspCommand(vspNetwork, vspDhcpOptions, false);
+        ImplementNetworkVspAnswer implNtwkAns = (ImplementNetworkVspAnswer)_resource.executeRequest(cmd);
         assertTrue(implNtwkAns.getResult());
+        verify(_mockNuageVspGuruClient).implement(vspNetwork, vspDhcpOptions);
+    }
+
+    @Test
+    public void testImplementVsdManagedNetworkVspCommand() throws Exception {
+        _resource.configure("NuageVspResource", _hostDetails);
+
+        VspNetwork vspNetwork = buildVspNetwork();
+        VspDhcpDomainOption vspDhcpOptions = buildspDhcpDomainOption();
+        when(_mockNuageVspGuruClient.addPermissionL3Network(vspNetwork)).thenReturn(vspNetwork);
+        ImplementNetworkVspCommand cmd = new ImplementNetworkVspCommand(vspNetwork, vspDhcpOptions, true);
+        ImplementNetworkVspAnswer implNtwkAns = (ImplementNetworkVspAnswer)_resource.executeRequest(cmd);
+        assertTrue(implNtwkAns.getResult());
+        verify(_mockNuageVspGuruClient).addPermissionL3Network(vspNetwork);
     }
 
     @Test
     public void testReserveVmInterfaceVspCommand() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
+        _resource.configure("NuageVspResource", _hostDetails);
 
-        ReserveVmInterfaceVspCommand rsrvVmInfCmd = new ReserveVmInterfaceVspCommand("nicUuid", "nicMacAddress", "networkUuid", true, "vpcUuid", "networkDomainUuid",
-                "networksAccountUuid", false, "domainRouterIp", "vmInstanceName", "vmUuid", "vmUserName", "vmUserDomainName");
-        doAnswer(genericAnswer).when(_mockNuageVspGuruClient).reserve("nicUuid", "nicMacAddress", "networkUuid", true, "vpcUuid", "networkDomainUuid", "networksAccountUuid",
-                false, "domainRouterIp", "vmInstanceName", "vmUuid");
-        ReserveVmInterfaceVspAnswer rsrvVmInfAns = (ReserveVmInterfaceVspAnswer)_resource.executeRequest(rsrvVmInfCmd);
+        VspNetwork vspNetwork = buildVspNetwork();
+        VspVm vspVm = buildVspVm();
+        VspNic vspNic = buildVspNic();
+        VspStaticNat vspStaticNat = buildVspStaticNat();
+        VspDhcpVMOption vspDhcpOption = buildspDhcpVMOption();
+        ReserveVmInterfaceVspCommand cmd = new ReserveVmInterfaceVspCommand(vspNetwork, vspVm, vspNic, vspStaticNat, vspDhcpOption);
+        Answer rsrvVmInfAns = _resource.executeRequest(cmd);
         assertTrue(rsrvVmInfAns.getResult());
     }
 
     @Test
-    public void testReleaseVmVspCommand() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
-
-        ReleaseVmVspCommand releaseVmCmd = new ReleaseVmVspCommand("networkUuid", "vmUuid", "vmInstanceName");
-        doAnswer(genericAnswer).when(_mockNuageVspGuruClient).release("networkUuid", "vmUuid", "vmInstanceName");
-        ReleaseVmVspAnswer releaseVmAns = (ReleaseVmVspAnswer)_resource.executeRequest(releaseVmCmd);
-        assertTrue(releaseVmAns.getResult());
-    }
-
-    @Test
     public void testDeallocateVmVspCommand() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
+        _resource.configure("NuageVspResource", _hostDetails);
 
-        DeallocateVmVspCommand dellocateVmCmd = new DeallocateVmVspCommand("networkUuid", "nicFrmDdUuid", "nicMacAddress", "nicIp4Address", true, "vpcUuid", "networksDomainUuid",
-                "vmInstanceName", "vmUuid");
-        doAnswer(genericAnswer).when(_mockNuageVspGuruClient).deallocate("networkUuid", "nicFrmDdUuid", "nicMacAddress", "nicIp4Address", true, "vpcUuid", "networksDomainUuid",
-                "vmInstanceName", "vmUuid");
-        DeallocateVmVspAnswer dellocateVmAns = (DeallocateVmVspAnswer)_resource.executeRequest(dellocateVmCmd);
+        VspNetwork vspNetwork = buildVspNetwork();
+        VspVm vspVm = buildVspVm();
+        VspNic vspNic = buildVspNic();
+        DeallocateVmVspCommand cmd = new DeallocateVmVspCommand(vspNetwork, vspVm, vspNic);
+        Answer dellocateVmAns = _resource.executeRequest(cmd);
         assertTrue(dellocateVmAns.getResult());
     }
 
     @Test
     public void testTrashNetworkVspCommand() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
+        _resource.configure("NuageVspResource", _hostDetails);
 
-        TrashNetworkVspCommand trashNtwkCmd = new TrashNetworkVspCommand("domainUuid", "networkUuid", true, "vpcUuid");
-        doAnswer(genericAnswer).when(_mockNuageVspGuruClient).trash("domainUuid", "networkUuid", true, "vpcUuid");
-        TrashNetworkVspAnswer trashNtwkAns = (TrashNetworkVspAnswer)_resource.executeRequest(trashNtwkCmd);
+        VspNetwork vspNetwork = buildVspNetwork();
+        TrashNetworkVspCommand cmd = new TrashNetworkVspCommand(vspNetwork);
+        Answer trashNtwkAns = _resource.executeRequest(cmd);
         assertTrue(trashNtwkAns.getResult());
     }
 
     @Test
     public void testApplyStaticNatVspCommand() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
+        _resource.configure("NuageVspResource", _hostDetails);
 
-        ApplyStaticNatVspCommand applyNatCmd = new ApplyStaticNatVspCommand("networkDomainUuid", "vpcOrSubnetUuid", true, new ArrayList<Map<String, Object>>());
-        doAnswer(genericAnswer).when(_mockNuageVspElementClient).applyStaticNats("networkDomainUuid", "vpcOrSubnetUuid", true, new ArrayList<Map<String, Object>>());
-        ApplyStaticNatVspAnswer applyNatAns = (ApplyStaticNatVspAnswer)_resource.executeRequest(applyNatCmd);
+        VspNetwork vspNetwork = buildVspNetwork();
+        List<VspStaticNat> vspStaticNatDetails = Lists.newArrayList(buildVspStaticNat());
+        ApplyStaticNatVspCommand cmd = new ApplyStaticNatVspCommand(vspNetwork, vspStaticNatDetails);
+        Answer applyNatAns = _resource.executeRequest(cmd);
         assertTrue(applyNatAns.getResult());
     }
 
     @Test
     public void testApplyAclRuleVspCommand() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
+        _resource.configure("NuageVspResource", _hostDetails);
 
-        ApplyAclRuleVspCommand applyAclCmd = new ApplyAclRuleVspCommand("networkUuid", "networkDomainUuid", "vpcOrSubnetUuid", true, new ArrayList<Map<String, Object>>(), false,
-                100);
-        doAnswer(genericAnswer).when(_mockNuageVspElementClient).applyAclRules("networkUuid", "networkDomainUuid", "vpcOrSubnetUuid", true, new ArrayList<Map<String, Object>>(),
-                false, 100);
-        ApplyAclRuleVspAnswer applyAclAns = (ApplyAclRuleVspAnswer)_resource.executeRequest(applyAclCmd);
+        VspNetwork vspNetwork = buildVspNetwork();
+        List<VspAclRule> vspAclRules = Lists.newArrayList(buildVspAclRule());
+        ApplyAclRuleVspCommand cmd = new ApplyAclRuleVspCommand(VspAclRule.ACLType.NetworkACL, vspNetwork, vspAclRules, false);
+        Answer applyAclAns = _resource.executeRequest(cmd);
         assertTrue(applyAclAns.getResult());
     }
 
     @Test
     public void testShutDownVpcVspCommand() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
+        _resource.configure("NuageVspResource", _hostDetails);
 
-        ShutDownVpcVspCommand shutVpcCmd = new ShutDownVpcVspCommand("domainUuid", "vpcUuid");
-        doAnswer(genericAnswer).when(_mockNuageVspElementClient).shutDownVpc("domainUuid", "vpcUuid");
-        ShutDownVpcVspAnswer shutVpcAns = (ShutDownVpcVspAnswer)_resource.executeRequest(shutVpcCmd);
-        assertTrue(shutVpcAns.getResult());
-    }
-
-    @Test
-    public void testSyncVspCommand() throws Exception {
-        _resource.configure("NuageVspResource", _parameters);
-
-        SyncVspCommand shutVpcCmd = new SyncVspCommand("nuageVspEntity");
-        doAnswer(genericAnswer).when(_mockNuageVspSyncClient).syncWithNuageVsp("nuageVspEntity");
-        SyncVspAnswer shutVpcAns = (SyncVspAnswer)_resource.executeRequest(shutVpcCmd);
+        ShutDownVpcVspCommand cmd = new ShutDownVpcVspCommand("domainUuid", "vpcUuid", "domainTemplateName", Lists.<String>newArrayList(), new HashMap<>());
+        Answer shutVpcAns = _resource.executeRequest(cmd);
         assertTrue(shutVpcAns.getResult());
     }
 }

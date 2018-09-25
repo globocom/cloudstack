@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -45,7 +44,6 @@ import com.cloud.host.HostVO;
 import com.cloud.host.Status;
 import com.cloud.storage.dao.SnapshotDao;
 
-@Local(value = Discoverer.class)
 public class SimulatorSecondaryDiscoverer extends SecondaryStorageDiscoverer implements ResourceStateAdapter, Listener {
     private static final Logger s_logger = Logger.getLogger(SimulatorSecondaryDiscoverer.class);
     @Inject
@@ -143,6 +141,10 @@ public class SimulatorSecondaryDiscoverer extends SecondaryStorageDiscoverer imp
     }
 
     @Override
+    public void processHostAdded(long hostId) {
+    }
+
+    @Override
     public void processConnect(Host host, StartupCommand cmd, boolean forRebalance) throws ConnectionException {
 
     }
@@ -155,6 +157,14 @@ public class SimulatorSecondaryDiscoverer extends SecondaryStorageDiscoverer imp
     @Override
     public boolean processDisconnect(long agentId, Status state) {
         return false;
+    }
+
+    @Override
+    public void processHostAboutToBeRemoved(long hostId) {
+    }
+
+    @Override
+    public void processHostRemoved(long hostId, long clusterId) {
     }
 
     @Override

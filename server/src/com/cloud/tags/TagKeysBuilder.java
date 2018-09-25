@@ -34,14 +34,14 @@ public class TagKeysBuilder {
     }
 
     public static String getKeyMetadata(String key) {
-        return "TAG_" + key.trim();
+        return "TAG_" + key.trim().replaceAll(" ","_");
     }
 
     public static String buildTagKeys(List<ResourceTag> tags) {
         TagKeysBuilder builder = new TagKeysBuilder();
         if ( tags != null ){
             for(ResourceTag tag : tags) {
-                builder.add(tag.getKey());
+                builder.add(tag.getKey().replaceAll(" ","_"));
             }
         }
         return builder.value();

@@ -30,7 +30,8 @@ from marvin.lib.base import (Account,
                              SnapshotPolicy)
 from marvin.lib.common import (get_domain,
                                get_zone,
-                               get_template)
+                               get_template,
+                               find_storage_pool_type)
 from nose.plugins.attrib import attr
 from marvin.codes import PASS
 
@@ -45,6 +46,11 @@ class TestVolumes(cloudstackTestCase):
             cls.api_client = cls.testClient.getApiClient()
             cls.services = cls.testClient.getParsedTestDataConfig()
             cls.hypervisor = cls.testClient.getHypervisorInfo()
+            cls.find_storage_pool = True
+            if cls.hypervisor.lower() == 'lxc':
+                if not find_storage_pool_type(cls.api_client, storagetype='rbd'):
+                    cls.find_storage_pool = False
+                    return
             # Get Domain, Zone, Template
             cls.domain = get_domain(cls.api_client)
             cls.zone = get_zone(
@@ -90,6 +96,8 @@ class TestVolumes(cloudstackTestCase):
 
     def setUp(self):
 
+        if not self.find_storage_pool:
+            self.skipTest("Skipping tests since RBD storage type is required for data volumes for LXC")
         self.apiClient = self.testClient.getApiClient()
         self.account = Account.create(
             self.apiClient,
@@ -202,13 +210,6 @@ class TestVolumes(cloudstackTestCase):
             self.assertIsNotNone(
                 volume_created,
                 "Volume is not created"
-            )
-
-            self.assertEqual(
-                self.services["volume"]["diskname"],
-                volume_created.name,
-                "Newly created volume name and the test data\
-                volume name are not matching"
             )
 
         # Listing all the volumes again after creation of volumes
@@ -331,12 +332,7 @@ class TestVolumes(cloudstackTestCase):
             volume_created,
             "Volume is not created"
         )
-        self.assertEqual(
-            self.services["volume"]["diskname"],
-            volume_created.name,
-            "Newly created volume name and\
-            the test data volume name are not matching"
-        )
+
         # Listing all the volumes for a user after creating a data volume
         list_volumes_after = Volume.list(
             self.userapiclient,
@@ -465,7 +461,7 @@ class TestVolumes(cloudstackTestCase):
         Step6: Resizing data volume
         """
         if self.hypervisor.lower() in ['hyperv']:
-            raise unittest.SkipTest(
+            self.skipTest(
                 "This featureis not supported on existing\
                         hypervisor. Hence, skipping the test")
         # Listing volumes for a user before creating a volume
@@ -588,7 +584,7 @@ class TestVolumes(cloudstackTestCase):
         Step6: Resizing custom volume
         """
         if self.hypervisor.lower() in ['hyperv']:
-            raise unittest.SkipTest(
+            self.skipTest(
                 "This featureis not supported on existing\
                         hypervisor. Hence, skipping the test")
         # Listing all the disk offerings
@@ -714,8 +710,8 @@ class TestVolumes(cloudstackTestCase):
         Step4: Creating Volume from snapshot
         Step5: Creating Template from Snapshot
         """
-        if self.hypervisor.lower() in ['hyperv']:
-            raise unittest.SkipTest(
+        if self.hypervisor.lower() in ["hyperv", "lxc"]:
+            self.skipTest(
                 "This featureis not supported on existing\
                         hypervisor. Hence, skipping the test")
         list_volumes_before = Volume.list(
@@ -936,6 +932,12 @@ class TestVolumes(cloudstackTestCase):
         Step6: Listing snapshot policies for a volume created in step1 again
         Step7: Verifyign that the list snapshot policy length is increased by 1
         """
+
+        if self.hypervisor.lower() in ["hyperv", "lxc"]:
+            self.skipTest(
+                "This featureis not supported on existing\
+                        hypervisor. Hence, skipping the test")
+
         list_volumes_before = Volume.list(
             self.userapiclient,
             listall=self.services["listall"])
@@ -1068,6 +1070,12 @@ class TestVolumes(cloudstackTestCase):
         Step6: Listing snapshot policies for a volume created in step1 again
         Step7: Verifyign that the list snapshot policy length is increased by 1
         """
+
+        if self.hypervisor.lower() in ["hyperv", "lxc"]:
+            self.skipTest(
+                "This featureis not supported on existing\
+                        hypervisor. Hence, skipping the test")
+
         list_volumes_before = Volume.list(
             self.userapiclient,
             listall=self.services["listall"])
@@ -1199,6 +1207,12 @@ class TestVolumes(cloudstackTestCase):
         Step6: Listing snapshot policies for a volume created in step1 again
         Step7: Verifyign that the list snapshot policy length is increased by 1
         """
+
+        if self.hypervisor.lower() in ["hyperv", "lxc"]:
+            self.skipTest(
+                "This featureis not supported on existing\
+                        hypervisor. Hence, skipping the test")
+
         list_volumes_before = Volume.list(
             self.userapiclient,
             listall=self.services["listall"])
@@ -1334,6 +1348,11 @@ class TestVolumes(cloudstackTestCase):
         Step10:Verifying that the list snapshot policy length is decreased
                by 1
         """
+        if self.hypervisor.lower() in ["hyperv", "lxc"]:
+            self.skipTest(
+                "This featureis not supported on existing\
+                        hypervisor. Hence, skipping the test")
+
         list_volumes_before = Volume.list(
             self.userapiclient,
             listall=self.services["listall"])
@@ -1477,10 +1496,11 @@ class TestVolumes(cloudstackTestCase):
         Step11: Listign the snapshots from page 2 again and verifyign that
                 list returns none
         """
-        if self.hypervisor.lower() in ['hyperv']:
-            raise unittest.SkipTest(
+        if self.hypervisor.lower() in ["hyperv", "lxc"]:
+            self.skipTest(
                 "This featureis not supported on existing\
                         hypervisor. Hence, skipping the test")
+
         list_volumes_before = Volume.list(
             self.userapiclient,
             listall=self.services["listall"])
@@ -1780,16 +1800,10 @@ class TestVolumes(cloudstackTestCase):
         # Uploading a Volume
         volume_uploaded = Volume.upload(
             self.userapiclient,
-            self.services["upload_volume"],
+            self.services["configurableData"]["upload_volume"],
             self.zone.id
         )
         self.assertIsNotNone(volume_uploaded, "volume uploading failed")
-
-        self.assertEquals(
-            self.services["upload_volume"]["diskname"],
-            volume_uploaded.name,
-            "Uploaded volume name is not matching with name provided\
-            while uploading")
 
         # Listing the volumes for a user after uploading data volume
         list_volumes_after = Volume.list(
@@ -1820,7 +1834,7 @@ class TestVolumes(cloudstackTestCase):
               but not with size X
         """
         if self.hypervisor.lower() in ['hyperv']:
-            raise unittest.SkipTest(
+            self.skipTest(
                 "This featureis not supported on existing\
                         hypervisor. Hence, skipping the test")
         disk_offering = DiskOffering.create(

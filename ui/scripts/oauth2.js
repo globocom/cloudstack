@@ -20,7 +20,6 @@
 
         OAuth2: {
             authenticate: function(loginArgs, code, redirectUri) {
-
                 var haveSuccess = false, self = this;
                 // remove parameter code from url
                 history.replaceState(null, null, window.location.origin + window.location.pathname);
@@ -110,7 +109,6 @@
                 var code = $.urlParam("code"),
                     redirectUri = $.cookie('oauth_redirect'),
                     bypass;
-
                 if (code && redirectUri) {
                     // if there are code and redirectUri, make OAuth 2 authentication
                     return this.authenticate(loginArgs, code, redirectUri);

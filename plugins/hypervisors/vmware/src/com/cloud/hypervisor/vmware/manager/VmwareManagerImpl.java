@@ -16,39 +16,6 @@
 // under the License.
 package com.cloud.hypervisor.vmware.manager;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.rmi.RemoteException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import javax.ejb.Local;
-import javax.inject.Inject;
-import javax.naming.ConfigurationException;
-
-import org.apache.log4j.Logger;
-
-import com.vmware.vim25.AboutInfo;
-import com.vmware.vim25.ManagedObjectReference;
-
-import org.apache.cloudstack.api.command.admin.zone.AddVmwareDcCmd;
-import org.apache.cloudstack.api.command.admin.zone.ListVmwareDcsCmd;
-import org.apache.cloudstack.api.command.admin.zone.RemoveVmwareDcCmd;
-import org.apache.cloudstack.engine.subsystem.api.storage.DataStore;
-import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreManager;
-import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
-import org.apache.cloudstack.utils.identity.ManagementServerNode;
-
 import com.cloud.agent.AgentManager;
 import com.cloud.agent.Listener;
 import com.cloud.agent.api.AgentControlAnswer;
@@ -57,6 +24,7 @@ import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.Command;
 import com.cloud.agent.api.StartupCommand;
 import com.cloud.agent.api.StartupRoutingCommand;
+import com.cloud.api.query.dao.TemplateJoinDao;
 import com.cloud.cluster.ClusterManager;
 import com.cloud.cluster.ManagementServerHost;
 import com.cloud.cluster.dao.ManagementServerHostPeerDao;
@@ -92,6 +60,7 @@ import com.cloud.hypervisor.vmware.mo.HostFirewallSystemMO;
 import com.cloud.hypervisor.vmware.mo.HostMO;
 import com.cloud.hypervisor.vmware.mo.HypervisorHostHelper;
 import com.cloud.hypervisor.vmware.mo.VirtualEthernetCardType;
+import com.cloud.hypervisor.vmware.mo.VirtualSwitchType;
 import com.cloud.hypervisor.vmware.mo.VmwareHostType;
 import com.cloud.hypervisor.vmware.resource.VmwareContextFactory;
 import com.cloud.hypervisor.vmware.util.VmwareContext;
@@ -99,12 +68,18 @@ import com.cloud.hypervisor.vmware.util.VmwareHelper;
 import com.cloud.network.CiscoNexusVSMDeviceVO;
 import com.cloud.network.NetworkModel;
 import com.cloud.network.Networks.BroadcastDomainType;
+import com.cloud.network.Networks.TrafficType;
+import com.cloud.network.VmwareTrafficLabel;
 import com.cloud.network.dao.CiscoNexusVSMDeviceDao;
 import com.cloud.org.Cluster.ClusterType;
 import com.cloud.secstorage.CommandExecLogDao;
 import com.cloud.server.ConfigurationServer;
+import com.cloud.storage.ImageStoreDetailsUtil;
 import com.cloud.storage.JavaStorageLayer;
 import com.cloud.storage.StorageLayer;
+import com.cloud.storage.StorageManager;
+import com.cloud.storage.dao.VMTemplatePoolDao;
+import com.cloud.template.TemplateManager;
 import com.cloud.utils.FileUtil;
 import com.cloud.utils.NumbersUtil;
 import com.cloud.utils.Pair;
@@ -119,15 +94,51 @@ import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.script.Script;
 import com.cloud.utils.ssh.SshHelper;
 import com.cloud.vm.DomainRouterVO;
+import com.cloud.vm.dao.UserVmCloneSettingDao;
+import com.cloud.vm.dao.VMInstanceDao;
+import com.vmware.vim25.AboutInfo;
+import com.vmware.vim25.ManagedObjectReference;
+import org.apache.cloudstack.api.command.admin.zone.AddVmwareDcCmd;
+import org.apache.cloudstack.api.command.admin.zone.ListVmwareDcsCmd;
+import org.apache.cloudstack.api.command.admin.zone.RemoveVmwareDcCmd;
+import org.apache.cloudstack.engine.subsystem.api.storage.DataStore;
+import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreManager;
+import org.apache.cloudstack.framework.config.ConfigKey;
+import org.apache.cloudstack.framework.config.Configurable;
+import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
+import org.apache.cloudstack.framework.jobs.impl.AsyncJobManagerImpl;
+import org.apache.cloudstack.storage.datastore.db.PrimaryDataStoreDao;
+import org.apache.cloudstack.utils.identity.ManagementServerNode;
+import org.apache.log4j.Logger;
 
-@Local(value = {VmwareManager.class, VmwareDatacenterService.class})
-public class VmwareManagerImpl extends ManagerBase implements VmwareManager, VmwareStorageMount, Listener, VmwareDatacenterService {
+import javax.inject.Inject;
+import javax.naming.ConfigurationException;
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.rmi.RemoteException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+public class VmwareManagerImpl extends ManagerBase implements VmwareManager, VmwareStorageMount, Listener, VmwareDatacenterService, Configurable {
     private static final Logger s_logger = Logger.getLogger(VmwareManagerImpl.class);
 
-    private static final int STARTUP_DELAY = 60000;                 // 60 seconds
-    private static final long DEFAULT_HOST_SCAN_INTERVAL = 600000;     // every 10 minutes
+    private static final long SECONDS_PER_MINUTE = 60;
+    private static final int DEFAULT_PORTS_PER_DV_PORT_GROUP_VSPHERE4_x = 256;
+    private static final int DEFAULT_PORTS_PER_DV_PORT_GROUP = 8;
 
-    private long _hostScanInterval = DEFAULT_HOST_SCAN_INTERVAL;
     private int _timeout;
 
     private String _instance;
@@ -166,12 +177,26 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
     private ManagementServerHostPeerDao _mshostPeerDao;
     @Inject
     private ClusterManager _clusterMgr;
+    @Inject
+    private ImageStoreDetailsUtil imageStoreDetailsUtil;
+    @Inject
+    private PrimaryDataStoreDao primaryStorageDao;
+    @Inject
+    private VMTemplatePoolDao templateDataStoreDao;
+    @Inject
+    private TemplateJoinDao templateDao;
+    @Inject
+    private VMInstanceDao vmInstanceDao;
+    @Inject
+    private UserVmCloneSettingDao cloneSettingDao;
+    @Inject
+    private TemplateManager templateManager;
 
     private String _mountParent;
     private StorageLayer _storage;
     private final String _privateNetworkVSwitchName = "vSwitch0";
 
-    private int _portsPerDvPortGroup = 256;
+    private int _portsPerDvPortGroup = DEFAULT_PORTS_PER_DV_PORT_GROUP;
     private boolean _fullCloneFlag;
     private boolean _instanceNameFlag;
     private String _serviceConsoleName;
@@ -182,22 +207,32 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
     private int _additionalPortRangeSize;
     private int _routerExtraPublicNics = 2;
     private int _vCenterSessionTimeout = 1200000; // Timeout in milliseconds
-
     private String _rootDiskController = DiskControllerType.ide.toString();
 
-    private final Map<String, String> _storageMounts = new HashMap<String, String>();
+    private final String _dataDiskController = DiskControllerType.osdefault.toString();
+
+    private final Map<String, String> _storageMounts = new HashMap<>();
 
     private final Random _rand = new Random(System.currentTimeMillis());
 
+    private static ScheduledExecutorService templateCleanupScheduler = Executors.newScheduledThreadPool(1, new NamedThreadFactory("Vmware-FullyClonedTemplateCheck"));;
+
     private final VmwareStorageManager _storageMgr;
     private final GlobalLock _exclusiveOpLock = GlobalLock.getInternLock("vmware.exclusive.op");
-
-    private final ScheduledExecutorService _hostScanScheduler = Executors.newScheduledThreadPool(1, new NamedThreadFactory("Vmware-Host-Scan"));
 
     public VmwareManagerImpl() {
         _storageMgr = new VmwareStorageManagerImpl(this);
     }
 
+    @Override
+    public String getConfigComponentName() {
+        return VmwareManagerImpl.class.getSimpleName();
+    }
+
+    @Override
+    public ConfigKey<?>[] getConfigKeys() {
+        return new ConfigKey<?>[] {s_vmwareNicHotplugWaitTimeout, s_vmwareCleanOldWorderVMs, templateCleanupInterval, s_vmwareSearchExcludeFolder, s_vmwareOVAPackageTimeout};
+    }
     @Override
     public boolean configure(String name, Map<String, Object> params) throws ConfigurationException {
         s_logger.info("Configure VmwareManagerImpl, manager name: " + name);
@@ -246,8 +281,6 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
             _instanceNameFlag = Boolean.parseBoolean(value);
         }
 
-        _portsPerDvPortGroup = NumbersUtil.parseInt(_configDao.getValue(Config.VmwarePortsPerDVPortGroup.key()), _portsPerDvPortGroup);
-
         _serviceConsoleName = _configDao.getValue(Config.VmwareServiceConsole.key());
         if (_serviceConsoleName == null) {
             _serviceConsoleName = "Service Console";
@@ -292,10 +325,6 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
 
         s_logger.info("Additional VNC port allocation range is settled at " + _additionalPortRangeStart + " to " + (_additionalPortRangeStart + _additionalPortRangeSize));
 
-        value = _configDao.getValue("vmware.host.scan.interval");
-        _hostScanInterval = NumbersUtil.parseLong(value, DEFAULT_HOST_SCAN_INTERVAL);
-        s_logger.info("VmwareManagerImpl config - vmware.host.scan.interval: " + _hostScanInterval);
-
         ((VmwareStorageManagerImpl)_storageMgr).configure(params);
 
         _agentMgr.registerForHostEvents(this, true, true, true);
@@ -306,20 +335,20 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
 
     @Override
     public boolean start() {
-        _hostScanScheduler.scheduleAtFixedRate(getHostScanTask(), STARTUP_DELAY, _hostScanInterval, TimeUnit.MILLISECONDS);
+// Do not run empty task        _hostScanScheduler.scheduleAtFixedRate(getHostScanTask(), STARTUP_DELAY, _hostScanInterval, TimeUnit.MILLISECONDS);
+// but implement it first!
 
+        startTemplateCleanJobSchedule();
         startupCleanup(_mountParent);
+
+        s_logger.info("start done");
         return true;
     }
 
     @Override
     public boolean stop() {
-        _hostScanScheduler.shutdownNow();
-        try {
-            _hostScanScheduler.awaitTermination(3000, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-        }
-
+        s_logger.info("shutting down scheduled tasks");
+        templateCleanupScheduler.shutdown();
         shutdownCleanup();
         return true;
     }
@@ -350,20 +379,32 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
         }
 
         // prepare at least one network on the vswitch to enable OVF importing
-        String vSwitchName = privateTrafficLabel;
-        String vlanId = null;
-        String vlanToken;
-        String[] tokens = privateTrafficLabel.split(",");
-        if (tokens.length >= 2) {
-            vSwitchName = tokens[0].trim();
-            vlanToken = tokens[1].trim();
-            if (!vlanToken.isEmpty()) {
-                vlanId = vlanToken;
-            }
-        }
+        String vSwitchName;
+        String vlanId;
+        String vSwitchType;
+        VmwareTrafficLabel mgmtTrafficLabelObj = new VmwareTrafficLabel(privateTrafficLabel, TrafficType.Management);
+        vSwitchName = mgmtTrafficLabelObj.getVirtualSwitchName();
+        vlanId = mgmtTrafficLabelObj.getVlanId();
+        vSwitchType = mgmtTrafficLabelObj.getVirtualSwitchType().toString();
+
         s_logger.info("Preparing network on host " + hostMo.getContext().toString() + " for " + privateTrafficLabel);
-        //The management network is probably always going to be a physical network with vlans, so assume BroadcastDomainType VLAN
-        HypervisorHostHelper.prepareNetwork(vSwitchName, "cloud.private", hostMo, vlanId, null, null, 180000, false, BroadcastDomainType.Vlan, null);
+        VirtualSwitchType vsType = VirtualSwitchType.getType(vSwitchType);
+        //The management network is probably always going to be a physical network with islation type of vlans, so assume BroadcastDomainType VLAN
+        if (VirtualSwitchType.StandardVirtualSwitch == vsType) {
+            HypervisorHostHelper.prepareNetwork(vSwitchName, "cloud.private", hostMo, vlanId, null, null, 180000, false, BroadcastDomainType.Vlan, null, null);
+        }
+        else {
+            int portsPerDvPortGroup = _portsPerDvPortGroup;
+            AboutInfo about = hostMo.getHostAboutInfo();
+            if (about != null) {
+                String version = about.getApiVersion();
+                if (version != null && (version.equals("4.0") || version.equals("4.1")) && _portsPerDvPortGroup < DEFAULT_PORTS_PER_DV_PORT_GROUP_VSPHERE4_x) {
+                    portsPerDvPortGroup = DEFAULT_PORTS_PER_DV_PORT_GROUP_VSPHERE4_x;
+                }
+            }
+            HypervisorHostHelper.prepareNetwork(vSwitchName, "cloud.private", hostMo, vlanId, null, null, null, 180000,
+                    vsType, portsPerDvPortGroup, null, false, BroadcastDomainType.Vlan, null, null);
+        }
     }
 
     @Override
@@ -431,12 +472,14 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
     }
 
     @Override
-    public String getSecondaryStorageStoreUrl(long dcId) {
+    public Pair<String, Long> getSecondaryStorageStoreUrlAndId(long dcId) {
 
         String secUrl = null;
+        Long secId = null;
         DataStore secStore = _dataStoreMgr.getImageStore(dcId);
         if (secStore != null) {
             secUrl = secStore.getUri();
+            secId = secStore.getId();
         }
 
         if (secUrl == null) {
@@ -445,12 +488,13 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
             DataStore cacheStore = _dataStoreMgr.getImageCacheStore(dcId);
             if (cacheStore != null) {
                 secUrl = cacheStore.getUri();
+                secId = cacheStore.getId();
             } else {
                 s_logger.warn("No staging storage is found when non-NFS secondary storage is used");
             }
         }
 
-        return secUrl;
+        return new Pair<String, Long>(secUrl, secId);
     }
 
     @Override
@@ -478,6 +522,7 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
         params.put("service.console.name", _serviceConsoleName);
         params.put("management.portgroup.name", _managemetPortGroupName);
         params.put("vmware.root.disk.controller", _rootDiskController);
+        params.put("vmware.data.disk.controller", _dataDiskController);
         params.put("vmware.recycle.hung.wokervm", _recycleHungWorker);
         params.put("ports.per.dvportgroup", _portsPerDvPortGroup);
     }
@@ -508,7 +553,7 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
             return false;
         }
 
-        Long.parseLong(tokens[0]);
+        long startTick = Long.parseLong(tokens[0]);
         long msid = Long.parseLong(tokens[1]);
         long runid = Long.parseLong(tokens[2]);
 
@@ -524,21 +569,29 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
             return true;
         }
 
-        // disable time-out check until we have found out a VMware API that can check if
-        // there are pending tasks on the subject VM
-        /*
-                if(System.currentTimeMillis() - startTick > _hungWorkerTimeout) {
-                    if(s_logger.isInfoEnabled())
-                        s_logger.info("Worker VM expired, seconds elapsed: " + (System.currentTimeMillis() - startTick) / 1000);
-                    return true;
-                }
-         */
+        // this time-out check was disabled
+        // "until we have found out a VMware API that can check if there are pending tasks on the subject VM"
+        // but as we expire jobs and those stale worker VMs stay around untill an MS reboot we opt in to have them removed anyway
+        Instant start = Instant.ofEpochMilli(startTick);
+        Instant end = start.plusSeconds(2 * (AsyncJobManagerImpl.JobExpireMinutes.value() + AsyncJobManagerImpl.JobCancelThresholdMinutes.value()) * SECONDS_PER_MINUTE);
+        Instant now = Instant.now();
+        if(s_vmwareCleanOldWorderVMs.value() && now.isAfter(end)) {
+            if(s_logger.isInfoEnabled()) {
+                s_logger.info("Worker VM expired, seconds elapsed: " + Duration.between(start,now).getSeconds());
+            }
+            return true;
+        }
+        if (s_logger.isTraceEnabled()) {
+            s_logger.trace("Worker VM with tag '" + workerTag + "' does not need recycling, yet." +
+                    "But in " + Duration.between(now,end).getSeconds() + " seconds, though");
+        }
         return false;
     }
 
     @Override
-    public void prepareSecondaryStorageStore(String storageUrl) {
-        String mountPoint = getMountPoint(storageUrl);
+    public void prepareSecondaryStorageStore(String storageUrl, Long storeId) {
+        Integer nfsVersion = imageStoreDetailsUtil.getNfsVersion(storeId);
+        String mountPoint = getMountPoint(storageUrl, nfsVersion);
 
         GlobalLock lock = GlobalLock.getInternLock("prepare.systemvm");
         try {
@@ -632,21 +685,8 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
         return keyFile;
     }
 
-    private Runnable getHostScanTask() {
-        return new Runnable() {
-            @Override
-            public void run() {
-                // TODO scan vSphere for newly added hosts.
-                // we are going to both support adding host from CloudStack UI and
-                // adding host via vSphere server
-                //
-                // will implement host scanning later
-            }
-        };
-    }
-
     @Override
-    public String getMountPoint(String storageUrl) {
+    public String getMountPoint(String storageUrl, Integer nfsVersion) {
         String mountPoint = null;
         synchronized (_storageMounts) {
             mountPoint = _storageMounts.get(storageUrl);
@@ -661,7 +701,8 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
                 s_logger.error("Invalid storage URL format ", e);
                 throw new CloudRuntimeException("Unable to create mount point due to invalid storage URL format " + storageUrl);
             }
-            mountPoint = mount(uri.getHost() + ":" + uri.getPath(), _mountParent);
+
+            mountPoint = mount(uri.getHost() + ":" + uri.getPath(), _mountParent, nfsVersion);
             if (mountPoint == null) {
                 s_logger.error("Unable to create mount point for " + storageUrl);
                 return "/mnt/sec"; // throw new CloudRuntimeException("Unable to create mount point for " + storageUrl);
@@ -736,7 +777,7 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
         }
     }
 
-    protected String mount(String path, String parent) {
+    protected String mount(String path, String parent, Integer nfsVersion) {
         String mountPoint = setupMountPoint(parent);
         if (mountPoint == null) {
             s_logger.warn("Unable to create a mount point");
@@ -747,6 +788,9 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
         String result = null;
         Script command = new Script(true, "mount", _timeout, s_logger);
         command.add("-t", "nfs");
+        if (nfsVersion != null){
+            command.add("-o", "vers=" + nfsVersion);
+        }
         // command.add("-o", "soft,timeo=133,retrans=2147483647,tcp,acdirmax=0,acdirmin=0");
         if ("Mac OS X".equalsIgnoreCase(System.getProperty("os.name"))) {
             command.add("-o", "resvport");
@@ -823,6 +867,10 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
     }
 
     @Override
+    public void processHostAdded(long hostId) {
+    }
+
+    @Override
     public void processConnect(Host host, StartupCommand cmd, boolean forRebalance) {
         if (cmd instanceof StartupCommand) {
             if (host.getHypervisorType() == HypervisorType.VMware) {
@@ -861,6 +909,14 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
     @Override
     public boolean processDisconnect(long agentId, Status state) {
         return false;
+    }
+
+    @Override
+    public void processHostAboutToBeRemoved(long hostId) {
+    }
+
+    @Override
+    public void processHostRemoved(long hostId, long clusterId) {
     }
 
     @Override
@@ -928,6 +984,11 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
     @Override
     public String getRootDiskController() {
         return _rootDiskController;
+    }
+
+    @Override
+    public String getDataDiskController() {
+        return _dataDiskController;
     }
 
     @Override
@@ -1074,8 +1135,8 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
     @Override
     public boolean removeVmwareDatacenter(RemoveVmwareDcCmd cmd) throws ResourceInUseException {
         Long zoneId = cmd.getZoneId();
-        // Validate zone
-        validateZone(zoneId);
+        // Validate Id of zone
+        doesZoneExist(zoneId);
         // Zone validation to check if the zone already has resources.
         // Association of VMware DC to zone is not allowed if zone already has resources added.
         validateZoneWithResources(zoneId, "remove VMware datacenter to zone");
@@ -1143,10 +1204,7 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
 
     private void validateZone(Long zoneId) throws InvalidParameterValueException {
         // Check if zone with specified id exists
-        DataCenterVO zone = _dcDao.findById(zoneId);
-        if (zone == null) {
-            throw new InvalidParameterValueException("Can't find zone by the id specified.");
-        }
+        doesZoneExist(zoneId);
         // Check if zone is legacy zone
         if (isLegacyZone(zoneId)) {
             throw new InvalidParameterValueException("The specified zone is legacy zone. Adding VMware datacenter to legacy zone is not supported.");
@@ -1189,7 +1247,7 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
         long vmwareDcId;
 
         // Validate if zone id parameter passed to API is valid
-        validateZone(zoneId);
+        doesZoneExist(zoneId);
 
         // Check if zone is associated with VMware DC
         vmwareDcZoneMap = _vmwareDcZoneMapDao.findByZoneId(zoneId);
@@ -1206,6 +1264,17 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
         return vmwareDcList;
     }
 
+    private void doesZoneExist(Long zoneId) throws InvalidParameterValueException {
+        // Check if zone with specified id exists
+        DataCenterVO zone = _dcDao.findById(zoneId);
+        if (zone == null) {
+            throw new InvalidParameterValueException("Can't find zone by the id specified.");
+        }
+        if (s_logger.isTraceEnabled()) {
+            s_logger.trace("Zone with id:[" + zoneId + "] exists.");
+        }
+    }
+
     @Override
     public boolean hasNexusVSM(Long clusterId) {
         ClusterVSMMapVO vsmMapVo = null;
@@ -1219,5 +1288,57 @@ public class VmwareManagerImpl extends ManagerBase implements VmwareManager, Vmw
             s_logger.info("An instance of Nexus 1000v VSM [Id:" + vsmMapVo.getVsmId() + "] associated with this cluster [Id:" + clusterId + "]");
             return true;
         }
+    }
+
+    private void startTemplateCleanJobSchedule() {
+        if(s_logger.isDebugEnabled()) {
+            s_logger.debug("checking to see if we should schedule a job to search for fully cloned templates to clean-up");
+        }
+        if(StorageManager.StorageCleanupEnabled.value() &&
+                StorageManager.TemplateCleanupEnabled.value() &&
+                templateCleanupInterval.value() > 0) {
+            try {
+                if (s_logger.isInfoEnabled()) {
+                    s_logger.info("scheduling job to search for fully cloned templates to clean-up once per " + templateCleanupInterval.value() + " minutes.");
+                }
+//                    futureTemplateCleanup =
+                Runnable task = getCleanupFullyClonedTemplatesTask();
+                templateCleanupScheduler.scheduleAtFixedRate(task,
+                        templateCleanupInterval.value(),
+                        templateCleanupInterval.value(),
+                        TimeUnit.MINUTES);
+                if (s_logger.isTraceEnabled()) {
+                    s_logger.trace("scheduled job to search for fully cloned templates to clean-up.");
+                }
+            } catch (RejectedExecutionException ree) {
+                s_logger.error("job to search for fully cloned templates cannot be scheduled");
+                s_logger.debug("job to search for fully cloned templates cannot be scheduled;", ree);
+            } catch (NullPointerException npe) {
+                s_logger.error("job to search for fully cloned templates is invalid");
+                s_logger.debug("job to search for fully cloned templates is invalid;", npe);
+            } catch (IllegalArgumentException iae) {
+                s_logger.error("job to search for fully cloned templates is scheduled at invalid intervals");
+                s_logger.debug("job to search for fully cloned templates is scheduled at invalid intervals;", iae);
+            } catch (Exception e) {
+                s_logger.error("job to search for fully cloned templates failed for unknown reasons");
+                s_logger.debug("job to search for fully cloned templates failed for unknown reasons;", e);
+            }
+        }
+    }
+
+    /**
+     * This task is to cleanup templates from primary storage that are otherwise not cleaned by the {@link com.cloud.storage.StorageManagerImpl.StorageGarbageCollector}.
+     * it is called at regular intervals when storage.template.cleanup.enabled == true
+     * It collect all templates that
+     * - are deleted from cloudstack
+     * - when vmware.create.full.clone == true and the entries for VMs having volumes on the primary storage in db table “user_vm_clone_setting” reads 'full'
+     */
+    private Runnable getCleanupFullyClonedTemplatesTask() {
+        return new CleanupFullyClonedTemplatesTask(primaryStorageDao,
+                templateDataStoreDao,
+                templateDao,
+                vmInstanceDao,
+                cloneSettingDao,
+                templateManager);
     }
 }

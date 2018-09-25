@@ -19,10 +19,9 @@ package com.cloud.network;
 import java.util.List;
 import java.util.Map;
 
-import javax.ejb.Local;
 import javax.naming.ConfigurationException;
 
-import org.apache.cloudstack.api.command.user.firewall.ListFirewallRulesCmd;
+import org.apache.cloudstack.api.command.user.firewall.IListFirewallRulesCmd;
 
 import com.cloud.exception.NetworkRuleConflictException;
 import com.cloud.exception.ResourceUnavailableException;
@@ -38,7 +37,6 @@ import com.cloud.user.Account;
 import com.cloud.utils.Pair;
 import com.cloud.utils.component.ManagerBase;
 
-@Local(value = {FirewallManager.class, FirewallService.class})
 public class MockFirewallManagerImpl extends ManagerBase implements FirewallManager, FirewallService {
 
     @Override
@@ -64,7 +62,7 @@ public class MockFirewallManagerImpl extends ManagerBase implements FirewallMana
     }
 
     @Override
-    public Pair<List<? extends FirewallRule>, Integer> listFirewallRules(ListFirewallRulesCmd cmd) {
+    public Pair<List<? extends FirewallRule>, Integer> listFirewallRules(IListFirewallRulesCmd cmd) {
         // TODO Auto-generated method stub
         return null;
     }

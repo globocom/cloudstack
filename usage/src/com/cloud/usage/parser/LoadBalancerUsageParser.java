@@ -99,6 +99,7 @@ public class LoadBalancerUsageParser {
             }
 
             if (lbCreateDate.after(endDate)) {
+                //Ignore records created after endDate
                 continue;
             }
 

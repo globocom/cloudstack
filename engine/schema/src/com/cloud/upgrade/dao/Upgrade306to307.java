@@ -17,7 +17,7 @@
 
 package com.cloud.upgrade.dao;
 
-import java.io.File;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -26,9 +26,8 @@ import java.sql.SQLException;
 import org.apache.log4j.Logger;
 
 import com.cloud.utils.exception.CloudRuntimeException;
-import com.cloud.utils.script.Script;
 
-public class Upgrade306to307 extends Upgrade30xBase implements DbUpgrade {
+public class Upgrade306to307 extends Upgrade30xBase {
     final static Logger s_logger = Logger.getLogger(Upgrade306to307.class);
 
     @Override
@@ -47,13 +46,14 @@ public class Upgrade306to307 extends Upgrade30xBase implements DbUpgrade {
     }
 
     @Override
-    public File[] getPrepareScripts() {
-        String script = Script.findScript("", "db/schema-306to307.sql");
+    public InputStream[] getPrepareScripts() {
+        final String scriptFile = "META-INF/db/schema-306to307.sql";
+        final InputStream script = Thread.currentThread().getContextClassLoader().getResourceAsStream(scriptFile);
         if (script == null) {
-            throw new CloudRuntimeException("Unable to find db/schema-306to307.sql");
+            throw new CloudRuntimeException("Unable to find " + scriptFile);
         }
 
-        return new File[] {new File(script)};
+        return new InputStream[] {script};
     }
 
     @Override
@@ -62,8 +62,7 @@ public class Upgrade306to307 extends Upgrade30xBase implements DbUpgrade {
     }
 
     @Override
-    public File[] getCleanupScripts() {
-
+    public InputStream[] getCleanupScripts() {
         return null;
     }
 
@@ -97,20 +96,11 @@ public class Upgrade306to307 extends Upgrade30xBase implements DbUpgrade {
             pstmt = conn.prepareStatement("drop table `cloud`.`network_details`");
             pstmt.executeUpdate();
         } catch (SQLException e) {
+            s_logger.info("[ignored] error during network offering update:" + e.getLocalizedMessage(), e);
         } finally {
-            try {
-                if (rs != null) {
-                    rs.close();
-                }
-
-                if (rs1 != null) {
-                    rs1.close();
-                }
-                if (pstmt != null) {
-                    pstmt.close();
-                }
-            } catch (SQLException e) {
-            }
+            closeAutoCloseable(rs);
+            closeAutoCloseable(rs1);
+            closeAutoCloseable(pstmt);
         }
     }
 

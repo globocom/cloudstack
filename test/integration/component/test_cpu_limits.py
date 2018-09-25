@@ -37,56 +37,7 @@ from marvin.lib.utils import cleanup_resources
 from marvin.codes import ERROR_NO_HOST_FOR_MIGRATION
 
 
-class Services:
-    """Test resource limit services
-    """
 
-    def __init__(self):
-        self.services = {
-                        "account": {
-                                "email": "test@test.com",
-                                "firstname": "Test",
-                                "lastname": "User",
-                                "username": "resource",
-                                # Random characters are appended for unique
-                                # username
-                                "password": "password",
-                         },
-                         "service_offering": {
-                                "name": "Tiny Instance",
-                                "displaytext": "Tiny Instance",
-                                "cpunumber": 4,
-                                "cpuspeed": 100,    # in MHz
-                                "memory": 128,    # In MBs
-                        },
-                        "virtual_machine": {
-                                "displayname": "TestVM",
-                                "username": "root",
-                                "password": "password",
-                                "ssh_port": 22,
-                                "hypervisor": 'KVM',
-                                "privateport": 22,
-                                "publicport": 22,
-                                "protocol": 'TCP',
-                                },
-                         "network": {
-                                "name": "Test Network",
-                                "displaytext": "Test Network",
-                                "netmask": '255.255.255.0'
-                                },
-                         "project": {
-                                "name": "Project",
-                                "displaytext": "Test project",
-                                },
-                         "domain": {
-                                "name": "Domain",
-                                },
-                        "ostype": 'CentOS 5.3 (64-bit)',
-                        "sleep": 60,
-                        "timeout": 10,
-                        "mode": 'advanced',
-                        # Networking mode: Advanced, Basic
-                    }
 
 class TestCPULimits(cloudstackTestCase):
 
@@ -94,24 +45,24 @@ class TestCPULimits(cloudstackTestCase):
     def setUpClass(cls):
         cls.testClient = super(TestCPULimits, cls).getClsTestClient()
         cls.api_client = cls.testClient.getApiClient()
-
-        cls.services = Services().services
+        cls.testdata = cls.testClient.getParsedTestDataConfig()
+        #cls.services = Services().services
         # Get Zone, Domain and templates
         cls.domain = get_domain(cls.api_client)
         cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
-        cls.services["mode"] = cls.zone.networktype
+        cls.testdata["mode"] = cls.zone.networktype
+        #cls.services["mode"] = cls.zone.networktype
 
         cls.template = get_template(
                             cls.api_client,
                             cls.zone.id,
-                            cls.services["ostype"]
+                            cls.testdata["ostype"]
                             )
-
-        cls.services["virtual_machine"]["zoneid"] = cls.zone.id
+        cls.testdata["virtual_machine"]["zoneid"] = cls.zone.id
 
         cls.service_offering = ServiceOffering.create(
                                             cls.api_client,
-                                            cls.services["service_offering"]
+                                            cls.testdata["service_offering_multiple_cores"]
                                             )
 
         cls._cleanup = [cls.service_offering, ]
@@ -131,7 +82,7 @@ class TestCPULimits(cloudstackTestCase):
         self.dbclient = self.testClient.getDbConnection()
         self.account = Account.create(
                             self.apiclient,
-                            self.services["account"],
+                            self.testdata["account"],
                             admin=True
                             )
 
@@ -161,7 +112,7 @@ class TestCPULimits(cloudstackTestCase):
         try:
             vm = VirtualMachine.create(
                     api_client,
-                    self.services["virtual_machine"],
+                    self.testdata["virtual_machine"],
                     templateid=self.template.id,
                     accountid=self.account.name,
                     domainid=self.account.domainid,
@@ -194,7 +145,7 @@ class TestCPULimits(cloudstackTestCase):
                               )
         resource_count = account_list[0].cputotal
 
-        expected_resource_count = int(self.services["service_offering"]["cpunumber"])
+        expected_resource_count = int(self.service_offering.cpunumber)
 
         self.assertEqual(resource_count, expected_resource_count,
                          "Resource count should match with the expected resource count")
@@ -240,6 +191,9 @@ class TestCPULimits(cloudstackTestCase):
         # 1. Deploy VM with multiple core CPU & verify the usage
         # 2. Migrate VM & verify updated resource count of Root Admin Account
         # 3. Resource count should list properly.
+        self.hypervisor = self.testClient.getHypervisorInfo()
+        if self.hypervisor.lower() in ['lxc']:
+            self.skipTest("vm migrate is not supported in %s" % self.hypervisor)
 
         account_list = Account.list(self.apiclient, id=self.account.id)
         self.assertIsInstance(account_list,
@@ -248,7 +202,7 @@ class TestCPULimits(cloudstackTestCase):
                               )
         resource_count = account_list[0].cputotal
 
-        expected_resource_count = int(self.services["service_offering"]["cpunumber"])
+        expected_resource_count = int(self.service_offering.cpunumber)
 
         self.assertEqual(resource_count, expected_resource_count,
                          "Resource count should match with the expected resource count")
@@ -289,7 +243,7 @@ class TestCPULimits(cloudstackTestCase):
                               )
         resource_count = account_list[0].cputotal
 
-        expected_resource_count = int(self.services["service_offering"]["cpunumber"])
+        expected_resource_count = int(self.service_offering.cpunumber)
 
         self.assertEqual(resource_count, expected_resource_count,
                          "Resource count should match with the expected resource count")
@@ -326,7 +280,7 @@ class TestCPULimits(cloudstackTestCase):
         self.debug("Creating service offering with 4 CPU cores")
         self.service_offering = ServiceOffering.create(
                                             self.apiclient,
-                                            self.services["service_offering"]
+                                            self.testdata["service_offering_multiple_cores"]
                                             )
         # Adding to cleanup list after execution
         self.cleanup.append(self.service_offering)
@@ -344,7 +298,7 @@ class TestCPULimits(cloudstackTestCase):
                               )
         resource_count = account_list[0].cputotal
 
-        expected_resource_count = int(self.services["service_offering"]["cpunumber"]) * 4 #Total 4 Vms
+        expected_resource_count = int(self.service_offering.cpunumber) * 4 #Total 4 Vms
         self.assertTrue(resource_count == expected_resource_count,
                          "Resource count does not match the expected vavlue")
         return
@@ -355,25 +309,26 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
     def setUpClass(cls):
         cls.testClient = super(TestDomainCPULimitsConfiguration, cls).getClsTestClient()
         cls.api_client = cls.testClient.getApiClient()
+        cls.testdata = cls.testClient.getParsedTestDataConfig()
 
-        cls.services = Services().services
+        #cls.services = Services().services
         # Get Zone, Domain and templates
         cls.domain = get_domain(cls.api_client)
         cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
 
-        cls.services["mode"] = cls.zone.networktype
+        cls.testdata["mode"] = cls.zone.networktype
         cls.template = get_template(
                             cls.api_client,
                             cls.zone.id,
-                            cls.services["ostype"]
+                            cls.testdata["ostype"]
                             )
 
         cls.service_offering = ServiceOffering.create(
                                             cls.api_client,
-                                            cls.services["service_offering"]
+                                            cls.testdata["service_offering_multiple_cores"]
                                             )
 
-        cls.services["virtual_machine"]["zoneid"] = cls.zone.id
+        cls.testdata["virtual_machine"]["zoneid"] = cls.zone.id
 
         cls._cleanup = [cls.service_offering, ]
         return
@@ -412,7 +367,7 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
         try:
             vm = VirtualMachine.create(
                     api_client,
-                    self.services["virtual_machine"],
+                    self.testdata["virtual_machine"],
                     templateid=self.template.id,
                     accountid=self.account.name,
                     domainid=self.account.domainid,
@@ -433,12 +388,12 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
         self.debug("Creating a sub-domain under: %s" % self.domain.name)
         self.child_domain_1 = Domain.create(
             self.apiclient,
-            services=self.services["domain"],
+            services=self.testdata["domain"],
             parentdomainid=self.domain.id
         )
         self.child_do_admin_1 = Account.create(
             self.apiclient,
-            self.services["account"],
+            self.testdata["account"],
             admin=True,
             domainid=self.child_domain_1.id
         )
@@ -448,13 +403,13 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
 
         self.child_domain_2 = Domain.create(
             self.apiclient,
-            services=self.services["domain"],
+            services=self.testdata["domain"],
             parentdomainid=self.domain.id
         )
 
         self.child_do_admin_2 = Account.create(
             self.apiclient,
-            self.services["account"],
+            self.testdata["account"],
             admin=True,
             domainid=self.child_domain_2.id
         )
@@ -499,7 +454,7 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
         )
         resource_count = account_list[0].cputotal
 
-        expected_resource_count = int(self.services["service_offering"]["cpunumber"])
+        expected_resource_count = int(self.service_offering.cpunumber)
 
         self.assertEqual(resource_count, expected_resource_count,
             "Initial resource count should match with the expected resource count")
@@ -546,6 +501,9 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
         # 2. List Resource count
         # 3. Migrate instance to another host
         # 4. Resource count should list properly.
+        self.hypervisor = self.testClient.getHypervisorInfo()
+        if self.hypervisor.lower() in ['lxc']:
+            self.skipTest("vm migrate is not supported in %s" % self.hypervisor)
 
         self.debug("Setting up account and domain hierarchy")
         self.setupAccounts()
@@ -571,7 +529,7 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
         )
         resource_count = account_list[0].cputotal
 
-        expected_resource_count = int(self.services["service_offering"]["cpunumber"])
+        expected_resource_count = int(self.service_offering.cpunumber)
 
         self.assertEqual(resource_count, expected_resource_count,
             "Initial resource count should with the expected resource count")
@@ -631,7 +589,7 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
         )
         resource_count = account_list[0].cputotal
 
-        expected_resource_count = int(self.services["service_offering"]["cpunumber"])
+        expected_resource_count = int(self.service_offering.cpunumber)
 
         self.assertEqual(resource_count, expected_resource_count,
             "Initial resource count should match with the expected resource count")
@@ -665,7 +623,7 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
         self.debug("Creating service offering with 4 CPU cores")
         self.service_offering = ServiceOffering.create(
                                             self.apiclient,
-                                            self.services["service_offering"]
+                                            self.testdata["service_offering_multiple_cores"]
                                             )
         # Adding to cleanup list after execution
         self.cleanup.append(self.service_offering)
@@ -710,7 +668,7 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
             )
             resource_count = account_list[0].cputotal
 
-            expected_resource_count = int(self.services["service_offering"]["cpunumber"]) * 4 #Total 4 vms
+            expected_resource_count = int(self.service_offering.cpunumber) * 4 #Total 4 vms
 
             self.assertEqual(resource_count, expected_resource_count,
                 "Initial resource count should with the expected resource count")
@@ -728,7 +686,7 @@ class TestDomainCPULimitsConfiguration(cloudstackTestCase):
             )
             resource_count_after_delete = account_list[0].cputotal
 
-            expected_resource_count -= int(self.services["service_offering"]["cpunumber"])
+            expected_resource_count -= int(self.service_offering.cpunumber)
 
             self.assertEqual(resource_count_after_delete, expected_resource_count,
                 "Resource count should be less than before after deleting the instance")

@@ -17,6 +17,7 @@
 
 package com.globo.globonetwork.cloudstack.manager;
 
+import com.cloud.domain.Domain;
 import com.cloud.exception.InsufficientVirtualNetworkCapacityException;
 import com.cloud.network.dao.LoadBalancerDao;
 import com.cloud.network.dao.LoadBalancerOptionsDao;
@@ -76,7 +77,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -245,7 +245,6 @@ import com.globo.globonetwork.cloudstack.response.GloboNetworkVipResponse.Real;
 import com.globo.globonetwork.cloudstack.response.GloboNetworkVlanResponse;
 
 @Component
-@Local({GloboNetworkService.class, PluggableService.class})
 public class GloboNetworkManager implements GloboNetworkService, PluggableService, Configurable {
 
     private static final Logger s_logger = Logger.getLogger(GloboNetworkManager.class);
@@ -632,9 +631,11 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
             public Network doInTransaction(TransactionStatus status) throws CloudException {
                 Boolean newSubdomainAccess = subdomainAccess;
                 Long sharedDomainId = null;
+                Domain domain = null;
                 if (isDomainSpecific) {
                     if (domainId != null) {
                         sharedDomainId = domainId;
+                        domain = _domainDao.findById(domainId);
                     } else {
                         sharedDomainId = owner.getDomainId();
                         newSubdomainAccess = true;
@@ -648,8 +649,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                 }
 
                 Network network = _networkMgr.createGuestNetwork(networkOfferingId.longValue(), vlanResponse.getVlanName(), vlanResponse.getVlanDescription(), gateway, cidr,
-                        String.valueOf(vlanResponse.getVlanNum()), newNetworkDomain, owner, sharedDomainId, pNtwk, zone.getId(), aclType, newSubdomainAccess, null, // vpcId,
-                        ip6Gateway, ip6Cidr, displayNetwork, null // isolatedPvlan
+                        String.valueOf(vlanResponse.getVlanNum()), false, newNetworkDomain, owner, sharedDomainId, pNtwk, zone.getId(), aclType, newSubdomainAccess, null, // vpcId,
+                        ip6Gateway, ip6Cidr, displayNetwork, null, null // isolatedPvlan
                         );
 
                 // Save relashionship with napi and network
@@ -658,8 +659,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
                 // if (caller.getType() == Account.ACCOUNT_TYPE_ADMIN || caller.getType() == Account.ACCOUNT_TYPE_DOMAIN_ADMIN) {
                 // Create vlan ip range
-                _configMgr.createVlanAndPublicIpRange(pNtwk.getDataCenterId(), network.getId(), physicalNetworkId, false, (Long)null, startIP, endIP, gateway, netmask,
-                        vlanNum.toString(), null, startIPv6, endIPv6, ip6Gateway, ip6Cidr);
+                _configMgr.createVlanAndPublicIpRange(pNtwk.getDataCenterId(), network.getId(), physicalNetworkId, false, false, (Long)null, startIP, endIP, gateway, netmask,
+                        vlanNum.toString(), false, domain, null, startIPv6, endIPv6, ip6Gateway, ip6Cidr);
                 // }
                 return network;
             }
@@ -762,7 +763,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         BigInteger ipRangeEnd;
 
         if (vlanResponse.isv6()) {
-            com.googlecode.ipv6.IPv6Address ipv6 = com.googlecode.ipv6.IPv6Address.fromString(nicProfile.getIp6Address());
+            com.googlecode.ipv6.IPv6Address ipv6 = com.googlecode.ipv6.IPv6Address.fromString(nicProfile.getIPv6Address());
             try {
                 ip = new BigInteger(ipv6.toInetAddress().getAddress());
 
@@ -776,17 +777,17 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                 com.googlecode.ipv6.IPv6Address ipv6End = ipv6Network.getLast();
                 ipRangeEnd = new BigInteger(ipv6End.toInetAddress().getAddress());
             } catch (UnknownHostException ex) {
-                throw new InvalidParameterValueException("Nic IP " + nicProfile.getIp6Address() + " is invalid");
+                throw new InvalidParameterValueException("Nic IP " + nicProfile.getIPv6Address() + " is invalid");
             }
         } else {
-            ip = BigInteger.valueOf(NetUtils.ip2Long(nicProfile.getIp4Address()));
+            ip = BigInteger.valueOf(NetUtils.ip2Long(nicProfile.getIPv4Address()));
             String ranges[] = NetUtils.ipAndNetMaskToRange(networkAddress, netmask);
             ipRangeStart = BigInteger.valueOf(NetUtils.ip2Long(ranges[0]));
             ipRangeEnd = BigInteger.valueOf(NetUtils.ip2Long(ranges[1]));
         }
 
         if (!(ip.compareTo(ipRangeStart) >= 0  && ip.compareTo(ipRangeEnd) <= 0)) {
-            throw new InvalidParameterValueException("Nic IP " + nicProfile.getIp4Address() + " does not belong to network " + networkAddress + " in vlanId " + cmd.getVlanId());
+            throw new InvalidParameterValueException("Nic IP " + nicProfile.getIPv4Address() + " does not belong to network " + networkAddress + " in vlanId " + cmd.getVlanId());
         }
 
         // everything is ok
@@ -1410,10 +1411,10 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         }
 
         RegisterEquipmentAndIpInGloboNetworkCommand cmd = new RegisterEquipmentAndIpInGloboNetworkCommand();
-        if (nic.getIp4Address() != null) {
-            cmd.setNicIp(nic.getIp4Address());
+        if (nic.getIPv4Address() != null) {
+            cmd.setNicIp(nic.getIPv4Address());
         } else {
-            cmd.setNicIp(nic.getIp6Address());
+            cmd.setNicIp(nic.getIPv6Address());
         }
 
         SimpleDateFormat format = new SimpleDateFormat("dd-MM-YYYY-HH:mm:ss");
@@ -1458,11 +1459,11 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         }
 
         UnregisterEquipmentAndIpInGloboNetworkCommand cmd = new UnregisterEquipmentAndIpInGloboNetworkCommand();
-        if (nic.getIp4Address() != null) {
-            cmd.setNicIp(nic.getIp4Address());
+        if (nic.getIPv4Address() != null) {
+            cmd.setNicIp(nic.getIPv4Address());
             cmd.setIsv6(false);
         } else {
-            cmd.setNicIp(nic.getIp6Address());
+            cmd.setNicIp(nic.getIPv6Address());
             cmd.setIsv6(true);
         }
         cmd.setVmName(getEquipNameFromUuid(vm.getUuid()));
@@ -1611,7 +1612,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                         continue;
                     }
                 } else {
-                    if (!NetUtils.isIpWithtInCidrRange(real.getIp(), network.getCidr())) {
+                    if (!NetUtils.isIpWithInCidrRange(real.getIp(), network.getCidr())) {
                         continue;
                     }
                 }
@@ -2103,10 +2104,10 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         UserVmVO vm = _userVmDao.findById(nic.getInstanceId());
         Network network = _networkService.getNetwork(nic.getNetworkId());
 
-        s_logger.debug("VM : " + vm.getHostName() + "nic: " + nic.getIp4Address());
+        s_logger.debug("VM : " + vm.getHostName() + "nic: " + nic.getIPv4Address());
 
-        boolean isIpv6 = nic.getIp4Address() == null;
-        String ipAddress = isIpv6 ? nic.getIp6Address() : nic.getIp4Address();
+        boolean isIpv6 = nic.getIPv4Address() == null;
+        String ipAddress = isIpv6 ? nic.getIPv6Address() : nic.getIPv4Address();
 
 
         boolean forceDomainRegister = true; //here user is forcing to register, so if fail, the user should get exception
@@ -2457,7 +2458,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                         continue;
                     }
                     instancesToAdd.add(nic.getInstanceId());
-                    vmIdIpMap.put(nic.getInstanceId(), Arrays.asList(nic.getIp4Address()));
+                    vmIdIpMap.put(nic.getInstanceId(), Arrays.asList(nic.getIPv4Address()));
                 }
                 _lbService.assignToLoadBalancer(lb.getId(), instancesToAdd, vmIdIpMap);
 

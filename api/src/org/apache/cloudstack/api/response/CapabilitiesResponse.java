@@ -16,18 +16,21 @@
 // under the License.
 package org.apache.cloudstack.api.response;
 
-import com.google.gson.annotations.SerializedName;
-
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseResponse;
 
 import com.cloud.serializer.Param;
+import com.google.gson.annotations.SerializedName;
 
 @SuppressWarnings("unused")
 public class CapabilitiesResponse extends BaseResponse {
     @SerializedName("securitygroupsenabled")
     @Param(description = "true if security groups support is enabled, false otherwise")
     private boolean securityGroupsEnabled;
+
+    @SerializedName("dynamicrolesenabled")
+    @Param(description = "true if dynamic role-based api checker is enabled, false otherwise")
+    private boolean dynamicRolesEnabled;
 
     @SerializedName("cloudstackversion")
     @Param(description = "version of the cloud stack")
@@ -73,8 +76,20 @@ public class CapabilitiesResponse extends BaseResponse {
     @Param(description = "Max allowed number of api requests within the specified interval")
     private Integer apiLimitMax;
 
+    @SerializedName("allowuserviewdestroyedvm")
+    @Param(description = "true if the user is allowed to view destroyed virtualmachines, false otherwise", since = "4.6.0")
+    private boolean allowUserViewDestroyedVM;
+
+    @SerializedName("allowuserexpungerecovervm")
+    @Param(description = "true if the user can recover and expunge virtualmachines, false otherwise", since = "4.6.0")
+    private boolean allowUserExpungeRecoverVM;
+
     public void setSecurityGroupsEnabled(boolean securityGroupsEnabled) {
         this.securityGroupsEnabled = securityGroupsEnabled;
+    }
+
+    public void setDynamicRolesEnabled(boolean dynamicRolesEnabled) {
+        this.dynamicRolesEnabled = dynamicRolesEnabled;
     }
 
     public void setCloudStackVersion(String cloudStackVersion) {
@@ -121,4 +136,11 @@ public class CapabilitiesResponse extends BaseResponse {
         this.apiLimitMax = apiLimitMax;
     }
 
+    public void setAllowUserViewDestroyedVM(boolean allowUserViewDestroyedVM) {
+        this.allowUserViewDestroyedVM = allowUserViewDestroyedVM;
+    }
+
+    public void setAllowUserExpungeRecoverVM(boolean allowUserExpungeRecoverVM) {
+        this.allowUserExpungeRecoverVM = allowUserExpungeRecoverVM;
+    }
 }

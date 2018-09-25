@@ -24,9 +24,8 @@ import java.util.List;
 
 import javax.inject.Inject;
 
-import com.cloud.storage.Storage;
-import junit.framework.TestCase;
-
+import org.apache.cloudstack.lb.ApplicationLoadBalancerRuleVO;
+import org.apache.cloudstack.network.lb.InternalLoadBalancerVMManager;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -34,9 +33,6 @@ import org.mockito.Matchers;
 import org.mockito.Mockito;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-
-import org.apache.cloudstack.lb.ApplicationLoadBalancerRuleVO;
-import org.apache.cloudstack.network.lb.InternalLoadBalancerVMManager;
 
 import com.cloud.agent.AgentManager;
 import com.cloud.agent.api.Answer;
@@ -60,6 +56,8 @@ import com.cloud.offerings.NetworkOfferingVO;
 import com.cloud.offerings.dao.NetworkOfferingDao;
 import com.cloud.service.ServiceOfferingVO;
 import com.cloud.service.dao.ServiceOfferingDao;
+import com.cloud.storage.Storage;
+import com.cloud.storage.Storage.ProvisioningType;
 import com.cloud.user.AccountManager;
 import com.cloud.user.AccountVO;
 import com.cloud.utils.component.ComponentContext;
@@ -73,6 +71,8 @@ import com.cloud.vm.VirtualMachine.State;
 import com.cloud.vm.VirtualMachineManager;
 import com.cloud.vm.dao.DomainRouterDao;
 import com.cloud.vm.dao.NicDao;
+
+import junit.framework.TestCase;
 
 /**
  * Set of unittests for InternalLoadBalancerVMManager
@@ -125,22 +125,22 @@ public class InternalLBVMManagerTest extends TestCase {
         list.add(off);
         list.add(off);
         Mockito.when(_svcOffDao.createSystemServiceOfferings(Matchers.anyString(), Matchers.anyString(), Matchers.anyInt(), Matchers.anyInt(), Matchers.anyInt(),
-                Matchers.anyInt(), Matchers.anyInt(), Matchers.anyBoolean(), Matchers.anyString(), Matchers.any(Storage.ProvisioningType.class), Matchers.anyBoolean(),
+                Matchers.anyInt(), Matchers.anyInt(), Matchers.anyBoolean(), Matchers.anyString(), Matchers.any(ProvisioningType.class), Matchers.anyBoolean(),
                 Matchers.anyString(), Matchers.anyBoolean(), Matchers.any(VirtualMachine.Type.class), Matchers.anyBoolean())).thenReturn(list);
 
         ComponentContext.initComponentsLifeCycle();
 
         vm =
-            new DomainRouterVO(1L, off.getId(), 1, "alena", 1, HypervisorType.XenServer, 1, 1, 1, false, 0, false, null, false, false,
-                VirtualMachine.Type.InternalLoadBalancerVm, null);
+                new DomainRouterVO(1L, off.getId(), 1, "alena", 1, HypervisorType.XenServer, 1, 1, 1, 1, false, null, false, false,
+                        VirtualMachine.Type.InternalLoadBalancerVm, null);
         vm.setRole(Role.INTERNAL_LB_VM);
         vm = setId(vm, 1);
         vm.setPrivateIpAddress("10.2.2.2");
-        NicVO nic = new NicVO("somereserver", 1L, 1L, VirtualMachine.Type.InternalLoadBalancerVm);
-        nic.setIp4Address(requestedIp);
+        final NicVO nic = new NicVO("somereserver", 1L, 1L, VirtualMachine.Type.InternalLoadBalancerVm);
+        nic.setIPv4Address(requestedIp);
 
-        List<DomainRouterVO> emptyList = new ArrayList<DomainRouterVO>();
-        List<DomainRouterVO> nonEmptyList = new ArrayList<DomainRouterVO>();
+        final List<DomainRouterVO> emptyList = new ArrayList<DomainRouterVO>();
+        final List<DomainRouterVO> nonEmptyList = new ArrayList<DomainRouterVO>();
         nonEmptyList.add(vm);
 
         Mockito.when(_domainRouterDao.listByNetworkAndRole(invalidNtwkId, Role.INTERNAL_LB_VM)).thenReturn(emptyList);
@@ -149,16 +149,16 @@ public class InternalLBVMManagerTest extends TestCase {
         Mockito.when(_nicDao.findByNtwkIdAndInstanceId(validNtwkId, 1)).thenReturn(nic);
         Mockito.when(_nicDao.findByNtwkIdAndInstanceId(invalidNtwkId, 1)).thenReturn(nic);
 
-        Answer answer = new Answer(null, true, null);
-        Answer[] answers = new Answer[1];
+        final Answer answer = new Answer(null, true, null);
+        final Answer[] answers = new Answer[1];
         answers[0] = answer;
 
         try {
             Mockito.when(_agentMgr.send(Matchers.anyLong(), Matchers.any(Commands.class))).thenReturn(answers);
-        } catch (AgentUnavailableException e) {
+        } catch (final AgentUnavailableException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-        } catch (OperationTimedoutException e) {
+        } catch (final OperationTimedoutException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
@@ -168,9 +168,9 @@ public class InternalLBVMManagerTest extends TestCase {
 
         Mockito.when(_itMgr.toNicTO(Matchers.any(NicProfile.class), Matchers.any(HypervisorType.class))).thenReturn(null);
         Mockito.when(_domainRouterDao.findById(Matchers.anyLong())).thenReturn(vm);
-        DataCenterVO dc = new DataCenterVO(1L, null, null, null, null, null, null, null, null, null, NetworkType.Advanced, null, null);
+        final DataCenterVO dc = new DataCenterVO(1L, null, null, null, null, null, null, null, null, null, NetworkType.Advanced, null, null);
         Mockito.when(_dcDao.findById(Matchers.anyLong())).thenReturn(dc);
-        NetworkOfferingVO networkOfferingVO = new NetworkOfferingVO();
+        final NetworkOfferingVO networkOfferingVO = new NetworkOfferingVO();
         networkOfferingVO.setConcurrentConnections(500);
         Mockito.when(_offeringDao.findById(Matchers.anyLong())).thenReturn(networkOfferingVO);
 
@@ -183,7 +183,7 @@ public class InternalLBVMManagerTest extends TestCase {
         ntwk = new NetworkVO();
         try {
             ntwk.setBroadcastUri(new URI("somevlan"));
-        } catch (URISyntaxException e) {
+        } catch (final URISyntaxException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
@@ -195,13 +195,13 @@ public class InternalLBVMManagerTest extends TestCase {
 
     @Test
     public void findInternalLbVmsForInvalidNetwork() {
-        List<? extends VirtualRouter> vms = _lbVmMgr.findInternalLbVms(invalidNtwkId, new Ip(requestedIp));
+        final List<? extends VirtualRouter> vms = _lbVmMgr.findInternalLbVms(invalidNtwkId, new Ip(requestedIp));
         assertTrue("Non empty vm list was returned for invalid network id", vms.isEmpty());
     }
 
     @Test
     public void findInternalLbVmsForValidNetwork() {
-        List<? extends VirtualRouter> vms = _lbVmMgr.findInternalLbVms(validNtwkId, new Ip(requestedIp));
+        final List<? extends VirtualRouter> vms = _lbVmMgr.findInternalLbVms(validNtwkId, new Ip(requestedIp));
         assertTrue("Empty vm list was returned for valid network id", !vms.isEmpty());
     }
 
@@ -209,10 +209,10 @@ public class InternalLBVMManagerTest extends TestCase {
     @Test
     public void applyEmptyRulesSet() {
         boolean result = false;
-        List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
+        final List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
         try {
             result = _lbVmMgr.applyLoadBalancingRules(new NetworkVO(), new ArrayList<LoadBalancingRule>(), vms);
-        } catch (ResourceUnavailableException e) {
+        } catch (final ResourceUnavailableException e) {
 
         } finally {
             assertTrue("Got failure when tried to apply empty list of rules", result);
@@ -222,14 +222,14 @@ public class InternalLBVMManagerTest extends TestCase {
     @Test(expected = CloudRuntimeException.class)
     public void applyWithEmptyVmsSet() {
         boolean result = false;
-        List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
-        List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
-        LoadBalancingRule rule = new LoadBalancingRule(null, null, null, null, null, null, null);
+        final List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
+        final List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
+        final LoadBalancingRule rule = new LoadBalancingRule(null, null, null, null, null, null, null);
 
         rules.add(rule);
         try {
             result = _lbVmMgr.applyLoadBalancingRules(new NetworkVO(), rules, vms);
-        } catch (ResourceUnavailableException e) {
+        } catch (final ResourceUnavailableException e) {
         } finally {
             assertFalse("Got success when tried to apply with the empty internal lb vm list", result);
         }
@@ -238,12 +238,12 @@ public class InternalLBVMManagerTest extends TestCase {
     @Test(expected = ResourceUnavailableException.class)
     public void applyToVmInStartingState() throws ResourceUnavailableException {
         boolean result = false;
-        List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
+        final List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
         vm.setState(State.Starting);
         vms.add(vm);
 
-        List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
-        LoadBalancingRule rule = new LoadBalancingRule(null, null, null, null, null, null, null);
+        final List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
+        final LoadBalancingRule rule = new LoadBalancingRule(null, null, null, null, null, null, null);
 
         rules.add(rule);
         try {
@@ -256,12 +256,12 @@ public class InternalLBVMManagerTest extends TestCase {
     @Test
     public void applyToVmInStoppedState() throws ResourceUnavailableException {
         boolean result = false;
-        List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
+        final List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
         vm.setState(State.Stopped);
         vms.add(vm);
 
-        List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
-        LoadBalancingRule rule = new LoadBalancingRule(null, null, null, null, null, null, null);
+        final List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
+        final LoadBalancingRule rule = new LoadBalancingRule(null, null, null, null, null, null, null);
 
         rules.add(rule);
         try {
@@ -274,12 +274,12 @@ public class InternalLBVMManagerTest extends TestCase {
     @Test
     public void applyToVmInStoppingState() throws ResourceUnavailableException {
         boolean result = false;
-        List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
+        final List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
         vm.setState(State.Stopping);
         vms.add(vm);
 
-        List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
-        LoadBalancingRule rule = new LoadBalancingRule(null, null, null, null, null, null, null);
+        final List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
+        final LoadBalancingRule rule = new LoadBalancingRule(null, null, null, null, null, null, null);
 
         rules.add(rule);
         try {
@@ -292,15 +292,15 @@ public class InternalLBVMManagerTest extends TestCase {
     @Test
     public void applyToVmInRunningState() throws ResourceUnavailableException {
         boolean result = false;
-        List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
+        final List<DomainRouterVO> vms = new ArrayList<DomainRouterVO>();
         vm.setState(State.Running);
         vms.add(vm);
 
-        List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
-        ApplicationLoadBalancerRuleVO lb = new ApplicationLoadBalancerRuleVO(null, null, 22, 22, "roundrobin", 1L, 1L, 1L, new Ip(requestedIp), 1L, Scheme.Internal);
+        final List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
+        final ApplicationLoadBalancerRuleVO lb = new ApplicationLoadBalancerRuleVO(null, null, 22, 22, "roundrobin", 1L, 1L, 1L, new Ip(requestedIp), 1L, Scheme.Internal);
         lb.setState(FirewallRule.State.Add);
 
-        LoadBalancingRule rule = new LoadBalancingRule(lb, null, null, null, new Ip(requestedIp));
+        final LoadBalancingRule rule = new LoadBalancingRule(lb, null, null, null, new Ip(requestedIp));
 
         rules.add(rule);
 
@@ -336,48 +336,48 @@ public class InternalLBVMManagerTest extends TestCase {
         }
     }
 
-    private static ServiceOfferingVO setId(ServiceOfferingVO vo, long id) {
-        ServiceOfferingVO voToReturn = vo;
-        Class<?> c = voToReturn.getClass();
+    private static ServiceOfferingVO setId(final ServiceOfferingVO vo, final long id) {
+        final ServiceOfferingVO voToReturn = vo;
+        final Class<?> c = voToReturn.getClass();
         try {
-            Field f = c.getSuperclass().getDeclaredField("id");
+            final Field f = c.getSuperclass().getDeclaredField("id");
             f.setAccessible(true);
             f.setLong(voToReturn, id);
-        } catch (NoSuchFieldException ex) {
+        } catch (final NoSuchFieldException ex) {
             return null;
-        } catch (IllegalAccessException ex) {
+        } catch (final IllegalAccessException ex) {
             return null;
         }
 
         return voToReturn;
     }
 
-    private static NetworkVO setId(NetworkVO vo, long id) {
-        NetworkVO voToReturn = vo;
-        Class<?> c = voToReturn.getClass();
+    private static NetworkVO setId(final NetworkVO vo, final long id) {
+        final NetworkVO voToReturn = vo;
+        final Class<?> c = voToReturn.getClass();
         try {
-            Field f = c.getDeclaredField("id");
+            final Field f = c.getDeclaredField("id");
             f.setAccessible(true);
             f.setLong(voToReturn, id);
-        } catch (NoSuchFieldException ex) {
+        } catch (final NoSuchFieldException ex) {
             return null;
-        } catch (IllegalAccessException ex) {
+        } catch (final IllegalAccessException ex) {
             return null;
         }
 
         return voToReturn;
     }
 
-    private static DomainRouterVO setId(DomainRouterVO vo, long id) {
-        DomainRouterVO voToReturn = vo;
-        Class<?> c = voToReturn.getClass();
+    private static DomainRouterVO setId(final DomainRouterVO vo, final long id) {
+        final DomainRouterVO voToReturn = vo;
+        final Class<?> c = voToReturn.getClass();
         try {
-            Field f = c.getSuperclass().getDeclaredField("id");
+            final Field f = c.getSuperclass().getDeclaredField("id");
             f.setAccessible(true);
             f.setLong(voToReturn, id);
-        } catch (NoSuchFieldException ex) {
+        } catch (final NoSuchFieldException ex) {
             return null;
-        } catch (IllegalAccessException ex) {
+        } catch (final IllegalAccessException ex) {
             return null;
         }
 

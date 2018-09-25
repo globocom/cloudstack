@@ -50,7 +50,7 @@ public class ImageStoreJoinVO extends BaseViewVO implements InternalIdentity, Id
     @Column(name = "name")
     private String name;
 
-    @Column(name = "url")
+    @Column(name = "url", length = 2048)
     private String url;
 
     @Column(name = "protocol")
@@ -75,12 +75,6 @@ public class ImageStoreJoinVO extends BaseViewVO implements InternalIdentity, Id
 
     @Column(name = "data_center_name")
     private String zoneName;
-
-    @Column(name = "detail_name")
-    private String detailName;
-
-    @Column(name = "detail_value")
-    private String detailValue;
 
     @Column(name = GenericDao.REMOVED_COLUMN)
     private Date removed;
@@ -125,14 +119,6 @@ public class ImageStoreJoinVO extends BaseViewVO implements InternalIdentity, Id
 
     public ScopeType getScope() {
         return scope;
-    }
-
-    public String getDetailName() {
-        return detailName;
-    }
-
-    public String getDetailValue() {
-        return detailValue;
     }
 
     public DataStoreRole getRole() {

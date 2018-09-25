@@ -34,6 +34,7 @@ import org.apache.cloudstack.api.command.user.vm.ScaleVMCmd;
 import org.apache.cloudstack.api.command.user.vm.StartVMCmd;
 import org.apache.cloudstack.api.command.user.vm.UpdateDefaultNicForVMCmd;
 import org.apache.cloudstack.api.command.user.vm.UpdateVMCmd;
+import org.apache.cloudstack.api.command.user.vm.UpdateVmNicIpCmd;
 import org.apache.cloudstack.api.command.user.vm.UpgradeVMCmd;
 import org.apache.cloudstack.api.command.user.vmgroup.CreateVMGroupCmd;
 import org.apache.cloudstack.api.command.user.vmgroup.DeleteVMGroupCmd;
@@ -49,6 +50,7 @@ import com.cloud.exception.VirtualMachineMigrationException;
 import com.cloud.host.Host;
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
 import com.cloud.network.Network.IpAddresses;
+import com.cloud.offering.DiskOffering;
 import com.cloud.offering.ServiceOffering;
 import com.cloud.storage.StoragePool;
 import com.cloud.template.VirtualMachineTemplate;
@@ -57,6 +59,8 @@ import com.cloud.uservm.UserVm;
 import com.cloud.utils.exception.ExecutionException;
 
 public interface UserVmService {
+
+
     /**
      * Destroys one virtual machine
      *
@@ -72,14 +76,14 @@ public interface UserVmService {
     /**
      * Destroys one virtual machine
      *
-     * @param userId
-     *            the id of the user performing the action
      * @param vmId
      *            the id of the virtual machine.
+     * @param expunge
+     *            indicates if vm should be expunged
      * @throws ConcurrentOperationException
      * @throws ResourceUnavailableException
      */
-    UserVm destroyVm(long vmId) throws ResourceUnavailableException, ConcurrentOperationException;
+    UserVm destroyVm(long vmId, boolean expunge) throws ResourceUnavailableException, ConcurrentOperationException;
 
     /**
      * Resets the password of a virtual machine.
@@ -126,6 +130,13 @@ public interface UserVmService {
      * @return the vm object if successful, null otherwise
      */
     UserVm updateDefaultNicForVirtualMachine(UpdateDefaultNicForVMCmd cmd);
+
+    /**
+     * Updated the ip address on the given NIC to the virtual machine
+     * @param cmd the command object that defines the ip address and the given nic
+     * @return the vm object if successful, null otherwise
+     */
+    UserVm updateNicIpForVirtualMachine(UpdateVmNicIpCmd cmd);
 
     UserVm recoverVirtualMachine(RecoverVMCmd cmd) throws ResourceAllocationException;
 
@@ -184,7 +195,14 @@ public interface UserVmService {
      * @param memory
      * @param cpuNumber
      * @param customId
+     * @param dhcpOptionMap
+     *           - Maps the dhcp option code and the dhcp value to the network uuid
      * @return UserVm object if successful.
+     * @param dataDiskTemplateToDiskOfferingMap
+     *            - Datadisk template to Disk offering Map
+     *             an optional parameter that creates additional data disks for the virtual machine
+     *             For each of the templates in the map, a data disk will be created from the corresponding
+     *             disk offering obtained from the map
      *
      * @throws InsufficientCapacityException
      *             if there is insufficient capacity to deploy the VM.
@@ -198,7 +216,8 @@ public interface UserVmService {
     UserVm createBasicSecurityGroupVirtualMachine(DataCenter zone, ServiceOffering serviceOffering, VirtualMachineTemplate template, List<Long> securityGroupIdList,
         Account owner, String hostName, String displayName, Long diskOfferingId, Long diskSize, String group, HypervisorType hypervisor, HTTPMethod httpmethod,
         String userData, String sshKeyPair, Map<Long, IpAddresses> requestedIps, IpAddresses defaultIp, Boolean displayVm, String keyboard,
-        List<Long> affinityGroupIdList, Map<String, String> customParameter, String customId) throws InsufficientCapacityException,
+        List<Long> affinityGroupIdList, Map<String, String> customParameter, String customId, Map<String, Map<Integer, String>> dhcpOptionMap,
+        Map<Long, DiskOffering> dataDiskTemplateToDiskOfferingMap) throws InsufficientCapacityException,
         ConcurrentOperationException, ResourceUnavailableException, StorageUnavailableException, ResourceAllocationException;
 
     /**
@@ -257,6 +276,13 @@ public interface UserVmService {
      * @param memory
      * @param cpuNumber
      * @param customId
+     * @param dhcpOptionMap
+     *             - Maps the dhcp option code and the dhcp value to the network uuid
+     * @param dataDiskTemplateToDiskOfferingMap
+     *            - Datadisk template to Disk offering Map
+     *             an optional parameter that creates additional data disks for the virtual machine
+     *             For each of the templates in the map, a data disk will be created from the corresponding
+     *             disk offering obtained from the map
      * @return UserVm object if successful.
      *
      * @throws InsufficientCapacityException
@@ -271,7 +297,8 @@ public interface UserVmService {
     UserVm createAdvancedSecurityGroupVirtualMachine(DataCenter zone, ServiceOffering serviceOffering, VirtualMachineTemplate template, List<Long> networkIdList,
         List<Long> securityGroupIdList, Account owner, String hostName, String displayName, Long diskOfferingId, Long diskSize, String group, HypervisorType hypervisor,
         HTTPMethod httpmethod, String userData, String sshKeyPair, Map<Long, IpAddresses> requestedIps, IpAddresses defaultIps, Boolean displayVm, String keyboard,
-        List<Long> affinityGroupIdList, Map<String, String> customParameters, String customId) throws InsufficientCapacityException,
+        List<Long> affinityGroupIdList, Map<String, String> customParameters, String customId, Map<String, Map<Integer, String>> dhcpOptionMap,
+        Map<Long, DiskOffering> dataDiskTemplateToDiskOfferingMap) throws InsufficientCapacityException,
         ConcurrentOperationException, ResourceUnavailableException, StorageUnavailableException, ResourceAllocationException;
 
     /**
@@ -328,6 +355,13 @@ public interface UserVmService {
      * @param memory
      * @param cpuNumber
      * @param customId
+     * @param dhcpOptionMap
+     *             - Map that maps the DhcpOption code and their value on the Network uuid
+     * @param dataDiskTemplateToDiskOfferingMap
+     *            - Datadisk template to Disk offering Map
+     *             an optional parameter that creates additional data disks for the virtual machine
+     *             For each of the templates in the map, a data disk will be created from the corresponding
+     *             disk offering obtained from the map
      * @return UserVm object if successful.
      *
      * @throws InsufficientCapacityException
@@ -342,7 +376,7 @@ public interface UserVmService {
     UserVm createAdvancedVirtualMachine(DataCenter zone, ServiceOffering serviceOffering, VirtualMachineTemplate template, List<Long> networkIdList, Account owner,
         String hostName, String displayName, Long diskOfferingId, Long diskSize, String group, HypervisorType hypervisor, HTTPMethod httpmethod, String userData,
         String sshKeyPair, Map<Long, IpAddresses> requestedIps, IpAddresses defaultIps, Boolean displayVm, String keyboard, List<Long> affinityGroupIdList,
-        Map<String, String> customParameters, String customId)
+        Map<String, String> customParameters, String customId, Map<String, Map<Integer, String>> dhcpOptionMap, Map<Long, DiskOffering> dataDiskTemplateToDiskOfferingMap)
 
         throws InsufficientCapacityException, ConcurrentOperationException, ResourceUnavailableException, StorageUnavailableException, ResourceAllocationException;
 
@@ -471,5 +505,9 @@ public interface UserVmService {
      * @return  value of the display flag
      */
     public boolean isDisplayResourceEnabled(Long vmId);
+
+    void collectVmDiskStatistics(UserVm userVm);
+
+    void collectVmNetworkStatistics (UserVm userVm);
 
 }

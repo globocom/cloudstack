@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
+import org.apache.cloudstack.api.response.UserResponse;
 import org.apache.log4j.Logger;
 
 import org.apache.cloudstack.acl.RoleType;
@@ -77,7 +78,7 @@ public class ListVMsCmd extends BaseListTaggedResourcesCmd {
     @Parameter(name = ApiConstants.POD_ID, type = CommandType.UUID, entityType = PodResponse.class, description = "the pod ID")
     private Long podId;
 
-    @Parameter(name = ApiConstants.STATE, type = CommandType.STRING, description = "state of the virtual machine")
+    @Parameter(name = ApiConstants.STATE, type = CommandType.STRING, description = "state of the virtual machine. Possible values are: Running, Stopped, Present, Destroyed, Expunged. Present is used for the state equal not destroyed.")
     private String state;
 
     @Parameter(name = ApiConstants.ZONE_ID, type = CommandType.UUID, entityType = ZoneResponse.class, description = "the availability zone ID")
@@ -120,6 +121,9 @@ public class ListVMsCmd extends BaseListTaggedResourcesCmd {
     @Parameter(name = ApiConstants.AFFINITY_GROUP_ID, type = CommandType.UUID, entityType = AffinityGroupResponse.class, description = "list vms by affinity group")
     private Long affinityGroupId;
 
+    @Parameter(name = ApiConstants.SSH_KEYPAIR, type = CommandType.STRING, description = "list vms by ssh keypair name")
+    private String keypair;
+
     @Parameter(name = ApiConstants.SERVICE_OFFERING_ID, type = CommandType.UUID, entityType = ServiceOfferingResponse.class, description = "list by the service offering", since = "4.4")
     private Long serviceOffId;
 
@@ -128,6 +132,9 @@ public class ListVMsCmd extends BaseListTaggedResourcesCmd {
 
     @Parameter(name = "simple", type = CommandType.BOOLEAN, description = "List only basic VM data")
     private boolean simple;
+
+    @Parameter(name = ApiConstants.USER_ID, type = CommandType.UUID, entityType = UserResponse.class, required = false, description = "the user ID that created the VM and is under the account that owns the VM")
+    private Long userId;
 
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
@@ -143,6 +150,10 @@ public class ListVMsCmd extends BaseListTaggedResourcesCmd {
 
     public List<Long> getIds() {
         return ids;
+    }
+
+    public Long getUserId() {
+        return userId;
     }
 
     public String getName() {
@@ -189,6 +200,10 @@ public class ListVMsCmd extends BaseListTaggedResourcesCmd {
 
     public boolean isSimple() {
         return simple;
+    }
+
+    public String getKeyPairName() {
+        return keypair;
     }
 
     public EnumSet<VMDetails> getDetails() throws InvalidParameterValueException {

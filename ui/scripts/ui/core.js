@@ -98,7 +98,7 @@
             $navItem.addClass('active');
             $browser.cloudBrowser('removeAllPanels');
         }
-        
+
         $browser.cloudBrowser('addPanel', {
             title: '<span class="section">' + _l(data.title) + '</span>' + '<span class="subsection"></span>',
             data: '',
@@ -106,7 +106,7 @@
                 if(!isPlugin) {
                     $breadcrumb.attr('title', _l(data.title));
                 }
-                
+
                 data.$breadcrumb = $breadcrumb;
 
                 // Hide breadcrumb if this is the home section
@@ -225,7 +225,7 @@
                 .append(
                     $('<div>').addClass('name').text(
                         args.context && args.context.users ?
-                        cloudStack.concat(userLabel, 14) : 'Invalid User'
+                        cloudStack.concat(userLabel, 21) : 'Invalid User'
                     )
             )
                 .append(
@@ -284,6 +284,9 @@
             .data('cloudStack-args', args)
             .appendTo(this);
         var context = args.context;
+
+        // Cleanup login
+        $('.login').remove();
 
         // Create pageElems
         $.each(pageElems, function(id, fn) {
@@ -363,7 +366,7 @@
             function(value, element) {
                 return (value.indexOf("<") == -1 && value.indexOf(">") == -1);
             },
-            jQuery.format('message.disallowed.characters')
+            jQuery.validator.format('message.disallowed.characters')
         );
 
         // Check for pending project invitations

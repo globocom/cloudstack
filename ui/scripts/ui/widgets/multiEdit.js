@@ -31,6 +31,7 @@
             var $item = $('<div>').addClass('data-item');
             var multiRule = data;
             var reorder = options.reorder;
+            var selectPermission = options.selectPermission;
 
             $item.append($('<table>').append($('<tbody>')));
             $tr = $('<tr>').appendTo($item.find('tbody'));
@@ -90,7 +91,7 @@
                 if (isHidden) {
                     return true;
                 }
-                
+
                 var $td = $('<td>').addClass(fieldName).appendTo($tr);
                 var $input, val;
                 var $addButton = $multi.find('form .button.add-vm:not(.custom-action)').clone();
@@ -104,7 +105,7 @@
                         $(data).each(function() {
                             var item = this;
                             var $itemRow = _medit.multiItem.itemRow(item, options.itemActions, multiRule, $tbody);
-
+                            $itemRow.data('json-obj', item);
                             $itemRow.appendTo($tbody);
                             newItemRows.push($itemRow);
 
@@ -178,6 +179,19 @@
                             }
                             $td.attr('title', data[fieldName]);
                         }
+                    } else if (field.isBoolean) {
+                        var $checkbox = $('<input>');
+                        $checkbox.attr({
+                            disabled: true,
+                            name: fieldName,
+                            type: 'checkbox'
+                        });
+                        if (_s(data[fieldName])) {
+                            $checkbox.attr({
+                                checked: true
+                            });
+                        }
+                        $checkbox.appendTo($td);
                     } else if (field.select) {
                         // Get matching option text
                         var $matchingSelect = $multi.find('select')
@@ -189,10 +203,34 @@
                                 return $(this).val() == data[fieldName];
                             });
 
-                        var matchingValue = $matchingOption.size() ?
-                            $matchingOption.html() : data[fieldName];
+                        if (selectPermission) {
+                            // Wrap div to get its html code
+                            selectedOptionHtml = $matchingOption.clone().wrap('<div>').parent().html();
+                            // Get html code from not matching option
+                            $matchingSelect.find('option').each(
+                                function() {
+                                    if ($(this).val() != data[fieldName]){
+                                        selectedOptionHtml += $(this).clone().wrap('<div>').parent().html();
+                                    }
+                                }
+                            );
+                            $select = $('<select>');
+                            $select.html(selectedOptionHtml);
+                            $select.change(function(event) {
+                                selectPermission.action({
+                                    roleid: data['roleid'],
+                                    ruleid: data['id'],
+                                    permission: $(this).val()
+                                });
+                            });
+                            $td.append($select);
+                        }
+                        else {
+                            var matchingValue = $matchingOption.size() ?
+                                $matchingOption.html() : data[fieldName];
 
-                        $td.append($('<span>').html(_s(matchingValue)));
+                            $td.append($('<span>').html(_s(matchingValue)));
+                        }
                     } else if (field.addButton && !options.noSelect) {
                         if (options.multipleAdd) {
                             $addButton.click(function() {
@@ -278,9 +316,6 @@
                     $td.addClass('blank');
                 }
 
-                // Align width to main header
-                _medit.refreshItemWidths($multi);
-                
                 if (data._hideFields &&
                     $.inArray(fieldName, data._hideFields) > -1) {
                     $td.addClass('disabled');
@@ -449,7 +484,7 @@
 
                             cloudStack.dialog.createForm({
                                 form: {
-                                    title: 'Edit rule',
+                                    title: 'label.edit.rule',
                                     desc: '',
                                     fields: editableFields
                                 },
@@ -570,7 +605,7 @@
 
             var $dataList = $listView.addClass('multi-edit-add-list').dialog({
                 dialogClass: 'multi-edit-add-list panel',
-                width: 825,
+                width: 900,
                 title: label,
                 buttons: [{
                     text: _l('label.apply'),
@@ -737,7 +772,7 @@
 
             itemRow: function(item, itemActions, multiRule, $tbody) {
                 var $tr = $('<tr>');
-                
+
                 var itemName = multiRule._itemName ? item[multiRule._itemName] : item.name;
                 var $itemName = $('<span>').html(_s(itemName));
 
@@ -752,14 +787,14 @@
                     });
                 });
 
-                                
+
                 var itemIp = multiRule._itemIp ? item[multiRule._itemIp] : null;
                 if (itemIp != null) {
-                	 var $itemIp = $('<span>').html(_s(itemIp));
+                     var $itemIp = $('<span>').html(_s(itemIp));
                      $tr.append($('<td>').addClass('state').appendTo($tr).append($itemIp));
-                }                        
-                
-                
+                }
+
+
                 var itemState = item._itemState ? item._itemState : item.state;
 
                 $tr.append($('<td>').addClass('state').appendTo($tr).append(
@@ -890,6 +925,7 @@
         var actionPreFilter = args.actionPreFilter;
         var readOnlyCheck = args.readOnlyCheck;
         var reorder = args.reorder;
+        var selectPermission = args.selectPermission;
 
         var $thead = $('<tr>').appendTo(
             $('<thead>').appendTo($inputTable)
@@ -982,7 +1018,6 @@
                         error: function(args) {}
                     }
                 });
-
                 // Tooltip
                 if (field.docID) {
                     $select.toolTip({
@@ -992,6 +1027,12 @@
                         attachTo: 'table.multi-edit'
                     });
                 }
+            } else if (field.isBoolean) {
+                var $input = $('<input>')
+                    .attr({
+                        name: fieldName,
+                        type: 'checkbox'
+                }).appendTo($td);
             } else if (field.edit && field.edit != 'ignore') {
                 if (field.range) {
                     var $range = $('<div>').addClass('range').appendTo($td);
@@ -1026,6 +1067,10 @@
                             .addClass('disallowSpecialCharacters')
                         .attr('disabled', field.isDisabled ? 'disabled' : false)
                         .appendTo($td);
+
+                    if (field.validation) {
+                        $td.find('input').first().data("validation-settings",  field.validation );
+                    }
 
                     if (field.isDisabled) $input.hide();
                     if (field.defaultValue) {
@@ -1129,7 +1174,11 @@
                 $multi.find('input').each(function() {
                     var $input = $(this);
 
-                    if ($input.data('multi-default-value')) {
+                    if ($input.is(":checkbox")) {
+                        $input.attr({
+                            checked: false
+                        });
+                    } else if ($input.data('multi-default-value')) {
                         $input.val($input.data('multi-default-value'));
                     } else {
                         $input.val('');
@@ -1234,7 +1283,8 @@
                                     preFilter: actionPreFilter,
                                     listView: listView,
                                     tags: tags,
-                                    reorder: reorder
+                                    reorder: reorder,
+                                    selectPermission: selectPermission
                                 }
                             ).appendTo($dataBody);
                         });
@@ -1289,6 +1339,11 @@
 
         $multiForm.validate();
 
+        var inputs = $multiForm.find('input');
+        $.each(inputs, function() {
+            if ($(this).data && $(this).data('validation-settings'))
+                $(this).rules('add', $(this).data('validation-settings'));
+        });
         return this;
     };
 

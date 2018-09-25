@@ -24,14 +24,14 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack-plugins</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.1.0</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <dependencies>
     <dependency>
       <groupId>com.globo.globonetwork</groupId>
       <artifactId>globonetwork-client</artifactId>
-      <version>0.0.56</version>
+      <version>0.0.60</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

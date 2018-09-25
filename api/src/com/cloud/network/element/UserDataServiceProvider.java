@@ -24,10 +24,9 @@ import com.cloud.network.Network;
 import com.cloud.vm.NicProfile;
 import com.cloud.vm.ReservationContext;
 import com.cloud.vm.VirtualMachineProfile;
-import java.util.Map;
 
 public interface UserDataServiceProvider extends NetworkElement {
-    public boolean addPasswordAndUserdata(Network network, NicProfile nic, VirtualMachineProfile vm, DeployDestination dest, ReservationContext context)
+    boolean addPasswordAndUserdata(Network network, NicProfile nic, VirtualMachineProfile vm, DeployDestination dest, ReservationContext context)
         throws ConcurrentOperationException, InsufficientCapacityException, ResourceUnavailableException;
 
     boolean savePassword(Network network, NicProfile nic, VirtualMachineProfile vm) throws ResourceUnavailableException;
@@ -36,5 +35,4 @@ public interface UserDataServiceProvider extends NetworkElement {
 
     boolean saveSSHKey(Network network, NicProfile nic, VirtualMachineProfile vm, String sshPublicKey) throws ResourceUnavailableException;
 
-    boolean saveUserVMData(Network network, NicProfile nicProfile, VirtualMachineProfile vmProfile, Map<String, String> vmData)  throws ResourceUnavailableException;
 }

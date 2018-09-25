@@ -79,7 +79,7 @@ public class CreatePortForwardingRuleCmd extends BaseAsyncCreateCmd implements P
     @Parameter(name = ApiConstants.PROTOCOL,
                type = CommandType.STRING,
                required = true,
-            description = "the protocol for the port fowarding rule. Valid values are TCP or UDP.")
+            description = "the protocol for the port forwarding rule. Valid values are TCP or UDP.")
     private String protocol;
 
     @Parameter(name = ApiConstants.PRIVATE_END_PORT,
@@ -348,7 +348,7 @@ public class CreatePortForwardingRuleCmd extends BaseAsyncCreateCmd implements P
 
         Ip privateIp = getVmSecondaryIp();
         if (privateIp != null) {
-            if (!NetUtils.isValidIp(privateIp.toString())) {
+            if (!NetUtils.isValidIp4(privateIp.toString())) {
                 throw new InvalidParameterValueException("Invalid vm ip address");
             }
         }
@@ -426,6 +426,11 @@ public class CreatePortForwardingRuleCmd extends BaseAsyncCreateCmd implements P
 
     @Override
     public TrafficType getTrafficType() {
+        return null;
+    }
+
+    @Override
+    public List<String> getDestinationCidrList(){
         return null;
     }
 

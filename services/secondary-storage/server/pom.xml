@@ -23,12 +23,9 @@
   <parent>
     <groupId>org.apache.cloudstack</groupId>
     <artifactId>cloudstack-service-secondary-storage</artifactId>
-    <version>4.5.2</version>
+    <version>4.11.1.0</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
-    <properties>
-    <skipTests>true</skipTests>
-  </properties>
     <dependencies>
     <dependency>
       <groupId>log4j</groupId>
@@ -53,6 +50,18 @@
       <artifactId>cloud-server</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.cloudstack</groupId>
+      <artifactId>cloud-engine-storage-configdrive</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- dependencies for starting a post upload server on ssvm -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-all</artifactId>
+        <version>4.0.33.Final</version>
+        <scope>compile</scope>
+      </dependency>
   </dependencies>
   <build>
     <plugins>

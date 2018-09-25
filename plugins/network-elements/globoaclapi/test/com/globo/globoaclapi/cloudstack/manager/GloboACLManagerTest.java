@@ -331,7 +331,7 @@ public class GloboACLManagerTest {
         FirewallRuleVO rule = new FirewallRuleVO(
             "1", 1L, portStart, portEnd, "tcp", 1, 1, 1,
             FirewallRule.Purpose.Firewall, null, null, null, null,
-            FirewallRule.TrafficType.Egress, FirewallRule.FirewallRuleType.User
+            1l, FirewallRule.TrafficType.Egress, FirewallRule.FirewallRuleType.User
         );
         rule.setSourceCidrList(Arrays.asList(destination));
         return rule;
@@ -340,7 +340,7 @@ public class GloboACLManagerTest {
     private FirewallRuleVO createICMPFirewallRuleVO(String destination, Integer icmpCode, Integer icmpType) {
         FirewallRuleVO rule = new FirewallRuleVO(
                 "1", 1L, null, null, "icmp", 1, 1, 1,
-                FirewallRule.Purpose.Firewall, null, icmpCode, icmpType, null,
+                FirewallRule.Purpose.Firewall, null, Arrays.asList(destination), icmpCode, icmpType, null,
                 FirewallRule.TrafficType.Egress, FirewallRule.FirewallRuleType.User
         );
         rule.setSourceCidrList(Arrays.asList(destination));
@@ -352,7 +352,7 @@ public class GloboACLManagerTest {
             1L, Networks.TrafficType.Guest, Networks.Mode.None,
             Networks.BroadcastDomainType.Vlan, 1L, 1L, 1L, 1L, "bla", "fake", "eet.net",
             Network.GuestType.Shared, 1L, 1L,
-            ControlledEntity.ACLType.Account, false, 1L
+            ControlledEntity.ACLType.Account, false, 1L, false
         );
         network.setNetworkCidr("10.10.10.0/24");
         return network;

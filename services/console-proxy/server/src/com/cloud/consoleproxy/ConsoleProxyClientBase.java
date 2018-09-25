@@ -230,6 +230,7 @@ public abstract class ConsoleProxyClientBase implements ConsoleProxyClient, Cons
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
+                s_logger.debug("[ignored] Console proxy was interupted while waiting for viewer to become ready.");
             }
         }
         return false;
@@ -259,18 +260,6 @@ public abstract class ConsoleProxyClientBase implements ConsoleProxyClient, Cons
 
         if (s_logger.isTraceEnabled())
             s_logger.trace("Ajax client start, frame buffer w: " + width + ", " + height);
-
-        /*
-                int retry = 0;
-                tracker.initCoverageTest();
-                while(!tracker.hasFullCoverage() && retry < 10) {
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                    }
-                    retry++;
-                }
-        */
 
         List<TileInfo> tiles = tracker.scan(true);
         String imgUrl = prepareAjaxImage(tiles, true);
@@ -305,6 +294,7 @@ public abstract class ConsoleProxyClientBase implements ConsoleProxyClient, Cons
 
         String[] content =
             new String[] {"<html>", "<head>", "<script type=\"text/javascript\" language=\"javascript\" src=\"/resource/js/jquery.js\"></script>",
+                "<script type=\"text/javascript\" language=\"javascript\" src=\"/resource/js/jquery.flot.navigate.js\"></script>",
                 "<script type=\"text/javascript\" language=\"javascript\" src=\"/resource/js/cloud.logger.js\"></script>",
                 "<script type=\"text/javascript\" language=\"javascript\" src=\"/resource/js/ajaxkeys.js\"></script>",
                 "<script type=\"text/javascript\" language=\"javascript\" src=\"/resource/js/ajaxviewer.js\"></script>",
@@ -320,7 +310,8 @@ public abstract class ConsoleProxyClientBase implements ConsoleProxyClient, Cons
                 "<span><img align=\"left\" src=\"/resource/images/winlog.png\" alt=\"Keyboard\" style=\"width:16px;height:16px\"/>Keyboard</span>", "</a>", "<ul>",
                 "<li><a href=\"#\" cmd=\"keyboard_us\"><span>Standard (US) keyboard</span></a></li>",
                 "<li><a href=\"#\" cmd=\"keyboard_uk\"><span>UK keyboard</span></a></li>",
-                "<li><a href=\"#\" cmd=\"keyboard_jp\"><span>Japanese keyboard</span></a></li>", "</ul>", "</li>", "</ul>",
+                "<li><a href=\"#\" cmd=\"keyboard_jp\"><span>Japanese keyboard</span></a></li>",
+                "<li><a href=\"#\" cmd=\"keyboard_fr\"><span>French AZERTY keyboard</span></a></li>", "</ul>", "</li>", "</ul>",
                 "<span id=\"light\" class=\"dark\" cmd=\"toggle_logwin\"></span>", "</div>", "<div id=\"main_panel\" tabindex=\"1\"></div>",
                 "<script language=\"javascript\">", "var acceptLanguages = '" + sbLanguages.toString() + "';", "var tileMap = [ " + tileSequence + " ];",
                 "var ajaxViewer = new AjaxViewer('main_panel', '" + imgUrl + "', '" + updateUrl + "', '" + locale + "', '" + guest + "', tileMap, ",
@@ -352,6 +343,7 @@ public abstract class ConsoleProxyClientBase implements ConsoleProxyClient, Cons
                 try {
                     tileDirtyEvent.wait(3000);
                 } catch (InterruptedException e) {
+                    s_logger.debug("[ignored] Console proxy ajax update was interupted while waiting for viewer to become ready.");
                 }
             }
         }

@@ -1,4 +1,4 @@
-#!/bin/bash -xl
+#!/bin/bash -l
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -16,16 +16,212 @@
 # specific language governing permissions and limitations
 # under the License.
 
-set -x
+# build script which wraps around packer and virtualbox to create the systemvm template
 
+function usage() {
+  cat <<END
+Usage:
+   ./build.sh [template] [version] [BUILD_NUMBER]
+
+   * Set \$appliance to provide definition name to build
+     (or use command line arg, default systemvmtemplate)
+   * Set \$version to provide version to apply to built appliance
+     (or use command line arg, default empty)
+   * Set \$BUILD_NUMBER to provide build number to apply to built appliance
+     (or use command line arg, default empty)
+   * Set \$DEBUG=1 to enable debug logging
+   * Set \$TRACE=1 to enable trace logging
+END
+  exit 0
+}
+echo $@ | grep help >/dev/null && usage
+echo $@ | grep '\-h' >/dev/null && usage
+
+# requires 32-bit vhd-util and faketime binaries to be available (even for 64 bit builds)
+# Something like (on centos 6.5)...
+# * faketime
+#    wget -q http://bits.xensource.com/oss-xen/release/4.2.0/xen-4.2.0.tar.gz
+#    sudo yum -y install libuuid.i686
+#    cd repo/libfaketime/
+#    vim Makefile
+#    # (tune 32 bit)
+#    make
+#    sudo make install
+# * vhd-util
+#    Install on yum-based:
+#    sudo yum -y install python-devel dev86 iasl iasl-devel libuuid libuuid-devel \
+#        glib-devel glib2 glib2-devel yajl yajl-devel
+#    Install on apt-based:
+#    sudo apt-get install -y python python-dev bcc bin86 iasl uuid-dev \
+#        libglib2.0-dev libyajl-dev build-essential libc6-dev zlib1g-dev libncurses5-dev \
+#        patch iasl libbz2-dev e2fslibs-dev xz-utils gettext
+#    wget -q http://bits.xensource.com/oss-xen/release/4.2.0/xen-4.2.0.tar.gz
+#    tar xzvf xen-4.2.0.tar.gz
+#    cd xen-4.2.0/tools/
+#    wget https://github.com/citrix-openstack/xenserver-utils/raw/master/blktap2.patch -qO - | patch -p0
+#    ./configure --disable-monitors --disable-ocamltools --disable-rombios --disable-seabios
+#    make
+#    sudo cp ./blktap2/vhd/lib/libvhd.so.1.0 /usr/lib64/
+#    ldconfig
+#    sudo ldconfig
+#    sudo cp blktap2/vhd/vhd-util /usr/lib64/cloud/common/scripts/vm/hypervisor/xenserver
+#    faketime 2010-01-01 vhd-util convert
+#
+set -e
+
+###
+### Configuration
+###
+# whether to show DEBUG logs
+DEBUG="${DEBUG:-}"
+# whether to have other commands trace their actions
+TRACE="${TRACE:-0}"
+JENKINS_HOME=${JENKINS_HOME:-}
+if [[ ! -z "${JENKINS_HOME}" ]]; then
+  DEBUG=1
+fi
+
+# which packer definition to use
+appliance="${1:-${appliance:-systemvmtemplate}}"
+
+# optional version tag to put into the image filename
+version="${2:-${version:-}}"
+
+# optional (jenkins) build number tag to put into the image filename
+BUILD_NUMBER="${4:-${BUILD_NUMBER:-}}"
+
+version_tag=
+if [ ! -z "${version}" ]; then
+  if [ ! -z "${BUILD_NUMBER}" ]; then
+    version="${version}.${BUILD_NUMBER}"
+  fi
+  version_tag="-${version}"
+elif [ ! -z "${BUILD_NUMBER}" ]; then
+  version="${BUILD_NUMBER}"
+  version_tag="-${BUILD_NUMBER}"
+fi
+
+appliance_build_name=${appliance}${version_tag}
+
+###
+### Generic helper functions
+###
+
+# how to tell sed to use extended regular expressions
+os=`uname`
+sed_regex_option="-E"
+if [ "${os}" == "Linux" ]; then
+  sed_regex_option="-r"
+fi
+
+# logging support
+if [[ "${DEBUG}" == "1" ]]; then
+  set -x
+fi
+
+function log() {
+  local level=${1?}
+  shift
+
+  if [[ "${DEBUG}" != "1" && "${level}" == "DEBUG" ]]; then
+    return
+  fi
+
+  local code=
+  local line="[$(date '+%F %T')] $level: $*"
+  if [ -t 2 ]
+  then
+    case "$level" in
+      INFO) code=36 ;;
+      DEBUG) code=30 ;;
+      WARN) code=33 ;;
+      ERROR) code=31 ;;
+      *) code=37 ;;
+    esac
+    echo -e "\033[${code}m${line}\033[0m"
+  else
+    echo "$line"
+  fi >&2
+}
+
+function error() {
+  log ERROR $@
+  exit 1
+}
+
+# cleanup code support
+declare -a on_exit_items
+
+function on_exit() {
+  for (( i=${#on_exit_items[@]}-1 ; i>=0 ; i-- )) ; do
+    sleep 2
+    log DEBUG "on_exit: ${on_exit_items[i]}"
+    eval ${on_exit_items[i]}
+  done
+}
+
+function add_on_exit() {
+  local n=${#on_exit_items[*]}
+  on_exit_items[${n}]="$*"
+  if [ ${n} -eq 0 ]; then
+    log DEBUG "Setting trap"
+    trap on_exit EXIT
+  fi
+}
+
+# retry code support
+function retry() {
+  local times=$1
+  shift
+  local count=0
+  while [ ${count} -lt ${times} ]; do
+    "$@" && break
+    count=$(( $count +  1 ))
+    sleep ${count}
+  done
+
+  if [ ${count} -eq ${times} ]; then
+    error "Failed ${times} times: $@"
+  fi
+}
+
+###
+### Script logic
+###
+
+function create_definition() {
+  if [ "${appliance}" != "${appliance_build_name}" ]; then
+    cp -r "${appliance}" "${appliance_build_name}"
+    set +e
+    if [ ! -z "${version}" ]; then
+    sed ${sed_regex_option} -i -e "s/^CLOUDSTACK_RELEASE=.+/CLOUDSTACK_RELEASE=${version}/" \
+        "${appliance_build_name}/scripts/configure_systemvm_services.sh"
+    fi
+    set -e
+    add_on_exit rm -rf "${appliance_build_name}"
+  fi
+
+  ./shar_cloud_scripts.sh
+  add_on_exit rm -f cloud_scripts_shar_archive.sh
+}
+
+function prepare() {
+  log INFO "preparing for build"
+  rm -rf dist *.ova *.vhd *.vdi *.qcow* *.bz2 *.vmdk *.ovf
+}
+
+function packer_build() {
+  log INFO "building new image with packer"
+  cd ${appliance_build_name} && packer build template.json && cd ..
+}
 
 function stage_vmx (){
-    cat << VMXFILE > "$1.vmx"
+  cat << VMXFILE > "${1}.vmx"
 .encoding = "UTF-8"
-displayname = "$1"
-annotation = "$1"
+displayname = "${1}"
+annotation = "${1}"
 guestos = "otherlinux-64"
-virtualhw.version = "7"
+virtualHW.version = "8"
 config.version = "8"
 numvcpus = "1"
 cpuid.coresPerSocket = "1"
@@ -61,12 +257,6 @@ scsi0:0.writeThrough = "false"
 scsi0.virtualDev = "lsilogic"
 scsi0.present = "TRUE"
 vmci0.unrestricted = "false"
-ethernet0.present = "TRUE"
-ethernet0.virtualDev = "e1000"
-ethernet0.connectionType = "bridged"
-ethernet0.startConnected = "TRUE"
-ethernet0.addressType = "generated"
-ethernet0.wakeonpcktrcv = "false"
 vcpu.hotadd = "false"
 vcpu.hotremove = "false"
 firmware = "bios"
@@ -74,118 +264,94 @@ mem.hotadd = "false"
 VMXFILE
 }
 
-if [ ! -z "$1" ]
-then
-  appliance="$1"
-else
-  appliance="systemvmtemplate"
-fi
-
-build_date=`date +%Y-%m-%d`
-
-# set fixed or leave empty to use git to determine
-branch=
-
-if [ -z "$branch" ] ; then
-  branch=`(git name-rev --no-undefined --name-only HEAD 2>/dev/null || echo unknown) | sed -e 's/remotes\/.*\///g'`
-fi
-
-rootdir=$PWD
-
-# Initialize veewee and dependencies
-bundle
-
-# Clean and start building the appliance
-bundle exec veewee vbox destroy $appliance
-bundle exec veewee vbox build $appliance --nogui --auto
-bundle exec veewee vbox halt $appliance
-
-while [[ `vboxmanage list runningvms | grep $appliance | wc -l` -ne 0 ]];
-do
-  echo "Waiting for $appliance to shutdown"
-  sleep 2;
-done
-
-# Get appliance uuids
-machine_uuid=`vboxmanage showvminfo $appliance | grep UUID | head -1 | awk '{print $2}'`
-hdd_uuid=`vboxmanage showvminfo $appliance | grep vdi | head -1 | awk '{print $8}' | cut -d ')' -f 1`
-hdd_path=`vboxmanage list hdds | grep "$appliance\/" | grep vdi | cut -c 14- | sed 's/^ *//'`
-
-# Remove any shared folder
-shared_folders=`vboxmanage showvminfo $appliance | grep Name | grep Host`
-while [ "$shared_folders" != "" ]
-do
-  vboxmanage sharedfolder remove $appliance --name "`echo $shared_folders | head -1 | cut -c 8- | cut -d \' -f 1`"
-  shared_folders=`vboxmanage showvminfo $appliance | grep Name | grep Host`
-done
-
-# Compact the virtual hdd
-vboxmanage modifyhd $hdd_uuid --compact
-
-# Start exporting
-rm -fr dist *.ova *.vhd *.vdi *.qcow* *.bz2 *.vmdk *.ovf
-mkdir dist
-
-# Export for XenServer
-which faketime >/dev/null 2>&1 && which vhd-util >/dev/null 2>&1
-if [ $? == 0 ]; then
+function xen_server_export() {
+  log INFO "creating xen server export"
+  set +e
+  which faketime >/dev/null 2>&1 && which vhd-util >/dev/null 2>&1
+  local result=$?
   set -e
-  vboxmanage internalcommands converttoraw -format vdi "$hdd_path" img.raw
-  vhd-util convert -s 0 -t 1 -i img.raw -o stagefixed.vhd
-  faketime '2010-01-01' vhd-util convert -s 1 -t 2 -i stagefixed.vhd -o $appliance-$branch-xen.vhd
-  rm *.bak
-  bzip2 $appliance-$branch-xen.vhd
-  echo "$appliance exported for XenServer: dist/$appliance-$branch-xen.vhd.bz2"
-else
-  echo "** Skipping $appliance export for XenServer: faketime or vhd-util command is missing. **"
-  echo "** faketime source code is available from https://github.com/wolfcw/libfaketime **"
-fi
+  if [ ${result} == 0 ]; then
+    qemu-img convert -f qcow2 -O raw "dist/${appliance}" img.raw
+    vhd-util convert -s 0 -t 1 -i img.raw -o stagefixed.vhd
+    faketime '2010-01-01' vhd-util convert -s 1 -t 2 -i stagefixed.vhd -o "${appliance_build_name}-xen.vhd"
+    rm -f *.bak
+    bzip2 "${appliance_build_name}-xen.vhd"
+    mv "${appliance_build_name}-xen.vhd.bz2" dist/
+    log INFO "${appliance} exported for XenServer: dist/${appliance_build_name}-xen.vhd.bz2"
+  else
+    log WARN "** Skipping ${appliance_build_name} export for XenServer: faketime or vhd-util command is missing. **"
+    log WARN "** faketime source code is available from https://github.com/wolfcw/libfaketime **"
+  fi
+}
 
-# Exit shell if exporting fails for any format
-set -e
+function ovm_export() {
+  log INFO "creating OVM export"
+  qemu-img convert -f qcow2 -O raw "dist/${appliance}" "dist/${appliance_build_name}-ovm.raw"
+  cd dist && bzip2 "${appliance_build_name}-ovm.raw" && cd ..
+  log INFO "${appliance} exported for OracleVM: dist/${appliance_build_name}-ovm.raw.bz2"
+}
 
-# Export for KVM
-rm -f raw.img
-vboxmanage internalcommands converttoraw -format vdi "$hdd_path" raw.img
-set +e
-qemu-img convert -o compat=0.10 -f raw -c -O qcow2 raw.img $appliance-$branch-kvm.qcow2
-qemuresult=$?
-set -e
-if [ ${qemuresult} != 0 ]; then
-  log INFO "'qemu-img convert' failed, trying without compat option"
-  qemu-img convert -f raw -c -O qcow2 raw.img $appliance-$branch-kvm.qcow2
-fi
-rm raw.img
-bzip2 $appliance-$branch-kvm.qcow2
-echo "$appliance exported for KVM: dist/$appliance-$branch-kvm.qcow2.bz2"
+function kvm_export() {
+  log INFO "creating kvm export"
+  set +e
+  qemu-img convert -o compat=0.10 -f qcow2 -c -O qcow2 "dist/${appliance}" "dist/${appliance_build_name}-kvm.qcow2"
+  local qemuresult=$?
+  cd dist && bzip2 "${appliance_build_name}-kvm.qcow2" && cd ..
+  log INFO "${appliance} exported for KVM: dist/${appliance_build_name}-kvm.qcow2.bz2"
+}
 
-# Export both ova and vmdk for VMWare
-vboxmanage clonehd $hdd_uuid $appliance-$branch-vmware.vmdk --format VMDK
-chmod 666 $appliance-$branch-vmware.vmdk
+function vmware_export() {
+  log INFO "creating vmware export"
+  qemu-img convert -f qcow2 -O vmdk "dist/${appliance}" "dist/${appliance_build_name}-vmware.vmdk"
 
-if ! ovftool_loc="$(type -p "ovftool")" || [ -z "$ovftool_loc" ]; then
-    echo "ovftool not found, using traditional method to export ova file"
-    vboxmanage export $machine_uuid --output $appliance-$branch-vmware.ovf
-    mv $appliance-$branch-vmware.ovf $appliance-$branch-vmware.ovf-orig
-    java -cp convert Convert convert_ovf_vbox_to_esx.xslt $appliance-$branch-vmware.ovf-orig $appliance-$branch-vmware.ovf
-    chmod 666 *.vmdk *.ovf
-    tar -cf $appliance-$branch-vmware.ova $appliance-$branch-vmware.ovf $appliance-$branch-vmware-disk[0-9].vmdk
-    rm -f $appliance-$branch-vmware.ovf $appliance-$branch-vmware.ovf-orig $appliance-$branch-vmware-disk[0-9].vmdk
-else
-    echo "ovftool found, using it to export ova file"
-    stage_vmx $appliance-$branch-vmware $appliance-$branch-vmware.vmdk
-    ovftool $appliance-$branch-vmware.vmx $appliance-$branch-vmware.ova
-fi
-bzip2 $appliance-$branch-vmware.vmdk
-echo "$appliance exported for VMWare: dist/$appliance-$branch-vmware.vmdk.bz2"
-echo "$appliance exported for VMWare: dist/$appliance-$branch-vmware.ova"
+  if ! ovftool_loc="$(type -p "ovftool")" || [ -z "$ovftool_loc" ]; then
+    log INFO "ovftool not found, skipping ova generation for VMware"
+    return
+  fi
 
-# Export for HyperV
-vboxmanage clonehd $hdd_uuid $appliance-$branch-hyperv.vhd --format VHD
-# HyperV doesn't support import a zipped image from S3, but we create a zipped version to save space on the jenkins box
-zip $appliance-$branch-hyperv.vhd.zip $appliance-$branch-hyperv.vhd
-echo "$appliance exported for HyperV: dist/$appliance-$branch-hyperv.vhd"
+  log INFO "ovftool found, using it to export ova file"
+  CDIR=$PWD
+  cd dist
+  chmod 666 ${appliance_build_name}-vmware.vmdk
+  stage_vmx ${appliance_build_name}-vmware ${appliance_build_name}-vmware.vmdk
+  ovftool ${appliance_build_name}-vmware.vmx ${appliance_build_name}-vmware.ova
+  rm -f *vmx *vmdk
+  cd $CDIR
+  log INFO "${appliance} exported for VMWare: dist/${appliance_build_name}-vmware.ova"
+}
 
-mv *-hyperv.vhd *-hyperv.vhd.zip *.bz2 *.ova dist/
-md5sum dist/* > dist/md5sum.txt
+function hyperv_export() {
+  log INFO "creating hyperv export"
+  qemu-img convert -f qcow2 -O vpc "dist/${appliance}" "dist/${appliance_build_name}-hyperv.vhd"
+  CDIR=$PWD
+  cd dist
+  zip "${appliance_build_name}-hyperv.vhd.zip" "${appliance_build_name}-hyperv.vhd"
+  rm -f *vhd
+  cd $CDIR
+  log INFO "${appliance} exported for HyperV: dist/${appliance_build_name}-hyperv.vhd.zip"
+}
 
+###
+### Main invocation
+###
+
+function main() {
+  prepare
+
+  create_definition
+  packer_build
+
+  # process the disk at dist
+  kvm_export
+  ovm_export
+  xen_server_export
+  vmware_export
+  hyperv_export
+  rm -f "dist/${appliance}"
+  cd dist && md5sum * > md5sum.txt && cd ..
+  cd dist && sha512sum * > sha512sum.txt && cd ..
+  add_on_exit log INFO "BUILD SUCCESSFUL"
+}
+
+# we only run main() if not source-d
+return 2>/dev/null || main

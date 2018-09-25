@@ -16,7 +16,6 @@
 // under the License.
 package com.cloud.acl;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.springframework.stereotype.Component;
@@ -47,7 +46,6 @@ import com.cloud.user.dao.AccountDao;
 import com.cloud.utils.component.AdapterBase;
 
 @Component
-@Local(value = SecurityChecker.class)
 public class DomainChecker extends AdapterBase implements SecurityChecker {
 
     @Inject
@@ -170,7 +168,7 @@ public class DomainChecker extends AdapterBase implements SecurityChecker {
 
     @Override
     public boolean checkAccess(Account account, DiskOffering dof) throws PermissionDeniedException {
-        if (account == null || dof.getDomainId() == null) {//public offering
+        if (account == null || dof == null || dof.getDomainId() == null) {//public offering
             return true;
         } else {
             //admin has all permissions
@@ -181,7 +179,8 @@ public class DomainChecker extends AdapterBase implements SecurityChecker {
             //check if account's domain is a child of zone's domain (Note: This is made consistent with the list command for disk offering)
             else if (_accountService.isNormalUser(account.getId())
                     || account.getType() == Account.ACCOUNT_TYPE_RESOURCE_DOMAIN_ADMIN
-                    || _accountService.isDomainAdmin(account.getId())) {
+                    || _accountService.isDomainAdmin(account.getId())
+                    || account.getType() == Account.ACCOUNT_TYPE_PROJECT) {
                 if (account.getDomainId() == dof.getDomainId()) {
                     return true; //disk offering and account at exact node
                 } else {
@@ -219,7 +218,8 @@ public class DomainChecker extends AdapterBase implements SecurityChecker {
             //check if account's domain is a child of zone's domain (Note: This is made consistent with the list command for service offering)
             else if (_accountService.isNormalUser(account.getId())
                     || account.getType() == Account.ACCOUNT_TYPE_RESOURCE_DOMAIN_ADMIN
-                    || _accountService.isDomainAdmin(account.getId())) {
+                    || _accountService.isDomainAdmin(account.getId())
+                    || account.getType() == Account.ACCOUNT_TYPE_PROJECT) {
                 if (account.getDomainId() == so.getDomainId()) {
                     return true; //service offering and account at exact node
                 } else {

@@ -21,6 +21,7 @@ import java.util.Map;
 
 import com.google.gson.annotations.SerializedName;
 
+import org.apache.cloudstack.acl.RoleType;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseResponse;
 import org.apache.cloudstack.api.EntityReference;
@@ -28,7 +29,6 @@ import org.apache.cloudstack.api.EntityReference;
 import com.cloud.serializer.Param;
 import com.cloud.user.Account;
 
-@SuppressWarnings("unused")
 @EntityReference(value = Account.class)
 public class AccountResponse extends BaseResponse implements ResourceLimitAndCountResponse {
     @SerializedName(ApiConstants.ID)
@@ -42,6 +42,18 @@ public class AccountResponse extends BaseResponse implements ResourceLimitAndCou
     @SerializedName(ApiConstants.ACCOUNT_TYPE)
     @Param(description = "account type (admin, domain-admin, user)")
     private Short accountType;
+
+    @SerializedName(ApiConstants.ROLE_ID)
+    @Param(description = "the ID of the role")
+    private String roleId;
+
+    @SerializedName(ApiConstants.ROLE_TYPE)
+    @Param(description = "the type of the role (Admin, ResourceAdmin, DomainAdmin, User)")
+    private String roleType;
+
+    @SerializedName(ApiConstants.ROLE_NAME)
+    @Param(description = "the name of the role")
+    private String roleName;
 
     @SerializedName(ApiConstants.DOMAIN_ID)
     @Param(description = "id of the Domain the account belongs too")
@@ -209,7 +221,7 @@ public class AccountResponse extends BaseResponse implements ResourceLimitAndCou
 
     @SerializedName("secondarystoragetotal")
     @Param(description = "the total secondary storage space (in GiB) owned by account", since = "4.2.0")
-    private Long secondaryStorageTotal;
+    private float secondaryStorageTotal;
 
     @SerializedName("secondarystorageavailable")
     @Param(description = "the total secondary storage space (in GiB) available to be used for this account", since = "4.2.0")
@@ -258,6 +270,20 @@ public class AccountResponse extends BaseResponse implements ResourceLimitAndCou
 
     public void setAccountType(Short accountType) {
         this.accountType = accountType;
+    }
+
+    public void setRoleId(String roleId) {
+        this.roleId = roleId;
+    }
+
+    public void setRoleType(RoleType roleType) {
+        if (roleType != null) {
+            this.roleType = roleType.name();
+        }
+    }
+
+    public void setRoleName(String roleName) {
+        this.roleName = roleName;
     }
 
     public void setDomainId(String domainId) {
@@ -474,7 +500,7 @@ public class AccountResponse extends BaseResponse implements ResourceLimitAndCou
     }
 
     @Override
-    public void setSecondaryStorageTotal(Long secondaryStorageTotal) {
+    public void setSecondaryStorageTotal(float secondaryStorageTotal) {
         this.secondaryStorageTotal = secondaryStorageTotal;
     }
 

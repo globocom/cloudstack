@@ -144,7 +144,7 @@ public class AutoScaleCounterCollector extends ManagedContextRunnable implements
         if(nic == null)
             return null;
 
-        return nic.getIp4Address() != null ? nic.getIp4Address() : nic.getIp6Address();
+        return nic.getIPv4Address() != null ? nic.getIPv4Address() : nic.getIPv6Address();
     }
 
     private NicVO getNonDefaultNic(List<NicVO> nicList) {

@@ -18,7 +18,6 @@ package com.globo.globonetwork.cloudstack.guru;
 
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -45,7 +44,6 @@ import com.cloud.network.PhysicalNetwork.IsolationMethod;
 import com.cloud.network.dao.NetworkVO;
 import com.cloud.network.dao.PhysicalNetworkVO;
 import com.cloud.network.guru.GuestNetworkGuru;
-import com.cloud.network.guru.NetworkGuru;
 import com.cloud.network.router.VpcVirtualNetworkApplianceManager;
 import com.cloud.offering.NetworkOffering;
 import com.cloud.user.Account;
@@ -62,7 +60,6 @@ import com.globo.globonetwork.cloudstack.dao.GloboNetworkVipAccDao;
 import com.globo.globonetwork.cloudstack.manager.GloboNetworkService;
 
 @Component
-@Local(value = {NetworkGuru.class})
 public class GloboNetworkGuru extends GuestNetworkGuru {
     private static final Logger s_logger = Logger.getLogger(GloboNetworkGuru.class);
 
@@ -80,7 +77,7 @@ public class GloboNetworkGuru extends GuestNetworkGuru {
     protected NetworkType _networkType = NetworkType.Advanced;
 
     public GloboNetworkGuru() {
-        _isolationMethods = new IsolationMethod[] {IsolationMethod.VLAN};
+        _isolationMethods = new IsolationMethod[] {new IsolationMethod("VLAN")};
         setName("GloboNetworkGuru");
     }
 
@@ -122,7 +119,7 @@ public class GloboNetworkGuru extends GuestNetworkGuru {
             return null;
         }
 
-        NetworkVO config = new NetworkVO(offering.getTrafficType(), Mode.Dhcp, BroadcastDomainType.Vlan, offering.getId(), State.Allocated, plan.getDataCenterId(), plan.getPhysicalNetworkId());
+        NetworkVO config = new NetworkVO(offering.getTrafficType(), Mode.Dhcp, BroadcastDomainType.Vlan, offering.getId(), State.Allocated, plan.getDataCenterId(), plan.getPhysicalNetworkId(), false);
 
         if (userSpecified != null) {
             if ((userSpecified.getCidr() == null && userSpecified.getGateway() != null) || (userSpecified.getCidr() != null && userSpecified.getGateway() == null)) {
@@ -172,10 +169,10 @@ public class GloboNetworkGuru extends GuestNetworkGuru {
     public void updateNicProfile(NicProfile profile, Network network) {
         DataCenter dc = _dcDao.findById(network.getDataCenterId());
         if (profile != null) {
-            profile.setDns1(dc.getDns1());
-            profile.setDns2(dc.getDns2());
-            profile.setIp6Dns1(dc.getIp6Dns1());
-            profile.setIp6Dns2(dc.getIp6Dns2());
+            profile.setIPv4Dns1(dc.getDns1());
+            profile.setIPv4Dns2(dc.getDns2());
+            profile.setIPv6Dns1(dc.getIp6Dns1());
+            profile.setIPv6Dns2(dc.getIp6Dns2());
         }
     }
 

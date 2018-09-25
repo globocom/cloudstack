@@ -20,6 +20,7 @@ package org.apache.cloudstack.storage.volume.datastore;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -118,6 +119,8 @@ public class PrimaryDataStoreHelper {
             dataStoreVO.setPath(updatedPath);
         }
         String tags = params.getTags();
+        List<String> storageTags = new ArrayList<String>();
+
         if (tags != null) {
             String[] tokens = tags.split(",");
 
@@ -126,10 +129,10 @@ public class PrimaryDataStoreHelper {
                 if (tag.length() == 0) {
                     continue;
                 }
-                details.put(tag, "true");
+                storageTags.add(tag);
             }
         }
-        dataStoreVO = dataStoreDao.persist(dataStoreVO, details);
+        dataStoreVO = dataStoreDao.persist(dataStoreVO, details, storageTags);
         return dataStoreMgr.getDataStore(dataStoreVO.getId(), DataStoreRole.Primary);
     }
 
@@ -192,6 +195,20 @@ public class PrimaryDataStoreHelper {
         return true;
     }
 
+    public boolean disable(DataStore store) {
+        StoragePoolVO pool = this.dataStoreDao.findById(store.getId());
+        pool.setStatus(StoragePoolStatus.Disabled);
+        this.dataStoreDao.update(pool.getId(), pool);
+        return true;
+    }
+
+    public boolean enable(DataStore store) {
+        StoragePoolVO pool = this.dataStoreDao.findById(store.getId());
+        pool.setStatus(StoragePoolStatus.Up);
+        dataStoreDao.update(pool.getId(), pool);
+        return true;
+    }
+
     protected boolean deletePoolStats(Long poolId) {
         CapacityVO capacity1 = _capacityDao.findByHostIdType(poolId, Capacity.CAPACITY_TYPE_STORAGE);
         CapacityVO capacity2 = _capacityDao.findByHostIdType(poolId, Capacity.CAPACITY_TYPE_STORAGE_ALLOCATED);
@@ -217,6 +234,7 @@ public class PrimaryDataStoreHelper {
         poolVO.setUuid(null);
         this.dataStoreDao.update(poolVO.getId(), poolVO);
         dataStoreDao.remove(poolVO.getId());
+        dataStoreDao.deletePoolTags(poolVO.getId());
         deletePoolStats(poolVO.getId());
         // Delete op_host_capacity entries
         this._capacityDao.removeBy(Capacity.CAPACITY_TYPE_STORAGE_ALLOCATED, null, null, null, poolVO.getId());

@@ -66,13 +66,13 @@ public class VmwareSecondaryStorageResourceHandler implements SecondaryStorageRe
      * private Map<String, HostMO> _activeHosts = new HashMap<String, HostMO>();
      */
 
-    public VmwareSecondaryStorageResourceHandler(PremiumSecondaryStorageResource resource) {
+    public VmwareSecondaryStorageResourceHandler(PremiumSecondaryStorageResource resource, Integer nfsVersion) {
         _resource = resource;
-        _storageMgr = new VmwareStorageManagerImpl(this);
+        _storageMgr = new VmwareStorageManagerImpl(this, nfsVersion);
         _gson = GsonHelper.getGsonLogger();
 
-        VmwareStorageProcessor storageProcessor = new VmwareStorageProcessor(this, true, this, resource.getTimeout(), null, null, _resource);
-        VmwareStorageSubsystemCommandHandler vmwareStorageSubsystemCommandHandler = new VmwareStorageSubsystemCommandHandler(storageProcessor);
+        VmwareStorageProcessor storageProcessor = new VmwareStorageProcessor(this, true, this, resource.getTimeout(), null, null, _resource, nfsVersion);
+        VmwareStorageSubsystemCommandHandler vmwareStorageSubsystemCommandHandler = new VmwareStorageSubsystemCommandHandler(storageProcessor, nfsVersion);
         vmwareStorageSubsystemCommandHandler.setStorageResource(_resource);
         vmwareStorageSubsystemCommandHandler.setStorageManager(_storageMgr);
         storageSubsystemHandler = vmwareStorageSubsystemCommandHandler;
@@ -145,8 +145,11 @@ public class VmwareSecondaryStorageResourceHandler implements SecondaryStorageRe
     }
 
     protected Answer execute(CreateEntityDownloadURLCommand cmd) {
-        _storageMgr.execute(this, cmd);
-        return _resource.defaultAction(cmd);
+        boolean success = _storageMgr.execute(this, cmd);
+        if (success) {
+            return _resource.defaultAction(cmd);
+        }
+        return new Answer(cmd, false, "Failed to download");
     }
 
     private Answer execute(PrimaryStorageDownloadCommand cmd) {
@@ -236,7 +239,7 @@ public class VmwareSecondaryStorageResourceHandler implements SecondaryStorageRe
             VmwareContext context = currentContext.get();
             currentContext.set(null);
             assert (context.getPool() != null);
-            context.getPool().returnContext(context);
+            context.getPool().registerContext(context);
         }
     }
 
@@ -304,7 +307,7 @@ public class VmwareSecondaryStorageResourceHandler implements SecondaryStorageRe
     }
 
     @Override
-    public String getMountPoint(String storageUrl) {
-        return _resource.getRootDir(storageUrl);
+    public String getMountPoint(String storageUrl, Integer nfsVersion) {
+        return _resource.getRootDir(storageUrl, nfsVersion);
     }
 }

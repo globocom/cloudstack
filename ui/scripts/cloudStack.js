@@ -22,9 +22,9 @@
             var sections = [];
 
             if (isAdmin()) {
-                sections = ["dashboard", "instances", "storage", "network", "loadbalancer", "templates", "accounts", "domains", "events", "system", "global-settings", "configuration", "projects", "regions", "affinityGroups"];
+                sections = ["dashboard", "instances", "storage", "network", "loadbalancer", "templates", "roles", "accounts", "domains", "events", "system", "global-settings", "configuration", "projects", "regions", "affinityGroups"];
             } else if (isDomainAdmin()) {
-                sections = ["dashboard", "instances", "storage", "network", "loadbalancer", "templates", "accounts", "domains", "events", "projects", "regions", "affinityGroups"];
+                sections = ["dashboard", "instances", "storage", "network", "loadbalancer", "templates", "accounts", "domains", "events", "projects", "configuration", "regions", "affinityGroups"];
             } else if (g_userProjectsEnabled) {
                 sections = ["dashboard", "instances", "storage", "network", "loadbalancer", "templates", "accounts", "events", "projects", "regions", "affinityGroups"];
             } else { //normal user
@@ -53,6 +53,7 @@
             templates: {},
             events: {},
             projects: {},
+            roles: {},
             accounts: {},
 
             domains: {}, //domain-admin and root-admin only
@@ -72,7 +73,6 @@
         /**
          * Generic error handling
          */
-
         $.ajaxSetup({
             url: clientApiUrl,
             async: true,
@@ -120,6 +120,7 @@
                     g_username = unBoxCookieValue('username');
                     g_userfullname = unBoxCookieValue('userfullname');
                     g_timezone = unBoxCookieValue('timezone');
+                    g_timezoneoffset = unBoxCookieValue('timezoneoffset');
                 } else { //single-sign-on (bypass login screen)
                     g_sessionKey = encodeURIComponent(g_loginResponse.sessionkey);
                     g_role = g_loginResponse.type;
@@ -129,6 +130,7 @@
                     g_domainid = g_loginResponse.domainid;
                     g_userfullname = g_loginResponse.firstname + ' ' + g_loginResponse.lastname;
                     g_timezone = g_loginResponse.timezone;
+                    g_timezoneoffset = g_loginResponse.timezoneoffset;
                 }
 
                 var userValid = false;
@@ -137,15 +139,16 @@
                     dataType: "json",
                     async: false,
                     success: function(json) {
-                        g_capabilities = json.listcapabilitiesresponse.capability;                        
-                        g_supportELB = json.listcapabilitiesresponse.capability.supportELB.toString(); //convert boolean to string if it's boolean   
-                        g_kvmsnapshotenabled = json.listcapabilitiesresponse.capability.kvmsnapshotenabled; //boolean          
-                        g_regionsecondaryenabled = json.listcapabilitiesresponse.capability.regionsecondaryenabled; //boolean    
+                        g_capabilities = json.listcapabilitiesresponse.capability;
+                        g_supportELB = json.listcapabilitiesresponse.capability.supportELB.toString(); //convert boolean to string if it's boolean
+                        g_kvmsnapshotenabled = json.listcapabilitiesresponse.capability.kvmsnapshotenabled; //boolean
+                        g_regionsecondaryenabled = json.listcapabilitiesresponse.capability.regionsecondaryenabled; //boolean
                         if (json.listcapabilitiesresponse.capability.userpublictemplateenabled != null) {
-                            g_userPublicTemplateEnabled = json.listcapabilitiesresponse.capability.userpublictemplateenabled.toString(); //convert boolean to string if it's boolean                            
+                            g_userPublicTemplateEnabled = json.listcapabilitiesresponse.capability.userpublictemplateenabled.toString(); //convert boolean to string if it's boolean
                         }
+
+                        g_allowUserExpungeRecoverVm = json.listcapabilitiesresponse.capability.allowuserexpungerecovervm;
                         g_userProjectsEnabled = json.listcapabilitiesresponse.capability.allowusercreateprojects;
-                       
 
                         g_cloudstackversion = json.listcapabilitiesresponse.capability.cloudstackversion;
 
@@ -165,23 +168,43 @@
                     }
                 });
 
+                // Update global pagesize for list APIs in UI
+                $.ajax({
+                    type: 'GET',
+                    url: createURL('listConfigurations'),
+                    data: {name: 'default.ui.page.size'},
+                    dataType: 'json',
+                    async: false,
+                    success: function(data, textStatus, xhr) {
+                        if (data && data.listconfigurationsresponse && data.listconfigurationsresponse.configuration) {
+                            var config = data.listconfigurationsresponse.configuration[0];
+                            if (config && config.name == 'default.ui.page.size') {
+                                pageSize = parseInt(config.value);
+                            }
+                        }
+                    },
+                    error: function(xhr) { // ignore any errors, fallback to the default
+                    }
+                });
+
+
                 // Populate IDP list
-                // $.ajax({
-                //     type: 'GET',
-                //     url: createURL('listIdps'),
-                //     dataType: 'json',
-                //     async: false,
-                //     success: function(data, textStatus, xhr) {
-                //         if (data && data.listidpsresponse && data.listidpsresponse.idp) {
-                //             var idpList = data.listidpsresponse.idp.sort(function (a, b) {
-                //                 return a.orgName.localeCompare(b.orgName);
-                //             });
-                //             g_idpList = idpList;
-                //         }
-                //     },
-                //     error: function(xhr) {
-                //     },
-                // });
+                $.ajax({
+                    type: 'GET',
+                    url: createURL('listIdps'),
+                    dataType: 'json',
+                    async: false,
+                    success: function(data, textStatus, xhr) {
+                        if (data && data.listidpsresponse && data.listidpsresponse.idp) {
+                            var idpList = data.listidpsresponse.idp.sort(function (a, b) {
+                                return a.orgName.localeCompare(b.orgName);
+                            });
+                            g_idpList = idpList;
+                        }
+                    },
+                    error: function(xhr) {
+                    }
+                });
 
                 return userValid ? {
                     user: {
@@ -193,106 +216,6 @@
                         domainid: g_domainid
                     }
                 } : false;
-            },
-
-            // Actual login process, via form
-            processLogin: function(loginresponse) {
-                var success;
-                g_mySession = $.cookie('JSESSIONID');
-                g_sessionKey = encodeURIComponent(loginresponse.sessionkey);
-                g_role = loginresponse.type;
-                g_username = loginresponse.username;
-                g_userid = loginresponse.userid;
-                g_account = loginresponse.account;
-                g_domainid = loginresponse.domainid;
-                g_timezone = loginresponse.timezone;
-                g_timezoneoffset = loginresponse.timezoneoffset;
-                g_userfullname = loginresponse.firstname + ' ' + loginresponse.lastname;
-
-                $.cookie('sessionKey', g_sessionKey, {
-                    expires: 1
-                });
-                $.cookie('username', g_username, {
-                    expires: 1
-                });
-                $.cookie('account', g_account, {
-                    expires: 1
-                });
-                $.cookie('domainid', g_domainid, {
-                    expires: 1
-                });
-                $.cookie('role', g_role, {
-                    expires: 1
-                });
-                $.cookie('timezoneoffset', g_timezoneoffset, {
-                    expires: 1
-                });
-                $.cookie('timezone', g_timezone, {
-                    expires: 1
-                });
-                $.cookie('userfullname', g_userfullname, {
-                    expires: 1
-                });
-                $.cookie('userid', g_userid, {
-                    expires: 1
-                });
-
-                $.ajax({
-                    url: createURL("listCapabilities"),
-                    dataType: "json",
-                    async: false,
-                    success: function(json) {
-                        success = true;
-                        g_capabilities = json.listcapabilitiesresponse.capability;
-                        $.cookie('capabilities', g_capabilities, {
-                            expires: 1
-                        });
-
-                        g_supportELB = json.listcapabilitiesresponse.capability.supportELB.toString(); //convert boolean to string if it's boolean
-                        $.cookie('supportELB', g_supportELB, {
-                            expires: 1
-                        });
-
-                        g_kvmsnapshotenabled = json.listcapabilitiesresponse.capability.kvmsnapshotenabled; //boolean
-                        $.cookie('kvmsnapshotenabled', g_kvmsnapshotenabled, {
-                            expires: 1
-                        });   
-                        
-                        g_regionsecondaryenabled = json.listcapabilitiesresponse.capability.regionsecondaryenabled; //boolean
-                        $.cookie('regionsecondaryenabled', g_regionsecondaryenabled, {
-                            expires: 1
-                        }); 
-                        
-                        if (json.listcapabilitiesresponse.capability.userpublictemplateenabled != null) {
-                            g_userPublicTemplateEnabled = json.listcapabilitiesresponse.capability.userpublictemplateenabled.toString(); //convert boolean to string if it's boolean
-                            $.cookie('userpublictemplateenabled', g_userPublicTemplateEnabled, {
-                                expires: 1
-                            });
-                        }
-
-                        g_userProjectsEnabled = json.listcapabilitiesresponse.capability.allowusercreateprojects;
-                        $.cookie('userProjectsEnabled', g_userProjectsEnabled, {
-                            expires: 1
-                        });
-
-                        g_cloudstackversion = json.listcapabilitiesresponse.capability.cloudstackversion;
-
-                        if (json.listcapabilitiesresponse.capability.apilimitinterval != null && json.listcapabilitiesresponse.capability.apilimitmax != null) {
-                            var intervalLimit = ((json.listcapabilitiesresponse.capability.apilimitinterval * 1000) / json.listcapabilitiesresponse.capability.apilimitmax) * 3; //multiply 3 to be on safe side
-                            //intervalLimit = 8888; //this line is for testing only, comment it before check in
-                            if (intervalLimit > g_queryAsyncJobResultInterval)
-                                g_queryAsyncJobResultInterval = intervalLimit;
-                        }
-                    },
-                    error: function(xmlHTTP) {
-                        success = false;
-                    }
-                });
-               
-                // Get project configuration
-                // TEMPORARY -- replace w/ output of capability response, etc., once implemented
-                window.g_projectsInviteRequired = false;
-                return success;
             },
 
             // Actual login process, via form
@@ -328,20 +251,87 @@
                     success: function(json) {
                         var loginresponse = json.loginresponse;
 
-                        if (!loginArgs.processLogin(loginresponse)) {
-                            args.response.error();
-                            return;
-                        }
+                        // sessionkey is recevied as a HttpOnly cookie
+                        // therefore reset any g_sessionKey value, an explicit
+                        // param in the API call is no longer needed
+                        g_sessionKey = null;
+                        g_role = loginresponse.type;
+                        g_username = loginresponse.username;
+                        g_userid = loginresponse.userid;
+                        g_account = loginresponse.account;
+                        g_domainid = loginresponse.domainid;
+                        g_timezone = loginresponse.timezone;
+                        g_timezoneoffset = loginresponse.timezoneoffset;
+                        g_userfullname = loginresponse.firstname + ' ' + loginresponse.lastname;
 
-                        args.response.success({
-                            data: {
-                                user: $.extend(true, {}, loginresponse, {
-                                    name: loginresponse.firstname + ' ' + loginresponse.lastname,
-                                    role: loginresponse.type == 1 ? 'admin' : 'user',
-                                    type: loginresponse.type
-                                })
+                        $.cookie('username', g_username, {
+                            expires: 1
+                        });
+                        $.cookie('account', g_account, {
+                            expires: 1
+                        });
+                        $.cookie('domainid', g_domainid, {
+                            expires: 1
+                        });
+                        $.cookie('role', g_role, {
+                            expires: 1
+                        });
+                        $.cookie('timezone', g_timezone, {
+                            expires: 1
+                        });
+                        $.cookie('timezoneoffset', g_timezoneoffset, {
+                            expires: 1
+                        });
+                        $.cookie('userfullname', g_userfullname, {
+                            expires: 1
+                        });
+                        $.cookie('userid', g_userid, {
+                            expires: 1
+                        });
+
+                        $.ajax({
+                            url: createURL("listCapabilities"),
+                            dataType: "json",
+                            async: false,
+                            success: function(json) {
+                                g_capabilities = json.listcapabilitiesresponse.capability;
+                                g_supportELB = json.listcapabilitiesresponse.capability.supportELB.toString(); //convert boolean to string if it's boolean
+                                g_kvmsnapshotenabled = json.listcapabilitiesresponse.capability.kvmsnapshotenabled; //boolean
+                                g_regionsecondaryenabled = json.listcapabilitiesresponse.capability.regionsecondaryenabled; //boolean
+                                if (json.listcapabilitiesresponse.capability.userpublictemplateenabled != null) {
+                                    g_userPublicTemplateEnabled = json.listcapabilitiesresponse.capability.userpublictemplateenabled.toString(); //convert boolean to string if it's boolean
+                                }
+                                g_allowUserExpungeRecoverVm = json.listcapabilitiesresponse.capability.allowuserexpungerecovervm;
+                                g_userProjectsEnabled = json.listcapabilitiesresponse.capability.allowusercreateprojects;
+
+                                g_cloudstackversion = json.listcapabilitiesresponse.capability.cloudstackversion;
+
+                                if (json.listcapabilitiesresponse.capability.apilimitinterval != null && json.listcapabilitiesresponse.capability.apilimitmax != null) {
+                                    var intervalLimit = ((json.listcapabilitiesresponse.capability.apilimitinterval * 1000) / json.listcapabilitiesresponse.capability.apilimitmax) * 3; //multiply 3 to be on safe side
+                                    //intervalLimit = 8888; //this line is for testing only, comment it before check in
+                                    if (intervalLimit > g_queryAsyncJobResultInterval)
+                                        g_queryAsyncJobResultInterval = intervalLimit;
+                                }
+
+                                args.response.success({
+                                    data: {
+                                        user: $.extend(true, {}, loginresponse, {
+                                            name: loginresponse.firstname + ' ' + loginresponse.lastname,
+                                            role: loginresponse.type == 1 ? 'admin' : 'user',
+                                            type: loginresponse.type
+                                        })
+                                    }
+                                });
+                            },
+                            error: function(xmlHTTP) {
+                                args.response.error();
                             }
                         });
+
+                        // Get project configuration
+                        // TEMPORARY -- replace w/ output of capability response, etc., once implemented
+                        window.g_projectsInviteRequired = false;
+
                     },
                     error: function(XMLHttpRequest) {
                         var errorMsg = parseXMLHttpResponse(XMLHttpRequest);
@@ -478,6 +468,106 @@
                     $('#container').html('');
                     $('#container').cloudStack(window.cloudStack);
                 };
+            },
+            // Actual login process, via form
+            processLogin: function(loginresponse) {
+                var success;
+                g_mySession = $.cookie('JSESSIONID');
+                g_sessionKey = encodeURIComponent(loginresponse.sessionkey);
+                g_role = loginresponse.type;
+                g_username = loginresponse.username;
+                g_userid = loginresponse.userid;
+                g_account = loginresponse.account;
+                g_domainid = loginresponse.domainid;
+                g_timezone = loginresponse.timezone;
+                g_timezoneoffset = loginresponse.timezoneoffset;
+                g_userfullname = loginresponse.firstname + ' ' + loginresponse.lastname;
+
+                $.cookie('sessionKey', g_sessionKey, {
+                    expires: 1
+                });
+                $.cookie('username', g_username, {
+                    expires: 1
+                });
+                $.cookie('account', g_account, {
+                    expires: 1
+                });
+                $.cookie('domainid', g_domainid, {
+                    expires: 1
+                });
+                $.cookie('role', g_role, {
+                    expires: 1
+                });
+                $.cookie('timezoneoffset', g_timezoneoffset, {
+                    expires: 1
+                });
+                $.cookie('timezone', g_timezone, {
+                    expires: 1
+                });
+                $.cookie('userfullname', g_userfullname, {
+                    expires: 1
+                });
+                $.cookie('userid', g_userid, {
+                    expires: 1
+                });
+
+                $.ajax({
+                    url: createURL("listCapabilities"),
+                    dataType: "json",
+                    async: false,
+                    success: function(json) {
+                        success = true;
+                        g_capabilities = json.listcapabilitiesresponse.capability;
+                        $.cookie('capabilities', g_capabilities, {
+                            expires: 1
+                        });
+
+                        g_supportELB = json.listcapabilitiesresponse.capability.supportELB.toString(); //convert boolean to string if it's boolean
+                        $.cookie('supportELB', g_supportELB, {
+                            expires: 1
+                        });
+
+                        g_kvmsnapshotenabled = json.listcapabilitiesresponse.capability.kvmsnapshotenabled; //boolean
+                        $.cookie('kvmsnapshotenabled', g_kvmsnapshotenabled, {
+                            expires: 1
+                        });
+
+                        g_regionsecondaryenabled = json.listcapabilitiesresponse.capability.regionsecondaryenabled; //boolean
+                        $.cookie('regionsecondaryenabled', g_regionsecondaryenabled, {
+                            expires: 1
+                        });
+
+                        if (json.listcapabilitiesresponse.capability.userpublictemplateenabled != null) {
+                            g_userPublicTemplateEnabled = json.listcapabilitiesresponse.capability.userpublictemplateenabled.toString(); //convert boolean to string if it's boolean
+                            $.cookie('userpublictemplateenabled', g_userPublicTemplateEnabled, {
+                                expires: 1
+                            });
+                        }
+
+                        g_userProjectsEnabled = json.listcapabilitiesresponse.capability.allowusercreateprojects;
+                        $.cookie('userProjectsEnabled', g_userProjectsEnabled, {
+                            expires: 1
+                        });
+
+                        g_cloudstackversion = json.listcapabilitiesresponse.capability.cloudstackversion;
+
+                        if (json.listcapabilitiesresponse.capability.apilimitinterval != null && json.listcapabilitiesresponse.capability.apilimitmax != null) {
+                            var intervalLimit = ((json.listcapabilitiesresponse.capability.apilimitinterval * 1000) / json.listcapabilitiesresponse.capability.apilimitmax) * 3; //multiply 3 to be on safe side
+                            //intervalLimit = 8888; //this line is for testing only, comment it before check in
+                            if (intervalLimit > g_queryAsyncJobResultInterval)
+                                g_queryAsyncJobResultInterval = intervalLimit;
+                        }
+                    },
+                    error: function(xmlHTTP) {
+                        success = false;
+                    }
+                });
+
+                // Get project configuration
+                // TEMPORARY -- replace w/ output of capability response, etc., once implemented
+                window.g_projectsInviteRequired = false;
+                return success;
+
             }
         };
 
@@ -500,7 +590,6 @@
         document.title = _l('label.app.name');
 
         var stopLogin = false;
-
         if ($.urlParam("direct") !== "true") {
             // try OAuth2 login
             stopLogin = !!cloudStack.OAuth2.login(loginArgs);
@@ -510,5 +599,6 @@
             cloudStack.uiCustom.login(loginArgs);
         }
 
+        document.title = _l('label.app.name');
     });
 })(cloudStack, jQuery);

@@ -16,6 +16,30 @@
 // under the License.
 package org.apache.cloudstack.engine.orchestration;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.cloud.uservm.UserVm;
+import com.cloud.vm.VirtualMachine.State;
+import com.cloud.utils.exception.CloudRuntimeException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Arrays;
+
+import com.cloud.exception.InvalidParameterValueException;
+import com.cloud.offerings.NetworkOfferingVO;
+import org.apache.log4j.Logger;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+import org.mockito.Matchers;
+
 import com.cloud.network.Network;
 import com.cloud.network.Network.GuestType;
 import com.cloud.network.Network.Service;
@@ -26,13 +50,10 @@ import com.cloud.network.dao.NetworkServiceMapDao;
 import com.cloud.network.dao.NetworkVO;
 import com.cloud.network.element.DhcpServiceProvider;
 import com.cloud.network.guru.NetworkGuru;
-import com.cloud.uservm.UserVm;
-import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.vm.Nic;
 import com.cloud.vm.NicVO;
 import com.cloud.vm.UserVmVO;
 import com.cloud.vm.VirtualMachine;
-import com.cloud.vm.VirtualMachine.State;
 import com.cloud.vm.VirtualMachine.Type;
 import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.dao.NicDao;
@@ -40,28 +61,13 @@ import com.cloud.vm.dao.NicIpAliasDao;
 import com.cloud.vm.dao.NicSecondaryIpDao;
 import com.cloud.vm.dao.UserVmDaoImpl;
 import junit.framework.TestCase;
-import org.apache.log4j.Logger;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Matchers;
 
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
-
-
 
 /**
  * NetworkManagerImpl implements NetworkManager.
  */
+@RunWith(JUnit4.class)
 public class NetworkOrchestratorTest extends TestCase {
     static final Logger s_logger = Logger.getLogger(NetworkOrchestratorTest.class);
 
@@ -70,6 +76,10 @@ public class NetworkOrchestratorTest extends TestCase {
     String guruName = "GuestNetworkGuru";
     String dhcpProvider = "VirtualRouter";
     NetworkGuru guru = mock(NetworkGuru.class);
+
+    NetworkOfferingVO networkOffering = mock(NetworkOfferingVO.class);
+
+    private static final long networkOfferingId = 1l;
 
     @Override
     @Before
@@ -96,6 +106,9 @@ public class NetworkOrchestratorTest extends TestCase {
         List<NetworkGuru> networkGurus = new ArrayList<NetworkGuru>();
         networkGurus.add(guru);
         testOrchastrator.networkGurus = networkGurus;
+
+        when(networkOffering.getGuestType()).thenReturn(GuestType.L2);
+        when(networkOffering.getId()).thenReturn(networkOfferingId);
     }
 
     @Test
@@ -110,7 +123,7 @@ public class NetworkOrchestratorTest extends TestCase {
         when(testOrchastrator._networkModel.areServicesSupportedInNetwork(network.getId(), Service.Dhcp)).thenReturn(true);
         when(network.getTrafficType()).thenReturn(TrafficType.Guest);
         when(network.getGuestType()).thenReturn(GuestType.Shared);
-        when(testOrchastrator._nicDao.listByNetworkIdTypeAndGatewayAndBroadcastUri(nic.getNetworkId(), VirtualMachine.Type.User, nic.getGateway(), nic.getBroadcastUri())).thenReturn(new ArrayList<NicVO>());
+        when(testOrchastrator._nicDao.listByNetworkIdTypeAndGatewayAndBroadcastUri(nic.getNetworkId(), VirtualMachine.Type.User, nic.getIPv4Gateway(), nic.getBroadcastUri())).thenReturn(new ArrayList<NicVO>());
 
 
 
@@ -203,8 +216,8 @@ public class NetworkOrchestratorTest extends TestCase {
 
     public UserVm newUserVm(Long id, String name, State state, final  Date removedTemp) {
         UserVmVO vm = new UserVmVO(id, name, null, 0l, null,
-                     0l, false, false, 0l, 0l,
-                     0l, null, null, 0l) {
+                0l, false, false, 0l, 0l,
+                0l, 1l, null, null, 0l) {
             public Date getRemoved() {
                 return removedTemp;
             }
@@ -214,5 +227,31 @@ public class NetworkOrchestratorTest extends TestCase {
 
 
         return vm;
+    }
+    public void testCheckL2OfferingServicesEmptyServices() {
+        when(testOrchastrator._networkModel.listNetworkOfferingServices(networkOfferingId)).thenReturn(new ArrayList<>());
+        when(testOrchastrator._networkModel.areServicesSupportedByNetworkOffering(networkOfferingId, Service.UserData)).thenReturn(false);
+        testOrchastrator.checkL2OfferingServices(networkOffering);
+    }
+
+    @Test
+    public void testCheckL2OfferingServicesUserDataOnly() {
+        when(testOrchastrator._networkModel.listNetworkOfferingServices(networkOfferingId)).thenReturn(Arrays.asList(Service.UserData));
+        when(testOrchastrator._networkModel.areServicesSupportedByNetworkOffering(networkOfferingId, Service.UserData)).thenReturn(true);
+        testOrchastrator.checkL2OfferingServices(networkOffering);
+    }
+
+    @Test(expected = InvalidParameterValueException.class)
+    public void testCheckL2OfferingServicesMultipleServicesIncludingUserData() {
+        when(testOrchastrator._networkModel.listNetworkOfferingServices(networkOfferingId)).thenReturn(Arrays.asList(Service.UserData, Service.Dhcp));
+        when(testOrchastrator._networkModel.areServicesSupportedByNetworkOffering(networkOfferingId, Service.UserData)).thenReturn(true);
+        testOrchastrator.checkL2OfferingServices(networkOffering);
+    }
+
+    @Test(expected = InvalidParameterValueException.class)
+    public void testCheckL2OfferingServicesMultipleServicesNotIncludingUserData() {
+        when(testOrchastrator._networkModel.listNetworkOfferingServices(networkOfferingId)).thenReturn(Arrays.asList(Service.Dns, Service.Dhcp));
+        when(testOrchastrator._networkModel.areServicesSupportedByNetworkOffering(networkOfferingId, Service.UserData)).thenReturn(false);
+        testOrchastrator.checkL2OfferingServices(networkOffering);
     }
 }

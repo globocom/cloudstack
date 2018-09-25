@@ -227,7 +227,7 @@ public class AutoScaleCounterCollectorTest {
         when(nicDao.listByVmId(vm.getId())).thenReturn(Arrays.asList(defaultNic, nonDefaultNic));
 
         String ipAddressesFrom = autoScaleCounterCollector.getIpAddressesFrom(vm);
-        assertEquals("IP should be from the non default NIC if VM has more than one NIC", nonDefaultNic.getIp4Address(), ipAddressesFrom);
+        assertEquals("IP should be from the non default NIC if VM has more than one NIC", nonDefaultNic.getIPv4Address(), ipAddressesFrom);
     }
 
     private void mockConfigurationDaoDataSource(String datasource) {
@@ -261,15 +261,15 @@ public class AutoScaleCounterCollectorTest {
     private NicVO createNIC(String address, boolean isIpv6) {
         NicVO nic = new NicVO("", 1L, 1, VirtualMachine.Type.Instance);
         if(isIpv6){
-            nic.setIp6Address(address);
+            nic.setIPv6Address(address);
         } else {
-            nic.setIp4Address(address);
+            nic.setIPv4Address(address);
         }
         return nic;
     }
 
     private VMInstanceVO createVM(long id){
-        return new VMInstanceVO(id, 1, "vm-" + id, "vm-" + id, VirtualMachine.Type.Instance, 1L, Hypervisor.HypervisorType.Simulator, 1, 1, 1, false, true, 1L);
+        return new VMInstanceVO(id, 1, "vm-" + id, "vm-" + id, VirtualMachine.Type.Instance, 1L, Hypervisor.HypervisorType.Simulator, 1, 1, 1, 1, true, true, 1l);
     }
 
     private AutoScaleVmGroupVO createAutoScaleGroup() {

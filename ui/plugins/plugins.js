@@ -16,6 +16,9 @@
 // under the License.
 (function($, cloudStack) {
   cloudStack.plugins = [
-    'globoNetworkVipPlugin'
+  	'globoNetworkVipPlugin',
+    //'testPlugin',
+    'cloudian',
+    'quota'
   ];
 }(jQuery, cloudStack));

@@ -19,68 +19,40 @@
 
 package com.cloud.agent.api.guru;
 
+import java.util.Objects;
+
+import net.nuage.vsp.acs.client.api.model.VspNetwork;
+import net.nuage.vsp.acs.client.api.model.VspNic;
+import net.nuage.vsp.acs.client.api.model.VspVm;
+
+import org.apache.commons.lang.builder.HashCodeBuilder;
+
 import com.cloud.agent.api.Command;
+
 
 public class DeallocateVmVspCommand extends Command {
 
-    String _networkUuid;
-    String _nicFrmDdUuid;
-    String _nicMacAddress;
-    String _nicIp4Address;
-    boolean _isL3Network;
-    String _vpcUuid;
-    String _networksDomainUuid;
-    String _vmInstanceName;
-    String _vmUuid;
+    private final VspNetwork _network;
+    private final VspVm _vm;
+    private final VspNic _nic;
 
-    public DeallocateVmVspCommand(String networkUuid, String nicFrmDdUuid, String nicMacAddress, String nicIp4Address, boolean isL3Network, String vpcUuid,
-            String networksDomainUuid, String vmInstanceName, String vmUuid) {
+    public DeallocateVmVspCommand(VspNetwork network, VspVm vm, VspNic nic) {
         super();
-        this._networkUuid = networkUuid;
-        this._nicFrmDdUuid = nicFrmDdUuid;
-        this._nicMacAddress = nicMacAddress;
-        this._nicIp4Address = nicIp4Address;
-        this._isL3Network = isL3Network;
-        this._vpcUuid = vpcUuid;
-        this._networksDomainUuid = networksDomainUuid;
-        this._vmInstanceName = vmInstanceName;
-        this._vmUuid = vmUuid;
+        this._network = network;
+        this._vm = vm;
+        this._nic = nic;
     }
 
-    public String getNetworkUuid() {
-        return _networkUuid;
+    public VspNetwork getNetwork() {
+        return this._network;
     }
 
-    public String getNicFrmDdUuid() {
-        return _nicFrmDdUuid;
+    public VspVm getVm() {
+        return this._vm;
     }
 
-    public String getNicMacAddress() {
-        return _nicMacAddress;
-    }
-
-    public String getNicIp4Address() {
-        return _nicIp4Address;
-    }
-
-    public boolean isL3Network() {
-        return _isL3Network;
-    }
-
-    public String getVpcUuid() {
-        return _vpcUuid;
-    }
-
-    public String getNetworksDomainUuid() {
-        return _networksDomainUuid;
-    }
-
-    public String getVmInstanceName() {
-        return _vmInstanceName;
-    }
-
-    public String getVmUuid() {
-        return _vmUuid;
+    public VspNic getNic() {
+        return this._nic;
     }
 
     @Override
@@ -88,4 +60,31 @@ public class DeallocateVmVspCommand extends Command {
         return false;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+
+        if (!(o instanceof DeallocateVmVspCommand)) {
+            return false;
+        }
+
+        DeallocateVmVspCommand that = (DeallocateVmVspCommand) o;
+
+        return super.equals(that)
+                && Objects.equals(_network, that._network)
+                && Objects.equals(_nic, that._nic)
+                && Objects.equals(_vm, that._vm);
+    }
+
+    @Override
+    public int hashCode() {
+        return new HashCodeBuilder()
+            .appendSuper(super.hashCode())
+            .append(_network)
+            .append(_vm)
+            .append(_nic)
+            .toHashCode();
+    }
 }

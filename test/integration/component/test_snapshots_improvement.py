@@ -19,7 +19,7 @@
 """
 # Import Local Modules
 from nose.plugins.attrib import attr
-from marvin.cloudstackTestCase import cloudstackTestCase, unittest
+from marvin.cloudstackTestCase import cloudstackTestCase
 from marvin.lib.utils import (random_gen,
                                           is_snapshot_on_nfs,
                                           cleanup_resources)
@@ -128,11 +128,17 @@ class TestSnapshotOnRootVolume(cloudstackTestCase):
     def setUpClass(cls):
         cls.testClient = super(TestSnapshotOnRootVolume, cls).getClsTestClient()
         cls.api_client = cls.testClient.getApiClient()
+        cls._cleanup = []
 
         cls.services = Services().services
         # Get Zone, Domain and templates
         cls.domain = get_domain(cls.api_client)
         cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
+        cls.unsupportedHypervisor = False
+        cls.hypervisor = cls.testClient.getHypervisorInfo()
+        if cls.hypervisor.lower() in ['hyperv', 'lxc']:
+            cls.unsupportedHypervisor = True
+            return
         cls.template = get_template(
                                     cls.api_client,
                                     cls.zone.id,
@@ -140,7 +146,6 @@ class TestSnapshotOnRootVolume(cloudstackTestCase):
         cls.account = Account.create(cls.api_client,
                                      cls.services["account"],
                                      domainid=cls.domain.id)
-        # pdb.set_trace()
         cls.service_offering = ServiceOffering.create(
                                             cls.api_client,
                                             cls.services["service_offering"])
@@ -175,6 +180,10 @@ class TestSnapshotOnRootVolume(cloudstackTestCase):
         self.apiclient = self.testClient.getApiClient()
         self.dbclient = self.testClient.getDbConnection()
         self.cleanup = []
+
+        if self.unsupportedHypervisor:
+            self.skipTest("snapshots are not supported on %s" %
+                self.hypervisor)
         return
 
     def tearDown(self):
@@ -303,9 +312,12 @@ class TestCreateSnapshot(cloudstackTestCase):
     def setUpClass(cls):
         cls.testClient = super(TestCreateSnapshot, cls).getClsTestClient()
         cls.api_client = cls.testClient.getApiClient()
+        cls._cleanup = []
+        cls.unsupportedHypervisor = False
         cls.hypervisor = cls.testClient.getHypervisorInfo()
-        if cls.hypervisor.lower() in ['hyperv']:
-            raise unittest.SkipTest("Snapshots feature is not supported on Hyper-V")
+        if cls.hypervisor.lower() in ['hyperv', 'lxc']:
+            cls.unsupportedHypervisor = True
+            return
         cls.services = Services().services
         # Get Zone, Domain and templates
         cls.domain = get_domain(cls.api_client)
@@ -324,9 +336,7 @@ class TestCreateSnapshot(cloudstackTestCase):
                                             cls.api_client,
                                             cls.services["service_offering"]
                                             )
-        cls._cleanup = [
-                        cls.service_offering,
-                        ]
+        cls._cleanup.append(cls.service_offering)
         return
 
     @classmethod
@@ -341,17 +351,22 @@ class TestCreateSnapshot(cloudstackTestCase):
     def setUp(self):
         self.apiclient = self.testClient.getApiClient()
         self.dbclient = self.testClient.getDbConnection()
+        self.cleanup = []
+
+        if self.unsupportedHypervisor:
+            self.skipTest("Snapshots are not supported on %s"
+                    % self.hypervisor)
 
         self.account = Account.create(
                             self.apiclient,
                             self.services["account"],
                             domainid=self.domain.id
                             )
+        self.cleanup.append(self.account)
 
         self.apiclient = self.testClient.getUserApiClient(
                                 UserName=self.account.name,
                                 DomainName=self.account.domain)
-        self.cleanup = [self.account, ]
         return
 
     def tearDown(self):
@@ -554,6 +569,9 @@ class TestCreateSnapshot(cloudstackTestCase):
         # Validate the following
         # a. Check all snapshots jobs are running concurrently on backgrounds
         # b. listSnapshots should list this newly created snapshot.
+        self.hypervisor = self.testClient.getHypervisorInfo()
+        if self.hypervisor.lower() in ['lxc']:
+            self.skipTest("vm migrate is not supported in %s" % self.hypervisor)
 
         self.debug("Create virtual machine and snapshot on ROOT disk volume")
         self.create_Snapshot_VM()

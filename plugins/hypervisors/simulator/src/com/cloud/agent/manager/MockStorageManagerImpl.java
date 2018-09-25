@@ -26,22 +26,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
-
 import org.apache.cloudstack.storage.command.DeleteCommand;
 import org.apache.cloudstack.storage.command.DownloadCommand;
 import org.apache.cloudstack.storage.command.DownloadProgressCommand;
+import org.apache.cloudstack.storage.command.UploadStatusAnswer;
+import org.apache.cloudstack.storage.command.UploadStatusAnswer.UploadStatus;
+import org.apache.cloudstack.storage.command.UploadStatusCommand;
+import org.apache.cloudstack.storage.to.VolumeObjectTO;
 
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.AttachIsoCommand;
-import com.cloud.agent.api.AttachVolumeAnswer;
-import com.cloud.agent.api.AttachVolumeCommand;
 import com.cloud.agent.api.BackupSnapshotAnswer;
 import com.cloud.agent.api.BackupSnapshotCommand;
 import com.cloud.agent.api.ComputeChecksumCommand;
@@ -53,6 +55,9 @@ import com.cloud.agent.api.CreateVolumeFromSnapshotCommand;
 import com.cloud.agent.api.DeleteStoragePoolCommand;
 import com.cloud.agent.api.GetStorageStatsAnswer;
 import com.cloud.agent.api.GetStorageStatsCommand;
+import com.cloud.agent.api.GetVolumeStatsAnswer;
+import com.cloud.agent.api.GetVolumeStatsCommand;
+import com.cloud.agent.api.HandleConfigDriveIsoCommand;
 import com.cloud.agent.api.ManageSnapshotAnswer;
 import com.cloud.agent.api.ManageSnapshotCommand;
 import com.cloud.agent.api.ModifyStoragePoolAnswer;
@@ -61,6 +66,7 @@ import com.cloud.agent.api.SecStorageSetupAnswer;
 import com.cloud.agent.api.SecStorageSetupCommand;
 import com.cloud.agent.api.SecStorageVMSetupCommand;
 import com.cloud.agent.api.StoragePoolInfo;
+import com.cloud.agent.api.VolumeStatsEntry;
 import com.cloud.agent.api.storage.CopyVolumeAnswer;
 import com.cloud.agent.api.storage.CopyVolumeCommand;
 import com.cloud.agent.api.storage.CreateAnswer;
@@ -102,7 +108,6 @@ import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.vm.DiskProfile;
 
 @Component
-@Local(value = {MockStorageManager.class})
 public class MockStorageManagerImpl extends ManagerBase implements MockStorageManager {
     private static final Logger s_logger = Logger.getLogger(MockStorageManagerImpl.class);
     @Inject
@@ -241,36 +246,6 @@ public class MockStorageManagerImpl extends ManagerBase implements MockStorageMa
                 volume.getSize(), null);
 
         return new CreateAnswer(cmd, volumeTo);
-    }
-
-    @Override
-    public AttachVolumeAnswer AttachVolume(AttachVolumeCommand cmd) {
-        TransactionLegacy txn = TransactionLegacy.open(TransactionLegacy.SIMULATOR_DB);
-        try {
-            txn.start();
-            String poolid = cmd.getPoolUuid();
-            String volumeName = cmd.getVolumeName();
-            MockVolumeVO volume = _mockVolumeDao.findByStoragePathAndType(cmd.getVolumePath());
-            if (volume == null) {
-                return new AttachVolumeAnswer(cmd, "Can't find volume:" + volumeName + "on pool:" + poolid);
-            }
-
-            String vmName = cmd.getVmName();
-            MockVMVO vm = _mockVMDao.findByVmName(vmName);
-            if (vm == null) {
-                return new AttachVolumeAnswer(cmd, "can't vm :" + vmName);
-            }
-            txn.commit();
-
-            return new AttachVolumeAnswer(cmd, cmd.getDeviceId(), cmd.getVolumePath());
-        } catch (Exception ex) {
-            txn.rollback();
-            throw new CloudRuntimeException("Error when attaching volume " + cmd.getVolumeName() + " to VM " + cmd.getVmName(), ex);
-        } finally {
-            txn.close();
-            txn = TransactionLegacy.open(TransactionLegacy.CLOUD_DB);
-            txn.close();
-        }
     }
 
     @Override
@@ -611,6 +586,37 @@ public class MockStorageManagerImpl extends ManagerBase implements MockStorageMa
     }
 
     @Override
+    public GetVolumeStatsAnswer getVolumeStats(final GetVolumeStatsCommand cmd) {
+        HashMap<String, VolumeStatsEntry> volumeStats =
+                cmd.getVolumeUuids()
+                .stream()
+                .collect(Collectors.toMap(Function.identity(),
+                                          this::getVolumeStat,
+                                          (v1, v2) -> v1, HashMap::new));
+
+        return new GetVolumeStatsAnswer(cmd, "", volumeStats);
+    }
+
+    private VolumeStatsEntry getVolumeStat(final String volumeUuid)  {
+        TransactionLegacy txn = TransactionLegacy.open(TransactionLegacy.SIMULATOR_DB);
+
+        try {
+            txn.start();
+            MockVolumeVO volume  = _mockVolumeDao.findByUuid(volumeUuid);
+            txn.commit();
+            return new VolumeStatsEntry(volumeUuid, volume.getSize(), volume.getSize());
+        } catch (Exception ex) {
+            txn.rollback();
+            throw new CloudRuntimeException("Error when finding volume " + volumeUuid, ex);
+        } finally {
+            txn.close();
+            txn = TransactionLegacy.open(TransactionLegacy.CLOUD_DB);
+            txn.close();
+        }
+
+    }
+
+    @Override
     public GetStorageStatsAnswer GetStorageStats(GetStorageStatsCommand cmd) {
         String uuid = cmd.getStorageId();
         TransactionLegacy txn = TransactionLegacy.open(TransactionLegacy.SIMULATOR_DB);
@@ -818,9 +824,13 @@ public class MockStorageManagerImpl extends ManagerBase implements MockStorageMa
             txn.start();
             MockVolumeVO template = _mockVolumeDao.findByStoragePathAndType(cmd.getData().getPath());
             if (template == null) {
-                return new Answer(cmd, false, "can't find object to delete:" + cmd.getData().getPath());
+                if(!((VolumeObjectTO)cmd.getData()).getName().startsWith("ROOT-")) {
+                    return new Answer(cmd, false, "can't find object to delete:" + cmd.getData()
+                                                                                      .getPath());
+                }
+            } else {
+                _mockVolumeDao.remove(template.getId());
             }
-            _mockVolumeDao.remove(template.getId());
             txn.commit();
         } catch (Exception ex) {
             txn.rollback();
@@ -1254,5 +1264,55 @@ public class MockStorageManagerImpl extends ManagerBase implements MockStorageMa
             }
             return new CopyVolumeAnswer(cmd, true, null, primaryStorage.getMountPoint(), vol.getPath());
         }
+    }
+
+    @Override
+    public UploadStatusAnswer getUploadStatus(UploadStatusCommand cmd) {
+        return new UploadStatusAnswer(cmd, UploadStatus.COMPLETED);
+    }
+
+    @Override public Answer handleConfigDriveIso(HandleConfigDriveIsoCommand cmd) {
+        TransactionLegacy txn = TransactionLegacy.open(TransactionLegacy.SIMULATOR_DB);
+        MockSecStorageVO sec;
+        try {
+            txn.start();
+            sec = _mockSecStorageDao.findByUrl(cmd.getDestStore().getUrl());
+            if (sec == null) {
+                return new Answer(cmd, false, "can't find secondary storage");
+            }
+
+            txn.commit();
+        } catch (Exception ex) {
+            txn.rollback();
+            throw new CloudRuntimeException("Error when creating config drive.");
+        } finally {
+            txn.close();
+            txn = TransactionLegacy.open(TransactionLegacy.CLOUD_DB);
+            txn.close();
+        }
+
+        MockVolumeVO template = new MockVolumeVO();
+        String uuid = UUID.randomUUID().toString();
+        template.setName(uuid);
+        template.setPath(sec.getMountPoint() + cmd.getIsoFile());
+        template.setPoolId(sec.getId());
+        template.setSize((long)(Math.random() * 200L) + 200L);
+        template.setStatus(Status.DOWNLOADED);
+        template.setType(MockVolumeType.ISO);
+        txn = TransactionLegacy.open(TransactionLegacy.SIMULATOR_DB);
+        try {
+            txn.start();
+            template = _mockVolumeDao.persist(template);
+            txn.commit();
+        } catch (Exception ex) {
+            txn.rollback();
+            throw new CloudRuntimeException("Encountered " + ex.getMessage() + " when persisting config drive " + template.getName(), ex);
+        } finally {
+            txn.close();
+            txn = TransactionLegacy.open(TransactionLegacy.CLOUD_DB);
+            txn.close();
+        }
+
+        return new Answer(cmd);
     }
 }

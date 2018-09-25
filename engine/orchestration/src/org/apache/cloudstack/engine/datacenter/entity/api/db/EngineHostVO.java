@@ -16,10 +16,16 @@
 // under the License.
 package org.apache.cloudstack.engine.datacenter.entity.api.db;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import com.cloud.host.Status;
+import com.cloud.hypervisor.Hypervisor.HypervisorType;
+import com.cloud.resource.ResourceState;
+import com.cloud.storage.Storage.StoragePoolType;
+import com.cloud.utils.NumbersUtil;
+import com.cloud.utils.db.GenericDao;
+import com.cloud.utils.db.StateMachine;
+import org.apache.cloudstack.api.Identity;
+import org.apache.cloudstack.engine.datacenter.entity.api.DataCenterResourceEntity.State;
+import org.apache.cloudstack.engine.datacenter.entity.api.DataCenterResourceEntity.State.Event;
 
 import javax.persistence.Column;
 import javax.persistence.DiscriminatorColumn;
@@ -36,18 +42,10 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 import javax.persistence.Transient;
-
-import org.apache.cloudstack.api.Identity;
-import org.apache.cloudstack.engine.datacenter.entity.api.DataCenterResourceEntity.State;
-import org.apache.cloudstack.engine.datacenter.entity.api.DataCenterResourceEntity.State.Event;
-
-import com.cloud.host.Status;
-import com.cloud.hypervisor.Hypervisor.HypervisorType;
-import com.cloud.resource.ResourceState;
-import com.cloud.storage.Storage.StoragePoolType;
-import com.cloud.utils.NumbersUtil;
-import com.cloud.utils.db.GenericDao;
-import com.cloud.utils.db.StateMachine;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Entity
 @Table(name = "host")
@@ -178,6 +176,11 @@ public class EngineHostVO implements EngineHost, Identity {
         return clusterId;
     }
 
+    @Override
+    public ResourceType resourceType() {
+        return ResourceType.Host;
+    }
+
     public void setClusterId(Long clusterId) {
         this.clusterId = clusterId;
     }
@@ -296,8 +299,6 @@ public class EngineHostVO implements EngineHost, Identity {
     }
 
     public String getDetail(String name) {
-        assert (details != null) : "Did you forget to load the details?";
-
         return details != null ? details.get(name) : null;
     }
 
@@ -723,6 +724,11 @@ public class EngineHostVO implements EngineHost, Identity {
     }
 
     @Override
+    public boolean isDisabled() {
+        return (getResourceState() == ResourceState.Disabled);
+    }
+
+    @Override
     public boolean isInMaintenanceStates() {
         return (getResourceState() == ResourceState.Maintenance || getResourceState() == ResourceState.ErrorInMaintenance || getResourceState() == ResourceState.PrepareForMaintenance);
     }
@@ -759,5 +765,10 @@ public class EngineHostVO implements EngineHost, Identity {
 
     public State getOrchestrationState() {
         return orchestrationState;
+    }
+
+    @Override
+    public PartitionType partitionType() {
+        return PartitionType.Host;
     }
 }

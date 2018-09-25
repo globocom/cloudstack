@@ -19,6 +19,7 @@
 
 package com.cloud.storage.resource;
 
+import org.apache.cloudstack.agent.directdownload.DirectDownloadCommand;
 import org.apache.cloudstack.storage.command.AttachCommand;
 import org.apache.cloudstack.storage.command.CopyCommand;
 import org.apache.cloudstack.storage.command.CreateObjectCommand;
@@ -26,6 +27,8 @@ import org.apache.cloudstack.storage.command.DeleteCommand;
 import org.apache.cloudstack.storage.command.DettachCommand;
 import org.apache.cloudstack.storage.command.ForgetObjectCmd;
 import org.apache.cloudstack.storage.command.IntroduceObjectCmd;
+import org.apache.cloudstack.storage.command.ResignatureCommand;
+import org.apache.cloudstack.storage.command.SnapshotAndCopyCommand;
 
 import com.cloud.agent.api.Answer;
 
@@ -62,7 +65,13 @@ public interface StorageProcessor {
 
     public Answer deleteSnapshot(DeleteCommand cmd);
 
-    Answer introduceObject(IntroduceObjectCmd cmd);
+    public Answer introduceObject(IntroduceObjectCmd cmd);
 
-    Answer forgetObject(ForgetObjectCmd cmd);
+    public Answer forgetObject(ForgetObjectCmd cmd);
+
+    public Answer snapshotAndCopy(SnapshotAndCopyCommand cmd);
+
+    public Answer resignature(ResignatureCommand cmd);
+
+    public Answer handleDownloadTemplateToPrimaryStorage(DirectDownloadCommand cmd);
 }

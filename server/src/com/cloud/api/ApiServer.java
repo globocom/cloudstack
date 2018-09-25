@@ -34,6 +34,7 @@ import com.cloud.exception.PermissionDeniedException;
 import com.cloud.exception.RequestLimitException;
 import com.cloud.exception.ResourceAllocationException;
 import com.cloud.exception.ResourceUnavailableException;
+import com.cloud.exception.UnavailableCommandException;
 import com.cloud.user.Account;
 import com.cloud.user.AccountManager;
 import com.cloud.user.DomainManager;
@@ -44,7 +45,10 @@ import com.cloud.utils.ConstantTimeComparator;
 import com.cloud.utils.HttpUtils;
 import com.cloud.utils.NumbersUtil;
 import com.cloud.utils.Pair;
+import com.cloud.utils.ReflectUtil;
 import com.cloud.utils.StringUtils;
+import com.cloud.utils.exception.UserCloudRuntimeException;
+import com.cloud.utils.net.NetUtils;
 import com.cloud.utils.component.ComponentContext;
 import com.cloud.utils.component.ManagerBase;
 import com.cloud.utils.component.PluggableService;
@@ -55,7 +59,7 @@ import com.cloud.utils.db.TransactionLegacy;
 import com.cloud.utils.db.UUIDManager;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.exception.ExceptionProxyObject;
-import com.cloud.utils.exception.UserCloudRuntimeException;
+import com.google.gson.reflect.TypeToken;
 import org.apache.cloudstack.acl.APIChecker;
 import org.apache.cloudstack.api.APICommand;
 import org.apache.cloudstack.api.ApiConstants;
@@ -65,6 +69,7 @@ import org.apache.cloudstack.api.BaseAsyncCmd;
 import org.apache.cloudstack.api.BaseAsyncCreateCmd;
 import org.apache.cloudstack.api.BaseCmd;
 import org.apache.cloudstack.api.BaseListCmd;
+import org.apache.cloudstack.api.Parameter;
 import org.apache.cloudstack.api.ResponseGenerator;
 import org.apache.cloudstack.api.ResponseObject;
 import org.apache.cloudstack.api.ResponseObject.ResponseView;
@@ -96,7 +101,10 @@ import org.apache.cloudstack.api.response.CreateCmdResponse;
 import org.apache.cloudstack.api.response.ExceptionResponse;
 import org.apache.cloudstack.api.response.ListResponse;
 import org.apache.cloudstack.api.response.LoginCmdResponse;
+import org.apache.cloudstack.config.ApiServiceConfiguration;
 import org.apache.cloudstack.context.CallContext;
+import org.apache.cloudstack.framework.config.ConfigKey;
+import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 import org.apache.cloudstack.framework.config.impl.ConfigurationVO;
 import org.apache.cloudstack.framework.events.EventBus;
@@ -137,7 +145,7 @@ import org.apache.http.protocol.ResponseContent;
 import org.apache.http.protocol.ResponseDate;
 import org.apache.http.protocol.ResponseServer;
 import org.apache.log4j.Logger;
-
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.stereotype.Component;
 
@@ -150,6 +158,8 @@ import javax.servlet.http.HttpSession;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.lang.reflect.Type;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -157,6 +167,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.security.SecureRandom;
+import java.security.Security;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -179,45 +190,44 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiServerService {
+public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiServerService, Configurable {
     private static final Logger s_logger = Logger.getLogger(ApiServer.class.getName());
     private static final Logger s_accessLogger = Logger.getLogger("apiserver." + ApiServer.class.getName());
 
-    public static boolean encodeApiResponse = false;
-    public static boolean s_enableSecureCookie = false;
-    public static String s_jsonContentType = HttpUtils.JSON_CONTENT_TYPE;
+    private static boolean encodeApiResponse = false;
 
     /**
      * Non-printable ASCII characters - numbers 0 to 31 and 127 decimal
      */
-    public static final String CONTROL_CHARACTERS = "[\000-\011\013-\014\016-\037\177]";
+    private static final String CONTROL_CHARACTERS = "[\000-\011\013-\014\016-\037\177]";
 
     @Inject
-    protected ApiDispatcher _dispatcher;
+    private ApiDispatcher dispatcher;
     @Inject
-    protected DispatchChainFactory dispatchChainFactory;
+    private DispatchChainFactory dispatchChainFactory;
     @Inject
-    private AccountManager _accountMgr;
+    private AccountManager accountMgr;
     @Inject
-    private DomainManager _domainMgr;
+    private DomainManager domainMgr;
     @Inject
-    private DomainDao _domainDao;
+    private DomainDao domainDao;
     @Inject
-    private UUIDManager _uuidMgr;
+    private UUIDManager uuidMgr;
     @Inject
-    private AsyncJobManager _asyncMgr;
+    private AsyncJobManager asyncMgr;
     @Inject
-    private ConfigurationDao _configDao;
+    private ConfigurationDao configDao;
     @Inject
-    private EntityManager _entityMgr;
+    private EntityManager entityMgr;
     @Inject
-    APIAuthenticationManager _authManager;
+    private APIAuthenticationManager authManager;
 
-    List<PluggableService> _pluggableServices;
-    List<APIChecker> _apiAccessCheckers;
+    private List<PluggableService> pluggableServices;
+
+    private List<APIChecker> apiAccessCheckers;
 
     @Inject
-    protected ApiAsyncJobDispatcher _asyncDispatcher;
+    private ApiAsyncJobDispatcher asyncDispatcher;
 
     private static int s_workerCount = 0;
     private static final DateFormat DateFormatToUse = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
@@ -225,22 +235,28 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
 
     private static ExecutorService s_executor = new ThreadPoolExecutor(10, 150, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(), new NamedThreadFactory(
             "ApiServer"));
+
     @Inject
     MessageBus _messageBus;
     @Inject
     ResponseGenerator _responseGenerator;
 
-    public ApiServer() {
-    }
+    static final ConfigKey<Boolean> EnableSecureSessionCookie = new ConfigKey<Boolean>("Advanced", Boolean.class, "enable.secure.session.cookie", "false",
+            "Session cookie is marked as secure if this is enabled. Secure cookies only work when HTTPS is used.", false);
+
+    static final ConfigKey<String> JSONcontentType = new ConfigKey<String>(String.class, "json.content.type", "Advanced", "application/json; charset=UTF-8",
+            "Http response content type for .js files (default is text/javascript)", false, ConfigKey.Scope.Global, null);
+    @Inject
+    private MessageBus messageBus;
 
     @Override
     public boolean configure(final String name, final Map<String, Object> params) throws ConfigurationException {
-        _messageBus.subscribe(AsyncJob.Topics.JOB_EVENT_PUBLISH, MessageDispatcher.getDispatcher(this));
+        messageBus.subscribe(AsyncJob.Topics.JOB_EVENT_PUBLISH, MessageDispatcher.getDispatcher(this));
         return true;
     }
 
     @MessageHandler(topic = AsyncJob.Topics.JOB_EVENT_PUBLISH)
-    private void handleAsyncJobPublishEvent(String subject, String senderAddress, Object args) {
+    public void handleAsyncJobPublishEvent(String subject, String senderAddress, Object args) {
         assert (args != null);
 
         @SuppressWarnings("unchecked")
@@ -262,17 +278,18 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             return;
         }
 
-        User userJobOwner = _accountMgr.getUserIncludingRemoved(job.getUserId());
-        Account jobOwner = _accountMgr.getAccount(userJobOwner.getAccountId());
+        User userJobOwner = accountMgr.getUserIncludingRemoved(job.getUserId());
+        Account jobOwner = accountMgr.getAccount(userJobOwner.getAccountId());
 
         // Get the event type from the cmdInfo json string
         String info = job.getCmdInfo();
         String cmdEventType = "unknown";
         if (info != null) {
-            String marker = "\"cmdEventType\"";
-            int begin = info.indexOf(marker);
-            if (begin >= 0) {
-                cmdEventType = info.substring(begin + marker.length() + 2, info.indexOf(",", begin) - 1);
+            Type type = new TypeToken<Map<String, String>>(){}.getType();
+            Map<String, String> cmdInfo = ApiGsonHelper.getBuilder().create().fromJson(info, type);
+            String eventTypeObj = cmdInfo.get("cmdEventType");
+            if (eventTypeObj != null) {
+                cmdEventType = eventTypeObj;
 
                 if (s_logger.isDebugEnabled())
                     s_logger.debug("Retrieved cmdEventType from job info: " + cmdEventType);
@@ -282,11 +299,10 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             }
         }
         // For some reason, the instanceType / instanceId are not abstract, which means we may get null values.
-        org.apache.cloudstack.framework.events.Event event = new org.apache.cloudstack.framework.events.Event(
-                "management-server",
-                EventCategory.ASYNC_JOB_CHANGE_EVENT.getName(),
-                jobEvent,
-                (job.getInstanceType() != null ? job.getInstanceType().toString() : "unknown"), null);
+        String instanceType = job.getInstanceType() != null ? job.getInstanceType() : "unknown";
+        String instanceUuid = job.getInstanceId() != null ? ApiDBUtils.findJobInstanceUuid(job) : "";
+        org.apache.cloudstack.framework.events.Event event = new org.apache.cloudstack.framework.events.Event("management-server", EventCategory.ASYNC_JOB_CHANGE_EVENT.getName(),
+                jobEvent, instanceType, instanceUuid);
 
         Map<String, String> eventDescription = new HashMap<String, String>();
         eventDescription.put("command", job.getCmd());
@@ -294,17 +310,17 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
         eventDescription.put("account", jobOwner.getUuid());
         eventDescription.put("processStatus", "" + job.getProcessStatus());
         eventDescription.put("resultCode", "" + job.getResultCode());
-        eventDescription.put("instanceUuid", (job.getInstanceId() != null ? ApiDBUtils.findJobInstanceUuid(job) : "" ) );
-        eventDescription.put("instanceType", (job.getInstanceType() != null ? job.getInstanceType().toString() : "unknown"));
+        eventDescription.put("instanceUuid", instanceUuid);
+        eventDescription.put("instanceType", instanceType);
         eventDescription.put("commandEventType", cmdEventType);
         eventDescription.put("jobId", job.getUuid());
         eventDescription.put("jobResult", job.getResult());
         eventDescription.put("cmdInfo", job.getCmdInfo());
         eventDescription.put("status", "" + job.getStatus() );
         // If the event.accountinfo boolean value is set, get the human readable value for the username / domainname
-        Map<String, String> configs = _configDao.getConfiguration("management-server", new HashMap<String, String>());
+        Map<String, String> configs = configDao.getConfiguration("management-server", new HashMap<String, String>());
         if (Boolean.valueOf(configs.get("event.accountinfo"))) {
-            DomainVO domain = _domainDao.findById(jobOwner.getDomainId());
+            DomainVO domain = domainDao.findById(jobOwner.getDomainId());
             eventDescription.put("username", userJobOwner.getUsername());
             eventDescription.put("accountname", jobOwner.getAccountName());
             eventDescription.put("domainname", domain.getName());
@@ -321,30 +337,32 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
 
     @Override
     public boolean start() {
+        Security.addProvider(new BouncyCastleProvider());
         Integer apiPort = null; // api port, null by default
-        final SearchCriteria<ConfigurationVO> sc = _configDao.createSearchCriteria();
+        final SearchCriteria<ConfigurationVO> sc = configDao.createSearchCriteria();
         sc.addAnd("name", SearchCriteria.Op.EQ, Config.IntegrationAPIPort.key());
-        final List<ConfigurationVO> values = _configDao.search(sc, null);
+        final List<ConfigurationVO> values = configDao.search(sc, null);
         if ((values != null) && (values.size() > 0)) {
             final ConfigurationVO apiPortConfig = values.get(0);
             if (apiPortConfig.getValue() != null) {
                 apiPort = Integer.parseInt(apiPortConfig.getValue());
+                apiPort = (apiPort <= 0) ? null : apiPort;
             }
         }
 
-        final Map<String, String> configs = _configDao.getConfiguration();
+        final Map<String, String> configs = configDao.getConfiguration();
         final String strSnapshotLimit = configs.get(Config.ConcurrentSnapshotsThresholdPerHost.key());
         if (strSnapshotLimit != null) {
             final Long snapshotLimit = NumbersUtil.parseLong(strSnapshotLimit, 1L);
             if (snapshotLimit.longValue() <= 0) {
                 s_logger.debug("Global config parameter " + Config.ConcurrentSnapshotsThresholdPerHost.toString() + " is less or equal 0; defaulting to unlimited");
             } else {
-                _dispatcher.setCreateSnapshotQueueSizeLimit(snapshotLimit);
+                dispatcher.setCreateSnapshotQueueSizeLimit(snapshotLimit);
             }
         }
 
         final Set<Class<?>> cmdClasses = new HashSet<Class<?>>();
-        for (final PluggableService pluggableService : _pluggableServices) {
+        for (final PluggableService pluggableService : pluggableServices) {
             cmdClasses.addAll(pluggableService.getCommands());
             if (s_logger.isDebugEnabled()) {
                 s_logger.debug("Discovered plugin " + pluggableService.getClass().getSimpleName());
@@ -367,15 +385,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
 
         }
 
-        setEncodeApiResponse(Boolean.valueOf(_configDao.getValue(Config.EncodeApiResponse.key())));
-        final String jsonType = _configDao.getValue(Config.JSONDefaultContentType.key());
-        if (jsonType != null) {
-            s_jsonContentType = jsonType;
-        }
-        final Boolean enableSecureSessionCookie = Boolean.valueOf(_configDao.getValue(Config.EnableSecureSessionCookie.key()));
-        if (enableSecureSessionCookie != null) {
-            s_enableSecureCookie = enableSecureSessionCookie;
-        }
+        setEncodeApiResponse(Boolean.valueOf(configDao.getValue(Config.EncodeApiResponse.key())));
 
         if (apiPort != null) {
             final ListenerThread listenerThread = new ListenerThread(this, apiPort);
@@ -432,10 +442,29 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             if (!(responseType.equals(HttpUtils.RESPONSE_TYPE_JSON) || responseType.equals(HttpUtils.RESPONSE_TYPE_XML))) {
                 responseType = HttpUtils.RESPONSE_TYPE_XML;
             }
-
             try {
+                //verify that parameter is legit for passing via admin port
+                String[] command = (String[]) parameterMap.get("command");
+                if (command != null) {
+                    Class<?> cmdClass = getCmdClass(command[0]);
+                    if (cmdClass != null) {
+                        List<Field> fields = ReflectUtil.getAllFieldsForClass(cmdClass, BaseCmd.class);
+                        for (Field field : fields) {
+                            Parameter parameterAnnotation = field.getAnnotation(Parameter.class);
+                            if ((parameterAnnotation == null) || !parameterAnnotation.expose()) {
+                                continue;
+                            }
+                            Object paramObj = parameterMap.get(parameterAnnotation.name());
+                            if (paramObj != null) {
+                                if (!parameterAnnotation.acceptedOnAdminPort()) {
+                                    throw new ServerApiException(ApiErrorCode.ACCOUNT_ERROR, "Parameter " + parameterAnnotation.name() + " can't be passed through the API integration port");
+                                }
+                            }
+                        }
+                    }
+                }
                 // always trust commands from API port, user context will always be UID_SYSTEM/ACCOUNT_ID_SYSTEM
-                CallContext.register(_accountMgr.getSystemUser(), _accountMgr.getSystemAccount());
+                CallContext.register(accountMgr.getSystemUser(), accountMgr.getSystemAccount());
                 sb.insert(0, "(userId=" + User.UID_SYSTEM + " accountId=" + Account.ACCOUNT_ID_SYSTEM + " sessionId=" + null + ") ");
                 final String responseText = handleRequest(parameterMap, responseType, sb);
                 sb.append(" 200 " + ((responseText == null) ? 0 : responseText.length()));
@@ -469,8 +498,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
                 final Pattern pattern = Pattern.compile(CONTROL_CHARACTERS);
                 final Matcher matcher = pattern.matcher(value[0]);
                 if (matcher.find()) {
-                    throw new ServerApiException(ApiErrorCode.PARAM_ERROR, "Received value " + value[0] + " for parameter " + key +
-                            " is invalid, contains illegal ASCII non-printable characters");
+                    throw new ServerApiException(ApiErrorCode.PARAM_ERROR, "Received value containing illegal ASCII non-printable characters for parameter " + key);
                 }
             }
             stringMap.put(key, value[0]);
@@ -500,7 +528,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
                 throw new ServerApiException(ApiErrorCode.UNSUPPORTED_ACTION_ERROR, "Invalid request, no command sent");
             } else {
                 // Don't allow Login/Logout APIs to go past this point
-                if (_authManager.getAPIAuthenticator(command[0]) != null) {
+                if (authManager.getAPIAuthenticator(command[0]) != null) {
                     return null;
                 }
                 final Map<String, String> paramMap = new HashMap<String, String>();
@@ -531,14 +559,9 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
                     cmdObj.setHttpMethod(paramMap.get(ApiConstants.HTTPMETHOD).toString());
 
                     // This is where the command is either serialized, or directly dispatched
-                    response = queueCommand(cmdObj, paramMap);
-                    if (annotation.responseHasSensitiveInfo())
-                    {
-                        buildAuditTrail(auditTrailSb, command[0],
-                                StringUtils.cleanString(response));
-                    }
-                    else
-                        buildAuditTrail(auditTrailSb, command[0], response);
+                    StringBuilder log = new StringBuilder();
+                    response = queueCommand(cmdObj, paramMap, log);
+                    buildAuditTrail(auditTrailSb, command[0], log.toString());
                 } else {
                     final String errorString = "Unknown API command: " + command[0];
                     s_logger.warn(errorString);
@@ -573,7 +596,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
         } catch (final InsufficientCapacityException ex) {
             s_logger.info(ex.getMessage(), ex);
             String errorMsg = ex.getMessage();
-            if (!_accountMgr.isRootAdmin(CallContext.current().getCallingAccount().getId())) {
+            if (!accountMgr.isRootAdmin(CallContext.current().getCallingAccount().getId())) {
                 // hide internal details to non-admin user for security reason
                 errorMsg = BaseCmd.USER_ERROR_MESSAGE;
             }
@@ -584,7 +607,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
         } catch (final ResourceUnavailableException ex) {
             s_logger.info(ex.getMessage());
             String errorMsg = ex.getMessage();
-            if (!_accountMgr.isRootAdmin(CallContext.current().getCallingAccount().getId())) {
+            if (!accountMgr.isRootAdmin(CallContext.current().getCallingAccount().getId())) {
                 // hide internal details to non-admin user for security reason
                 errorMsg = BaseCmd.USER_ERROR_MESSAGE;
             }
@@ -598,7 +621,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
         } catch (final Exception ex) {
             s_logger.error("unhandled exception executing api command: " + ((command == null) ? "null" : command), ex);
             String errorMsg = ex.getMessage();
-            if (!_accountMgr.isRootAdmin(CallContext.current().getCallingAccount().getId())) {
+            if (!accountMgr.isRootAdmin(CallContext.current().getCallingAccount().getId())) {
                 // hide internal details to non-admin user for security reason
                 errorMsg = BaseCmd.USER_ERROR_MESSAGE;
             }
@@ -611,7 +634,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
     private String getBaseAsyncResponse(final long jobId, final BaseAsyncCmd cmd) {
         final AsyncJobResponse response = new AsyncJobResponse();
 
-        final AsyncJob job = _entityMgr.findById(AsyncJob.class, jobId);
+        final AsyncJob job = entityMgr.findById(AsyncJob.class, jobId);
         response.setJobId(job.getUuid());
         response.setResponseName(cmd.getCommandName());
         return ApiResponseSerializer.toSerializedString(response, cmd.getResponseType());
@@ -619,14 +642,14 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
 
     private String getBaseAsyncCreateResponse(final long jobId, final BaseAsyncCreateCmd cmd, final String objectUuid) {
         final CreateCmdResponse response = new CreateCmdResponse();
-        final AsyncJob job = _entityMgr.findById(AsyncJob.class, jobId);
+        final AsyncJob job = entityMgr.findById(AsyncJob.class, jobId);
         response.setJobId(job.getUuid());
         response.setId(objectUuid);
         response.setResponseName(cmd.getCommandName());
         return ApiResponseSerializer.toSerializedString(response, cmd.getResponseType());
     }
 
-    private String queueCommand(final BaseCmd cmdObj, final Map<String, String> params) throws Exception {
+    private String queueCommand(final BaseCmd cmdObj, final Map<String, String> params, StringBuilder log) throws Exception {
         final CallContext ctx = CallContext.current();
         final Long callerUserId = ctx.getCallingUserId();
         final Account caller = ctx.getCallingAccount();
@@ -640,13 +663,13 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             String objectUuid = null;
             if (cmdObj instanceof BaseAsyncCreateCmd) {
                 final BaseAsyncCreateCmd createCmd = (BaseAsyncCreateCmd)cmdObj;
-                _dispatcher.dispatchCreateCmd(createCmd, params);
+                dispatcher.dispatchCreateCmd(createCmd, params);
                 objectId = createCmd.getEntityId();
                 objectUuid = createCmd.getEntityUuid();
                 params.put("id", objectId.toString());
                 Class entityClass = EventTypes.getEntityClassForEvent(createCmd.getEventType());
                 if (entityClass != null)
-                    ctx.putContextParameter(entityClass.getName(), objectUuid);
+                    ctx.putContextParameter(entityClass, objectUuid);
             } else {
                 // Extract the uuid before params are processed and id reflects internal db id
                 objectUuid = params.get(ApiConstants.ID);
@@ -685,31 +708,38 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
 
             // users can provide the job id they want to use, so log as it is a uuid and is unique
             String injectedJobId = asyncCmd.getInjectedJobId();
-            _uuidMgr.checkUuidSimple(injectedJobId, AsyncJob.class);
+            uuidMgr.checkUuidSimple(injectedJobId, AsyncJob.class);
 
             AsyncJobVO job = new AsyncJobVO("", callerUserId, caller.getId(), cmdObj.getClass().getName(),
                     ApiGsonHelper.getBuilder().create().toJson(params), instanceId,
                     asyncCmd.getInstanceType() != null ? asyncCmd.getInstanceType().toString() : null,
-                    injectedJobId);
-            job.setDispatcher(_asyncDispatcher.getName());
+                            injectedJobId);
+            job.setDispatcher(asyncDispatcher.getName());
 
-            final long jobId = _asyncMgr.submitAsyncJob(job);
+            final long jobId = asyncMgr.submitAsyncJob(job);
 
             if (jobId == 0L) {
                 final String errorMsg = "Unable to schedule async job for command " + job.getCmd();
                 s_logger.warn(errorMsg);
                 throw new ServerApiException(ApiErrorCode.INTERNAL_ERROR, errorMsg);
             }
-
+            final String response;
             if (objectId != null) {
                 final String objUuid = (objectUuid == null) ? objectId.toString() : objectUuid;
-                return getBaseAsyncCreateResponse(jobId, (BaseAsyncCreateCmd)asyncCmd, objUuid);
+                response = getBaseAsyncCreateResponse(jobId, (BaseAsyncCreateCmd)asyncCmd, objUuid);
             } else {
                 SerializationContext.current().setUuidTranslation(true);
-                return getBaseAsyncResponse(jobId, asyncCmd);
+                response = getBaseAsyncResponse(jobId, asyncCmd);
             }
+            // Always log response for async for now, I don't think any sensitive data will be in here.
+            // It might be nice to send this through scrubbing similar to how
+            // ApiResponseSerializer.toSerializedStringWithSecureLogs works. For now, this gets jobid's
+            // in the api logs.
+            log.append(response);
+            return response;
+
         } else {
-            _dispatcher.dispatch(cmdObj, params, false);
+            dispatcher.dispatch(cmdObj, params, false);
 
             // if the command is of the listXXXCommand, we will need to also return the
             // the job id and status if possible
@@ -726,7 +756,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             }
 
             SerializationContext.current().setUuidTranslation(true);
-            return ApiResponseSerializer.toSerializedString((ResponseObject)cmdObj.getResponseObject(), cmdObj.getResponseType());
+            return ApiResponseSerializer.toSerializedStringWithSecureLogs((ResponseObject)cmdObj.getResponseObject(), cmdObj.getResponseType(), log);
         }
     }
 
@@ -737,10 +767,10 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             List<? extends AsyncJob> jobs = null;
 
             // list all jobs for ROOT admin
-            if (_accountMgr.isRootAdmin(account.getId())) {
-                jobs = _asyncMgr.findInstancePendingAsyncJobs(command.getInstanceType().toString(), null);
+            if (accountMgr.isRootAdmin(account.getId())) {
+                jobs = asyncMgr.findInstancePendingAsyncJobs(command.getInstanceType().toString(), null);
             } else {
-                jobs = _asyncMgr.findInstancePendingAsyncJobs(command.getInstanceType().toString(), account.getId());
+                jobs = asyncMgr.findInstancePendingAsyncJobs(command.getInstanceType().toString(), account.getId());
             }
 
             if (jobs.size() == 0) {
@@ -779,7 +809,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
     }
 
     @Override
-    public boolean verifyRequest(final Map<String, Object[]> requestParameters, final Long userId) throws ServerApiException {
+    public boolean verifyRequest(final Map<String, Object[]> requestParameters, final Long userId, InetAddress remoteAddress) throws ServerApiException {
         try {
             String apiKey = null;
             String secretKey = null;
@@ -798,21 +828,18 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             if (userId != null) {
                 final User user = ApiDBUtils.findUserById(userId);
 
-                try {
-                    checkCommandAvailable(user, commandName);
-                } catch (final RequestLimitException ex) {
-                    s_logger.debug(ex.getMessage());
-                    throw new ServerApiException(ApiErrorCode.API_LIMIT_EXCEED, ex.getMessage());
-                } catch (final PermissionDeniedException ex) {
-                    s_logger.debug("The given command:" + commandName + " does not exist or it is not available for user with id:" + userId);
-                    throw new ServerApiException(ApiErrorCode.UNSUPPORTED_ACTION_ERROR, "The given command does not exist or it is not available for user");
+                if (!commandAvailable(remoteAddress, commandName, user)) {
+                    return false;
                 }
+
                 return true;
             } else {
                 // check against every available command to see if the command exists or not
                 if (!s_apiNameCmdClassMap.containsKey(commandName) && !commandName.equals("login") && !commandName.equals("logout")) {
-                    s_logger.debug("The given command:" + commandName + " does not exist or it is not available for user with id:" + userId);
-                    throw new ServerApiException(ApiErrorCode.UNSUPPORTED_ACTION_ERROR, "The given command does not exist or it is not available for user");
+                    final String errorMessage = "The given command " + commandName + " either does not exist, is not available" +
+                            " for user, or not available from ip address '" + remoteAddress.getHostAddress() + "'.";
+                    s_logger.debug(errorMessage);
+                    return false;
                 }
             }
 
@@ -885,7 +912,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             txn.close();
             User user = null;
             // verify there is a user with this api key
-            final Pair<User, Account> userAcctPair = _accountMgr.findUserByApiKey(apiKey);
+            final Pair<User, Account> userAcctPair = accountMgr.findUserByApiKey(apiKey);
             if (userAcctPair == null) {
                 s_logger.debug("apiKey does not map to a valid user -- ignoring request, apiKey: " + apiKey);
                 return false;
@@ -900,15 +927,8 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
                 return false;
             }
 
-            try {
-                checkCommandAvailable(user, commandName);
-            } catch (final RequestLimitException ex) {
-                s_logger.debug(ex.getMessage());
-                throw new ServerApiException(ApiErrorCode.API_LIMIT_EXCEED, ex.getMessage());
-            } catch (final PermissionDeniedException ex) {
-                s_logger.debug("The given command:" + commandName + " does not exist or it is not available for user");
-                throw new ServerApiException(ApiErrorCode.UNSUPPORTED_ACTION_ERROR, "The given command:" + commandName + " does not exist or it is not available for user with id:"
-                        + userId);
+            if (!commandAvailable(remoteAddress, commandName, user)) {
+                return false;
             }
 
             // verify secret key exists
@@ -943,9 +963,27 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
         return false;
     }
 
+    private boolean commandAvailable(final InetAddress remoteAddress, final String commandName, final User user) {
+        try {
+            checkCommandAvailable(user, commandName, remoteAddress);
+        } catch (final RequestLimitException ex) {
+            s_logger.debug(ex.getMessage());
+            throw new ServerApiException(ApiErrorCode.API_LIMIT_EXCEED, ex.getMessage());
+        }  catch (final UnavailableCommandException ex) {
+            s_logger.debug(ex.getMessage());
+            throw new ServerApiException(ApiErrorCode.UNSUPPORTED_ACTION_ERROR, ex.getMessage());
+        } catch (final PermissionDeniedException ex) {
+            final String errorMessage = "The given command '" + commandName + "' either does not exist, is not available" +
+                    " for user, or not available from ip address '" + remoteAddress + "'.";
+            s_logger.debug(errorMessage);
+            return false;
+        }
+        return true;
+    }
+
     @Override
     public Long fetchDomainId(final String domainUUID) {
-        final Domain domain = _domainMgr.getDomain(domainUUID);
+        final Domain domain = domainMgr.getDomain(domainUUID);
         if (domain != null)
             return domain.getId();
         else
@@ -990,6 +1028,9 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
                 if (ApiConstants.TIMEZONE.equalsIgnoreCase(attrName)) {
                     response.setTimeZone(attrObj.toString());
                 }
+                if (ApiConstants.TIMEZONEOFFSET.equalsIgnoreCase(attrName)) {
+                    response.setTimeZoneOffset(attrObj.toString());
+                }
                 if (ApiConstants.REGISTERED.equalsIgnoreCase(attrName)) {
                     response.setRegistered(attrObj.toString());
                 }
@@ -1003,24 +1044,18 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
     }
 
     @Override
-    public ResponseObject loginUser(final HttpSession session, final String username, final String password, Long domainId, final String domainPath, final String loginIpAddress,
+    public ResponseObject loginUser(final HttpSession session, final String username, final String password, Long domainId, final String domainPath, final InetAddress loginIpAddress,
             final Map<String, Object[]> requestParameters) throws CloudAuthenticationException {
         // We will always use domainId first. If that does not exist, we will use domain name. If THAT doesn't exist
         // we will default to ROOT
-        if (domainId == null) {
-            if (domainPath == null || domainPath.trim().length() == 0) {
-                domainId = Domain.ROOT_DOMAIN;
-            } else {
-                final Domain domainObj = _domainMgr.findDomainByPath(domainPath);
-                if (domainObj != null) {
-                    domainId = domainObj.getId();
-                } else { // if an unknown path is passed in, fail the login call
-                    throw new CloudAuthenticationException("Unable to find the domain from the path " + domainPath);
-                }
-            }
+        final Domain userDomain = domainMgr.findDomainByIdOrPath(domainId, domainPath);
+        if (userDomain == null || userDomain.getId() < 1L) {
+            throw new CloudAuthenticationException("Unable to find the domain from the path " + domainPath);
+        } else {
+            domainId = userDomain.getId();
         }
 
-        final UserAccount userAcct = _accountMgr.authenticateUser(username, password, domainId, loginIpAddress, requestParameters);
+        final UserAccount userAcct = accountMgr.authenticateUser(username, password, domainId, loginIpAddress, requestParameters);
         if (userAcct != null) {
             final String timezone = userAcct.getTimezone();
             float offsetInHrs = 0f;
@@ -1035,11 +1070,11 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
                 s_logger.info("Timezone offset from UTC is: " + offsetInHrs);
             }
 
-            final Account account = _accountMgr.getAccount(userAcct.getAccountId());
+            final Account account = accountMgr.getAccount(userAcct.getAccountId());
 
             // set the userId and account object for everyone
             session.setAttribute("userid", userAcct.getId());
-            final UserVO user = (UserVO)_accountMgr.getActiveUser(userAcct.getId());
+            final UserVO user = (UserVO)accountMgr.getActiveUser(userAcct.getId());
             if (user.getUuid() != null) {
                 session.setAttribute("user_UUID", user.getUuid());
             }
@@ -1051,7 +1086,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             session.setAttribute("account", account.getAccountName());
 
             session.setAttribute("domainid", account.getDomainId());
-            final DomainVO domain = (DomainVO)_domainMgr.getDomain(account.getDomainId());
+            final DomainVO domain = (DomainVO)domainMgr.getDomain(account.getDomainId());
             if (domain.getUuid() != null) {
                 session.setAttribute("domain_UUID", domain.getUuid());
             }
@@ -1080,16 +1115,16 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
 
     @Override
     public void logoutUser(final long userId) {
-        _accountMgr.logoutUser(userId);
+        accountMgr.logoutUser(userId);
         return;
     }
 
     @Override
     public boolean verifyUser(final Long userId) {
-        final User user = _accountMgr.getUserIncludingRemoved(userId);
+        final User user = accountMgr.getUserIncludingRemoved(userId);
         Account account = null;
         if (user != null) {
-            account = _accountMgr.getAccount(user.getAccountId());
+            account = accountMgr.getAccount(user.getAccountId());
         }
 
         if ((user == null) || (user.getRemoved() != null) || !user.getState().equals(Account.State.enabled) || (account == null) ||
@@ -1100,12 +1135,25 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
         return true;
     }
 
-    private void checkCommandAvailable(final User user, final String commandName) throws PermissionDeniedException {
+    private void checkCommandAvailable(final User user, final String commandName, final InetAddress remoteAddress) throws PermissionDeniedException {
         if (user == null) {
             throw new PermissionDeniedException("User is null for role based API access check for command" + commandName);
         }
 
-        for (final APIChecker apiChecker : _apiAccessCheckers) {
+        final Account account = accountMgr.getAccount(user.getAccountId());
+        final String accessAllowedCidrs = ApiServiceConfiguration.ApiAllowedSourceCidrList.valueIn(account.getId()).replaceAll("\\s","");
+        final Boolean apiSourceCidrChecksEnabled = ApiServiceConfiguration.ApiSourceCidrChecksEnabled.value();
+
+        if (apiSourceCidrChecksEnabled) {
+            s_logger.debug("CIDRs from which account '" + account.toString() + "' is allowed to perform API calls: " + accessAllowedCidrs);
+            if (!NetUtils.isIpInCidrList(remoteAddress, accessAllowedCidrs.split(","))) {
+                s_logger.warn("Request by account '" + account.toString() + "' was denied since " + remoteAddress + " does not match " + accessAllowedCidrs);
+                throw new PermissionDeniedException("Calls for domain '" + account.getAccountName() + "' are not allowed from ip address '" + remoteAddress.getHostAddress());
+                }
+        }
+
+
+        for (final APIChecker apiChecker : apiAccessCheckers) {
             apiChecker.checkAccess(user, commandName);
         }
     }
@@ -1121,7 +1169,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             // determine the cmd class based on calling context
             ResponseView view = ResponseView.Restricted;
             if (CallContext.current() != null
-                    && _accountMgr.isRootAdmin(CallContext.current().getCallingAccount().getId())) {
+                    && accountMgr.isRootAdmin(CallContext.current().getCallingAccount().getId())) {
                 view = ResponseView.Full;
             }
             for (Class<?> cmdClass : cmdList) {
@@ -1149,7 +1197,7 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
             final BasicHttpEntity body = new BasicHttpEntity();
             if (HttpUtils.RESPONSE_TYPE_JSON.equalsIgnoreCase(responseType)) {
                 // JSON response
-                body.setContentType(getJSONContentType());
+                body.setContentType(JSONcontentType.value());
                 if (responseText == null) {
                     body.setContent(new ByteArrayInputStream("{ \"error\" : { \"description\" : \"Internal Server Error\" } }".getBytes(HttpUtils.UTF_8)));
                 }
@@ -1167,6 +1215,16 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
         } catch (final Exception ex) {
             s_logger.error("error!", ex);
         }
+    }
+
+    @Override
+    public String getConfigComponentName() {
+        return ApiServer.class.getSimpleName();
+    }
+
+    @Override
+    public ConfigKey<?>[] getConfigKeys() {
+        return new ConfigKey<?>[] { EnableSecureSessionCookie, JSONcontentType };
     }
 
     // FIXME: the following two threads are copied from
@@ -1189,10 +1247,10 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
 
             _params = new BasicHttpParams();
             _params.setIntParameter(CoreConnectionPNames.SO_TIMEOUT, 30000)
-                    .setIntParameter(CoreConnectionPNames.SOCKET_BUFFER_SIZE, 8 * 1024)
-                    .setBooleanParameter(CoreConnectionPNames.STALE_CONNECTION_CHECK, false)
-                    .setBooleanParameter(CoreConnectionPNames.TCP_NODELAY, true)
-                    .setParameter(CoreProtocolPNames.ORIGIN_SERVER, "HttpComponents/1.1");
+            .setIntParameter(CoreConnectionPNames.SOCKET_BUFFER_SIZE, 8 * 1024)
+            .setBooleanParameter(CoreConnectionPNames.STALE_CONNECTION_CHECK, false)
+            .setBooleanParameter(CoreConnectionPNames.TCP_NODELAY, true)
+            .setParameter(CoreProtocolPNames.ORIGIN_SERVER, "HttpComponents/1.1");
 
             // Set up the HTTP protocol processor
             final BasicHttpProcessor httpproc = new BasicHttpProcessor();
@@ -1354,37 +1412,22 @@ public class ApiServer extends ManagerBase implements HttpRequestHandler, ApiSer
         return responseText;
     }
 
-    public List<PluggableService> getPluggableServices() {
-        return _pluggableServices;
-    }
-
     @Inject
     public void setPluggableServices(final List<PluggableService> pluggableServices) {
-        _pluggableServices = pluggableServices;
-    }
-
-    public List<APIChecker> getApiAccessCheckers() {
-        return _apiAccessCheckers;
+        this.pluggableServices = pluggableServices;
     }
 
     @Inject
     public void setApiAccessCheckers(final List<APIChecker> apiAccessCheckers) {
-        _apiAccessCheckers = apiAccessCheckers;
+        this.apiAccessCheckers = apiAccessCheckers;
     }
 
     public static boolean isEncodeApiResponse() {
-        return encodeApiResponse;
+        return ApiServer.encodeApiResponse;
     }
 
     private static void setEncodeApiResponse(final boolean encodeApiResponse) {
         ApiServer.encodeApiResponse = encodeApiResponse;
     }
 
-    public static boolean isSecureSessionCookieEnabled() {
-        return s_enableSecureCookie;
-    }
-
-    public static String getJSONContentType() {
-        return s_jsonContentType;
-    }
 }

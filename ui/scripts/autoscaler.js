@@ -587,7 +587,7 @@
             },
 
             scaleUpPolicy: {
-                title: 'ScaleUp Policy',
+                title: 'label.scaleup.policy',
                 label: 'label.scale.up.policy',
                 noSelect: true,
                 noHeaderActionsColumn: true,
@@ -692,7 +692,7 @@
             },
 
             scaleDownPolicy: {
-                title: 'ScaleDown Policy',
+                title: 'label.scaledown.policy',
                 noSelect: true,
                 noHeaderActionsColumn: true,
                 ignoreEmptyFields: true,
@@ -911,7 +911,7 @@
                         },
                         async: false,
                         success: function(json) {
-                            if (json.listusersresponse.user[0].apikey != null && json.listusersresponse.user[0].secretkey != null) {
+                            if (json.listusersresponse.user[0].apikey != null) {
                                 havingApiKeyAndSecretKey = true;
                             }
                         }
@@ -1289,7 +1289,7 @@
                     var apiCmd, apiCmdRes;
                     if (!('multiRules' in args.context) || !args.context.originalAutoscaleData) { //from a new LB or from existing LB without AutoscaleVmGroup) { //from a new LB
                         var data = {
-                            zoneid: args.context.networks[0].zoneid, //get zoneid from args.context.networks[0] instead of args.context.ipAddresses[0] because args.context.ipAddresses is null when adding AutoScale rule from Add Load Balancer tab in Network page
+                            zoneid: args.context.networks[0].zoneid ? args.context.networks[0].zoneid : args.context.ipAddresses[0].zoneid, //get zoneid from args.context.networks[0]. If it is not null then get it from args.context.ipAddresses[0] because args.context.ipAddresses is null when adding AutoScale rule from Add Load Balancer tab in Network page
                             serviceofferingid: args.data.serviceOfferingId,
                             templateid: args.data.templateNames,
                             destroyvmgraceperiod: args.data.destroyVMgracePeriod,
@@ -1547,7 +1547,7 @@
                         array1.push("&scaleuppolicyids=" + args.scaleUpPolicyResponse.id);
                         array1.push("&scaledownpolicyids=" + args.scaleDownPolicyResponse.id);
                         array1.push("&autoscalegroupvmprefixname=" + args.data.autoScaleVmGroupName);
-                        
+
                         $.ajax({
                             url: createURL('createAutoScaleVmGroup' + array1.join("")),
                             dataType: 'json',
@@ -1665,7 +1665,7 @@
 
                 var $dialog = $('<div>');
                 $dialog.dialog({
-                    title: 'AutoScale Configuration Wizard',
+                    title: 'label.autoscale.configuration.wizard',
                     closeonEscape: false,
 
                     draggable: true,

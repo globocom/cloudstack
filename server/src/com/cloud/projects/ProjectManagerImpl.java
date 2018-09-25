@@ -28,7 +28,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.mail.Authenticator;
 import javax.mail.Message.RecipientType;
@@ -94,7 +93,6 @@ import com.cloud.utils.db.TransactionStatus;
 import com.cloud.utils.exception.CloudRuntimeException;
 
 @Component
-@Local(value = {ProjectService.class, ProjectManager.class})
 public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     public static final Logger s_logger = Logger.getLogger(ProjectManagerImpl.class);
     private EmailInvite _emailInvite;
@@ -143,7 +141,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
         _invitationRequired = Boolean.valueOf(configs.get(Config.ProjectInviteRequired.key()));
 
         String value = configs.get(Config.ProjectInvitationExpirationTime.key());
-        _invitationTimeOut = Long.valueOf(value != null ? value : "86400") * 1000;
+        _invitationTimeOut = Long.parseLong(value != null ? value : "86400") * 1000;
         _allowUserToCreateProject = Boolean.valueOf(configs.get(Config.AllowUserToCreateProject.key()));
 
         // set up the email system for project invitations
@@ -246,7 +244,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
         StringBuilder acctNm = new StringBuilder("PrjAcct-");
                 acctNm.append(name).append("-").append(ownerFinal.getDomainId());
 
-        Account projectAccount = _accountMgr.createAccount(acctNm.toString(), Account.ACCOUNT_TYPE_PROJECT, domainId, null, null, UUID.randomUUID().toString());
+        Account projectAccount = _accountMgr.createAccount(acctNm.toString(), Account.ACCOUNT_TYPE_PROJECT, null, domainId, null, null, UUID.randomUUID().toString());
 
         Project project = _projectDao.persist(new ProjectVO(name, displayText, ownerFinal.getDomainId(), projectAccount.getId(), businessServiceId, clientId, componentId, subComponentId, productId, detailedUsage));
 
@@ -255,6 +253,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
 
         if (project != null) {
             CallContext.current().setEventDetails("Project id=" + project.getId());
+            CallContext.current().putContextParameter(Project.class, project.getUuid());
         }
 
         //Increment resource count

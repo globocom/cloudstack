@@ -37,7 +37,7 @@ def user(Name, DomainName, AcctType):
 class cloudstackTestCase(unittest.case.TestCase):
     clstestclient = None
 
-    def assertElementInList(inp, toverify, responsevar=None, pos=0,
+    def assertElementInList(self, inp, toverify, responsevar=None, pos=0,
                             assertmsg="TC Failed for reason"):
         '''
         @Name: assertElementInList
@@ -52,3 +52,7 @@ class cloudstackTestCase(unittest.case.TestCase):
     @classmethod
     def getClsTestClient(cls):
         return cls.clstestclient
+
+    @classmethod
+    def getClsConfig(cls):
+        return cls.config

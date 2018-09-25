@@ -627,7 +627,7 @@
         },
 
         // Project listing data provider
-        dataProvider: function(args) {        	
+        dataProvider: function(args) {
             var user = args.context.users[0];
             var data1 = {
                 accountId: user.userid,
@@ -635,43 +635,41 @@
                 simple: true
             };
             if (args.projectName) {
-            	data1.keyword = args.projectName;
+                data1.keyword = args.projectName;
             }
 
             var array1 = [];
-        	var page = 1;        	
-            var getNextPage = function() {            	
-            	var data2 = $.extend({}, data1, {
-            		page: page,
-                    simple: true,
-            		pageSize: 500
-            	});
-            	
-	            $.ajax({
-	                url: createURL('listProjects', {
-	                    ignoreProject: true,
-                        simple: true
-	                }),
-	                data: data2,	                
-	                async: false,
-	                success: function(json) {                	
-	                	var projects = json.listprojectsresponse.project;
-	                	if (projects != undefined) {
-	                		for(var i = 0; i < projects.length; i++) {
-	                			array1.push($.extend(projects[i], {
-	                                displayText: projects[i].displaytext
-	                            }));
-	                		}
-	                	}   
-	                	if (array1.length < json.listprojectsresponse.count) {	                	    
-	                	    page++;
-	                	    getNextPage();
-	                	}	                	
-	                }
-	            });
+            var page = 1;
+            var getNextPage = function() {
+                var data2 = $.extend({}, data1, {
+                    page: page,
+                    pageSize: 500
+                });
+
+                $.ajax({
+                    url: createURL('listProjects', {
+                        ignoreProject: true
+                    }),
+                    data: data2,
+                    async: false,
+                    success: function(json) {
+                        var projects = json.listprojectsresponse.project;
+                        if (projects != undefined) {
+                            for(var i = 0; i < projects.length; i++) {
+                                array1.push($.extend(projects[i], {
+                                    displayText: projects[i].displaytext
+                                }));
+                            }
+                        }
+                        if (array1.length < json.listprojectsresponse.count) {
+                            page++;
+                            getNextPage();
+                        }
+                    }
+                });
             }
-            getNextPage();          
-            args.response.success({ data: array1 });                     
+            getNextPage();
+            args.response.success({ data: array1 });
         }
     };
 
@@ -796,7 +794,13 @@
                                     data: data.listprojectsresponse.project,
                                     actionFilter: projectsActionFilter
                                 });
-                            }
+                            },
+                    error: function(XMLHttpResponse) {
+                        cloudStack.dialog.notice({
+                            message: parseXMLHttpResponse(XMLHttpResponse)
+                        });
+                        args.response.error();
+                     }
                         });
                     },
 
@@ -1107,6 +1111,9 @@
                                         label: 'label.display.name',
                                         isEditable: true
                                     },
+                                    id: {
+                                        label: 'label.id'
+                                    },
                                     domain: {
                                         label: 'label.domain'
                                     },
@@ -1135,6 +1142,28 @@
                                     },
                                     product: {
                                         label: 'label.project.product'
+                                    }
+                                }, {
+                                    vmtotal: {
+                                        label: 'label.total.vms'
+                                    },
+                                    memorytotal: {
+                                        label: 'label.memory.total'
+                                    },
+                                    cputotal: {
+                                        label: 'label.total.cpu'
+                                    },
+                                    volumetotal: {
+                                        label: 'label.volume'
+                                    },
+                                    primarystoragetotal: {
+                                        label: 'label.primary.storage'
+                                    },
+                                    iptotal: {
+                                        label: 'label.total.of.ip'
+                                    },
+                                    templatetotal: {
+                                        label: 'label.template'
                                     }
                                 }],
 

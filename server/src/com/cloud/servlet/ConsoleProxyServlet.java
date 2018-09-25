@@ -35,6 +35,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import com.cloud.resource.ResourceState;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -47,6 +48,7 @@ import org.apache.cloudstack.framework.security.keys.KeysManager;
 
 import com.cloud.exception.PermissionDeniedException;
 import com.cloud.host.HostVO;
+import com.cloud.hypervisor.Hypervisor;
 import com.cloud.server.ManagementServer;
 import com.cloud.storage.GuestOSVO;
 import com.cloud.user.Account;
@@ -227,12 +229,14 @@ public class ConsoleProxyServlet extends HttpServlet {
         try {
             w = Integer.parseInt(value);
         } catch (NumberFormatException e) {
+            s_logger.info("[ignored] not a number: " + value);
         }
 
         value = req.getParameter("h");
         try {
             h = Integer.parseInt(value);
         } catch (NumberFormatException e) {
+            s_logger.info("[ignored] not a number: " + value);
         }
 
         try {
@@ -260,6 +264,11 @@ public class ConsoleProxyServlet extends HttpServlet {
         if (host == null) {
             s_logger.warn("VM " + vmId + "'s host does not exist, sending blank response for console access request");
             sendResponse(resp, "");
+            return;
+        }
+
+        if (Hypervisor.HypervisorType.LXC.equals(vm.getHypervisorType())){
+            sendResponse(resp, "<html><body><p>Console access is not supported for LXC</p></body></html>");
             return;
         }
 
@@ -410,7 +419,14 @@ public class ConsoleProxyServlet extends HttpServlet {
         StringBuffer sb = new StringBuffer(rootUrl);
         String host = hostVo.getPrivateIpAddress();
 
-        Pair<String, Integer> portInfo = _ms.getVncPort(vm);
+        Pair<String, Integer> portInfo;
+        if (hostVo.getResourceState().equals(ResourceState.ErrorInMaintenance)) {
+            UserVmDetailVO detailAddress = _userVmDetailsDao.findDetail(vm.getId(), "kvm.vnc.address");
+            UserVmDetailVO detailPort = _userVmDetailsDao.findDetail(vm.getId(), "kvm.vnc.port");
+            portInfo = new Pair<>(detailAddress.getValue(), Integer.valueOf(detailPort.getValue()));
+        } else {
+            portInfo = _ms.getVncPort(vm);
+        }
         if (s_logger.isDebugEnabled())
             s_logger.debug("Port info " + portInfo.first());
 

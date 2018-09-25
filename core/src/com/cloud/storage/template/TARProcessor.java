@@ -24,12 +24,10 @@ import com.cloud.storage.StorageLayer;
 import com.cloud.utils.component.AdapterBase;
 import org.apache.log4j.Logger;
 
-import javax.ejb.Local;
 import javax.naming.ConfigurationException;
 import java.io.File;
 import java.util.Map;
 
-@Local(value = Processor.class)
 public class TARProcessor extends AdapterBase implements Processor {
     private static final Logger s_logger = Logger.getLogger(TARProcessor.class);
 
@@ -37,6 +35,11 @@ public class TARProcessor extends AdapterBase implements Processor {
 
     @Override
     public FormatInfo process(String templatePath, ImageFormat format, String templateName) {
+       return process(templatePath, format, templateName, 0);
+    }
+
+    @Override
+    public FormatInfo process(String templatePath, ImageFormat format, String templateName, long processTimeout) {
         if (format != null) {
             s_logger.debug("We currently don't handle conversion from " + format + " to TAR.");
             return null;

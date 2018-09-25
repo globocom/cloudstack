@@ -21,12 +21,14 @@ import java.util.Map;
 
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
 import com.cloud.storage.VMTemplateVO;
+import com.cloud.template.VirtualMachineTemplate;
 import com.cloud.utils.db.GenericDao;
+import com.cloud.utils.fsm.StateDao;
 
 /*
  * Data Access Object for vm_templates table
  */
-public interface VMTemplateDao extends GenericDao<VMTemplateVO, Long> {
+public interface VMTemplateDao extends GenericDao<VMTemplateVO, Long>, StateDao<VirtualMachineTemplate.State, VirtualMachineTemplate.Event, VirtualMachineTemplate> {
 
     public List<VMTemplateVO> listByPublic();
 
@@ -52,7 +54,11 @@ public interface VMTemplateDao extends GenericDao<VMTemplateVO, Long> {
 
     public List<VMTemplateVO> listAllInZone(long dataCenterId);
 
+    public List<VMTemplateVO> listInZoneByState(long dataCenterId, VirtualMachineTemplate.State... states);
+
     public List<VMTemplateVO> listAllActive();
+
+    public List<VMTemplateVO> listByState(VirtualMachineTemplate.State... states);
 
     public List<VMTemplateVO> listByHypervisorType(List<HypervisorType> hyperTypes);
 
@@ -75,4 +81,6 @@ public interface VMTemplateDao extends GenericDao<VMTemplateVO, Long> {
     void loadDetails(VMTemplateVO tmpl);
 
     void saveDetails(VMTemplateVO tmpl);
+
+    List<VMTemplateVO> listByParentTemplatetId(long parentTemplatetId);
 }

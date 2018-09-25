@@ -22,6 +22,10 @@ import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
 
+import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreProvider;
+import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreProviderManager;
+import org.apache.cloudstack.engine.subsystem.api.storage.HypervisorHostListener;
+import org.apache.cloudstack.engine.subsystem.api.storage.PrimaryDataStoreProvider;
 import org.apache.cloudstack.storage.datastore.db.PrimaryDataStoreDao;
 import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
 
@@ -46,13 +50,14 @@ public class StoragePoolMonitor implements Listener {
     private static final Logger s_logger = Logger.getLogger(StoragePoolMonitor.class);
     private final StorageManagerImpl _storageManager;
     private final PrimaryDataStoreDao _poolDao;
+    private DataStoreProviderManager _dataStoreProviderMgr;
     @Inject
     OCFS2Manager _ocfs2Mgr;
 
-    public StoragePoolMonitor(StorageManagerImpl mgr, PrimaryDataStoreDao poolDao) {
-        this._storageManager = mgr;
-        this._poolDao = poolDao;
-
+    public StoragePoolMonitor(StorageManagerImpl mgr, PrimaryDataStoreDao poolDao, DataStoreProviderManager dataStoreProviderMgr) {
+        _storageManager = mgr;
+        _poolDao = poolDao;
+        _dataStoreProviderMgr = dataStoreProviderMgr;
     }
 
     @Override
@@ -66,8 +71,25 @@ public class StoragePoolMonitor implements Listener {
     }
 
     @Override
-    public synchronized boolean processDisconnect(long agentId, Status state) {
-        return true;
+    public void processHostAdded(long hostId) {
+        List<DataStoreProvider> providers = _dataStoreProviderMgr.getProviders();
+
+        if (providers != null) {
+            for (DataStoreProvider provider : providers) {
+                if (provider instanceof PrimaryDataStoreProvider) {
+                    try {
+                        HypervisorHostListener hypervisorHostListener = provider.getHostListener();
+
+                        if (hypervisorHostListener != null) {
+                            hypervisorHostListener.hostAdded(hostId);
+                        }
+                    }
+                    catch (Exception ex) {
+                        s_logger.error("hostAdded(long) failed for storage provider " + provider.getName(), ex);
+                    }
+                }
+            }
+        }
     }
 
     @Override
@@ -77,7 +99,7 @@ public class StoragePoolMonitor implements Listener {
             if (scCmd.getHypervisorType() == HypervisorType.XenServer || scCmd.getHypervisorType() ==  HypervisorType.KVM ||
                 scCmd.getHypervisorType() == HypervisorType.VMware || scCmd.getHypervisorType() ==  HypervisorType.Simulator ||
                 scCmd.getHypervisorType() == HypervisorType.Ovm || scCmd.getHypervisorType() == HypervisorType.Hyperv ||
-                scCmd.getHypervisorType() == HypervisorType.LXC ) {
+                scCmd.getHypervisorType() == HypervisorType.LXC || scCmd.getHypervisorType() == HypervisorType.Ovm3) {
                 List<StoragePoolVO> pools = _poolDao.listBy(host.getDataCenterId(), host.getPodId(), host.getClusterId(), ScopeType.CLUSTER);
                 List<StoragePoolVO> zoneStoragePoolsByTags = _poolDao.findZoneWideStoragePoolsByTags(host.getDataCenterId(), null);
                 List<StoragePoolVO> zoneStoragePoolsByHypervisor = _poolDao.findZoneWideStoragePoolsByHypervisor(host.getDataCenterId(), scCmd.getHypervisorType());
@@ -99,12 +121,63 @@ public class StoragePoolMonitor implements Listener {
                     }
 
                     Long hostId = host.getId();
-                    s_logger.debug("Host " + hostId + " connected, sending down storage pool information ...");
+                    if (s_logger.isDebugEnabled()) {
+                        s_logger.debug("Host " + hostId + " connected, connecting host to shared pool id " + pool.getId() + " and sending storage pool information ...");
+                    }
                     try {
                         _storageManager.connectHostToSharedPool(hostId, pool.getId());
                         _storageManager.createCapacityEntry(pool.getId());
                     } catch (Exception e) {
-                        s_logger.warn("Unable to connect host " + hostId + " to pool " + pool + " due to " + e.toString(), e);
+                        throw new ConnectionException(true, "Unable to connect host " + hostId + " to storage pool id " + pool.getId() + " due to " + e.toString(), e);
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public synchronized boolean processDisconnect(long agentId, Status state) {
+        return true;
+    }
+
+    @Override
+    public void processHostAboutToBeRemoved(long hostId) {
+        List<DataStoreProvider> providers = _dataStoreProviderMgr.getProviders();
+
+        if (providers != null) {
+            for (DataStoreProvider provider : providers) {
+                if (provider instanceof PrimaryDataStoreProvider) {
+                    try {
+                        HypervisorHostListener hypervisorHostListener = provider.getHostListener();
+
+                        if (hypervisorHostListener != null) {
+                            hypervisorHostListener.hostAboutToBeRemoved(hostId);
+                        }
+                    }
+                    catch (Exception ex) {
+                        s_logger.error("hostAboutToBeRemoved(long) failed for storage provider " + provider.getName(), ex);
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public void processHostRemoved(long hostId, long clusterId) {
+        List<DataStoreProvider> providers = _dataStoreProviderMgr.getProviders();
+
+        if (providers != null) {
+            for (DataStoreProvider provider : providers) {
+                if (provider instanceof PrimaryDataStoreProvider) {
+                    try {
+                        HypervisorHostListener hypervisorHostListener = provider.getHostListener();
+
+                        if (hypervisorHostListener != null) {
+                            hypervisorHostListener.hostRemoved(hostId, clusterId);
+                        }
+                    }
+                    catch (Exception ex) {
+                        s_logger.error("hostRemoved(long, long) failed for storage provider " + provider.getName(), ex);
                     }
                 }
             }

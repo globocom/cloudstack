@@ -49,11 +49,12 @@ public class GlobalLockTest {
                 p.start();
                 locked = WorkLock.lock(timeoutSeconds);
                 p.stop();
-                System.out.println("Thread " + id + " waited " + p.getDuration() + " ms, locked=" + locked);
+                System.out.println("Thread " + id + " waited " + p.getDurationInMillis() + " ms, locked=" + locked);
                 if (locked) {
                     Thread.sleep(jobDuration * 1000);
                 }
             } catch (InterruptedException e) {
+                s_logger.debug("[ignored] interupted while testing global lock.");
             } finally {
                 if (locked) {
                     boolean unlocked = WorkLock.unlock();

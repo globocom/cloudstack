@@ -24,7 +24,7 @@ import java.util.Set;
 import org.apache.cloudstack.acl.RoleType;
 import org.apache.cloudstack.affinity.AffinityGroupResponse;
 import org.apache.cloudstack.api.ApiConstants;
-import org.apache.cloudstack.api.BaseResponse;
+import org.apache.cloudstack.api.BaseResponseWithTagInformation;
 import org.apache.cloudstack.api.EntityReference;
 
 import com.cloud.network.router.VirtualRouter;
@@ -35,7 +35,7 @@ import com.google.gson.annotations.SerializedName;
 
 @SuppressWarnings("unused")
 @EntityReference(value = {VirtualMachine.class, UserVm.class, VirtualRouter.class})
-public class UserVmResponse extends BaseResponse implements ControlledEntityResponse {
+public class UserVmResponse extends BaseResponseWithTagInformation implements ControlledEntityResponse {
     @SerializedName(ApiConstants.ID)
     @Param(description = "the ID of the virtual machine")
     private String id;
@@ -51,6 +51,14 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
     @SerializedName(ApiConstants.ACCOUNT)
     @Param(description = "the account associated with the virtual machine")
     private String accountName;
+
+    @SerializedName(ApiConstants.USER_ID)
+    @Param(description = "the user's ID who deployed the virtual machine")
+    private String userId;
+
+    @SerializedName(ApiConstants.USERNAME)
+    @Param(description = "the user's name who deployed the virtual machine")
+    private String userName;
 
     @SerializedName(ApiConstants.PROJECT_ID)
     @Param(description = "the project id of the vm")
@@ -188,6 +196,18 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
     @Param(description = "the write (bytes) of disk on the vm")
     private Long diskKbsWrite;
 
+    @SerializedName("memorykbs")
+    @Param(description = "the memory used by the vm")
+    private Long memoryKBs;
+
+    @SerializedName("memoryintfreekbs")
+    @Param(description = "the internal memory thats free in vm")
+    private Long memoryIntFreeKBs;
+
+    @SerializedName("memorytargetkbs")
+    @Param(description = "the target memory in vm")
+    private Long memoryTargetKBs;
+
     @SerializedName("diskioread")
     @Param(description = "the read (io) of disk on the vm")
     private Long diskIORead;
@@ -213,7 +233,7 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
     private Set<SecurityGroupResponse> securityGroupList;
 
     @SerializedName(ApiConstants.PASSWORD)
-    @Param(description = "the password (if exists) of the virtual machine")
+    @Param(description = "the password (if exists) of the virtual machine", isSensitive = true)
     private String password;
 
     @SerializedName("nic")
@@ -235,10 +255,6 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
     @SerializedName(ApiConstants.INSTANCE_NAME)
     @Param(description = "instance name of the user vm; this parameter is returned to the ROOT admin only", since = "3.0.1")
     private String instanceName;
-
-    @SerializedName(ApiConstants.TAGS)
-    @Param(description = "the list of resource tags associated with vm", responseObject = ResourceTagResponse.class)
-    private Set<ResourceTagResponse> tags;
 
     transient Set<Long> tagIds;
 
@@ -318,6 +334,14 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
 
     public String getAccountName() {
         return accountName;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public String getUserName() {
+        return userName;
     }
 
     public String getProjectId() {
@@ -455,6 +479,18 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
         return diskKbsWrite;
     }
 
+    public Long getMemoryKBs() {
+        return memoryKBs;
+    }
+
+    public Long getMemoryIntFreeKBs() {
+        return memoryIntFreeKBs;
+    }
+
+    public Long getMemoryTargetKBs() {
+        return memoryTargetKBs;
+    }
+
     public Long getDiskIORead() {
         return diskIORead;
     }
@@ -503,10 +539,6 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
         return instanceName;
     }
 
-    public Set<ResourceTagResponse> getTags() {
-        return tags;
-    }
-
     public String getKeyPairName() {
         return keyPairName;
     }
@@ -538,6 +570,14 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
     @Override
     public void setAccountName(String accountName) {
         this.accountName = accountName;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
     }
 
     @Override
@@ -624,6 +664,18 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
 
     public void setDiskIORead(Long diskIORead) {
         this.diskIORead = diskIORead;
+    }
+
+    public void setMemoryKBs(Long memoryKBs) {
+        this.memoryKBs = memoryKBs;
+    }
+
+    public void setMemoryIntFreeKBs(Long memoryIntFreeKBs) {
+        this.memoryIntFreeKBs = memoryIntFreeKBs;
+    }
+
+    public void setMemoryTargetKBs(Long memoryTargetKBs) {
+        this.memoryTargetKBs = memoryTargetKBs;
     }
 
     public void setDiskIOWrite(Long diskIOWrite) {
@@ -739,10 +791,6 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
         this.tags = tags;
     }
 
-    public void addTag(ResourceTagResponse tag) {
-        this.tags.add(tag);
-    }
-
     public void setKeyPairName(String keyPairName) {
         this.keyPairName = keyPairName;
     }
@@ -771,7 +819,32 @@ public class UserVmResponse extends BaseResponse implements ControlledEntityResp
         this.osTypeId = osTypeId;
     }
 
+    public Set<Long> getTagIds() {
+        return tagIds;
+    }
+
+    public void setTagIds(Set<Long> tagIds) {
+        this.tagIds = tagIds;
+    }
+
+    public Map getDetails() {
+        return details;
+    }
+
+    public Boolean getDynamicallyScalable() {
+        return isDynamicallyScalable;
+    }
+
+    public void setDynamicallyScalable(Boolean dynamicallyScalable) {
+        isDynamicallyScalable = dynamicallyScalable;
+    }
+
+    public Long getOsTypeId() {
+        return osTypeId;
+    }
+
     public void setOsTypeName(String osTypeName) {
         this.osTypeName = osTypeName;
     }
+
 }

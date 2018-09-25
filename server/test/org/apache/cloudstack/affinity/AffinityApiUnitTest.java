@@ -167,44 +167,45 @@ public class AffinityApiUnitTest {
     @Test
     public void createAffinityGroupTest() {
         when(_groupDao.isNameInUse(anyLong(), anyLong(), eq("group1"))).thenReturn(false);
-        AffinityGroup group = _affinityService.createAffinityGroup("user", domainId, "group1", "mock", "affinity group one");
+        AffinityGroup group = _affinityService.createAffinityGroup("user", null, domainId, "group1", "mock", "affinity group one");
         assertNotNull("Affinity group 'group1' of type 'mock' failed to create ", group);
 
     }
 
     @Test(expected = InvalidParameterValueException.class)
     public void invalidAffinityTypeTest() {
-        AffinityGroup group = _affinityService.createAffinityGroup("user", domainId, "group1", "invalid", "affinity group one");
+        AffinityGroup group = _affinityService.createAffinityGroup("user", null, domainId, "group1", "invalid", "affinity group one");
 
     }
 
     @Test(expected = InvalidParameterValueException.class)
     public void uniqueAffinityNameTest() {
         when(_groupDao.isNameInUse(anyLong(), anyLong(), eq("group1"))).thenReturn(true);
-        AffinityGroup group2 = _affinityService.createAffinityGroup("user", domainId, "group1", "mock", "affinity group two");
+        AffinityGroup group2 = _affinityService.createAffinityGroup("user", null, domainId, "group1", "mock", "affinity group two");
     }
 
     @Test(expected = InvalidParameterValueException.class)
     public void deleteAffinityGroupInvalidIdTest() throws ResourceInUseException {
         when(_groupDao.findById(20L)).thenReturn(null);
-        _affinityService.deleteAffinityGroup(20L, "user", domainId, "group1");
+        _affinityService.deleteAffinityGroup(20L, "user", null, domainId, "group1");
     }
 
     @Test(expected = InvalidParameterValueException.class)
     public void deleteAffinityGroupInvalidIdName() throws ResourceInUseException {
+        when(_acctMgr.finalyzeAccountId("user", domainId, null, true)).thenReturn(200L);
         when(_groupDao.findByAccountAndName(200L, "group1")).thenReturn(null);
-        _affinityService.deleteAffinityGroup(null, "user", domainId, "group1");
+        _affinityService.deleteAffinityGroup(null, "user", null, domainId, "group1");
     }
 
     @Test(expected = InvalidParameterValueException.class)
     public void deleteAffinityGroupNullIdName() throws ResourceInUseException {
-        _affinityService.deleteAffinityGroup(null, "user", domainId, null);
+        _affinityService.deleteAffinityGroup(null, "user", null, domainId, null);
     }
 
     @Test(expected = InvalidParameterValueException.class)
     public void updateAffinityGroupVMRunning() throws ResourceInUseException {
 
-        UserVmVO vm = new UserVmVO(10L, "test", "test", 101L, HypervisorType.Any, 21L, false, false, domainId, 200L, 5L, "", "test", 1L);
+        UserVmVO vm = new UserVmVO(10L, "test", "test", 101L, HypervisorType.Any, 21L, false, false, domainId, 200L, 1, 5L, "", "test", 1L);
         vm.setState(VirtualMachine.State.Running);
         when(_vmDao.findById(10L)).thenReturn(vm);
 

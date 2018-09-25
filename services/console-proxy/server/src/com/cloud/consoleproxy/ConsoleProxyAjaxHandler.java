@@ -16,6 +16,8 @@
 // under the License.
 package com.cloud.consoleproxy;
 
+import static com.cloud.utils.AutoCloseableUtil.closeAutoCloseable;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -201,10 +203,7 @@ public class ConsoleProxyAjaxHandler implements HttpHandler {
             s_logger.warn("Exception while reading request body: ", e);
         } finally {
             if (closeStreamAfterRead) {
-                try {
-                    is.close();
-                } catch (IOException e) {
-                }
+                closeAutoCloseable(is, "error closing stream after read");
             }
         }
         return sb.toString();
@@ -293,6 +292,7 @@ public class ConsoleProxyAjaxHandler implements HttpHandler {
             case 2:     // mouse down
             case 3:     // mouse up
             case 8:     // mouse double click
+            case 9:     // mouse scroll
                 str = queryMap.get("x");
                 if (str != null) {
                     try {

@@ -101,8 +101,8 @@ public class IPAddressUsageParser {
                 IpAssignDate = startDate;
             }
 
-            // ignore if assign date is after end date
             if (IpAssignDate.after(endDate)) {
+                //Ignore records created after endDate
                 continue;
             }
 

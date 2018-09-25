@@ -20,7 +20,6 @@ package com.cloud.ha;
 
 import java.util.List;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.log4j.Logger;
@@ -36,7 +35,6 @@ import com.cloud.hypervisor.Hypervisor;
 import com.cloud.resource.ResourceManager;
 import com.cloud.utils.component.AdapterBase;
 
-@Local(value=Investigator.class)
 public class HypervInvestigator extends AdapterBase implements Investigator {
     private final static Logger s_logger = Logger.getLogger(HypervInvestigator.class);
     @Inject HostDao _hostDao;
@@ -44,10 +42,10 @@ public class HypervInvestigator extends AdapterBase implements Investigator {
     @Inject ResourceManager _resourceMgr;
 
     @Override
-    public Boolean isVmAlive(com.cloud.vm.VirtualMachine vm, Host host) {
+    public boolean isVmAlive(com.cloud.vm.VirtualMachine vm, Host host) throws UnknownVM {
         Status status = isAgentAlive(host);
         if (status == null) {
-            return null;
+            throw new UnknownVM();
         }
         return status == Status.Up ? true : null;
     }

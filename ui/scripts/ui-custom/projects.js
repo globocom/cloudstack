@@ -106,7 +106,8 @@
                                             $.each(item, function(arrayKey, arrayValue) {
                                                 var $arrayElem = $li.find('[data-list-item=' + arrayKey + ']');
 
-                                                $arrayElem.html(_s(arrayValue));
+                                                $arrayElem.text(_s(arrayValue));
+                                                $arrayElem.attr('title', _s(arrayValue));
                                             });
 
                                             $li.attr({
@@ -808,7 +809,7 @@
      */
     var addProject = function() {
         pageElems.newProjectForm().dialog({
-            title: 'New Project',
+            title: _l('label.new.project'),
             closeOnEscape: false,
             width: 760
         }).closest('.ui-dialog').overlay();

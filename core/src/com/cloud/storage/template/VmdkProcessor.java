@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.ejb.Local;
 import javax.naming.ConfigurationException;
 
 import org.apache.log4j.Logger;
@@ -38,7 +37,6 @@ import com.cloud.storage.Storage.ImageFormat;
 import com.cloud.storage.StorageLayer;
 import com.cloud.utils.component.AdapterBase;
 
-@Local(value = Processor.class)
 public class VmdkProcessor extends AdapterBase implements Processor {
     private static final Logger s_logger = Logger.getLogger(VmdkProcessor.class);
 
@@ -46,6 +44,11 @@ public class VmdkProcessor extends AdapterBase implements Processor {
 
     @Override
     public FormatInfo process(String templatePath, ImageFormat format, String templateName) throws InternalErrorException {
+     return process(templatePath, format, templateName, 0);
+    }
+
+    @Override
+    public FormatInfo process(String templatePath, ImageFormat format, String templateName, long processTimeout) throws InternalErrorException {
         if (format != null) {
             if (s_logger.isInfoEnabled()) {
                 s_logger.info("We currently don't handle conversion from " + format + " to VMDK.");
@@ -77,7 +80,8 @@ public class VmdkProcessor extends AdapterBase implements Processor {
             long size = getTemplateVirtualSize(file.getParent(), file.getName());
             return size;
         } catch (Exception e) {
-
+            s_logger.info("[ignored]"
+                    + "failed to get template virtual size for vmdk: " + e.getLocalizedMessage());
         }
         return file.length();
     }
@@ -86,9 +90,10 @@ public class VmdkProcessor extends AdapterBase implements Processor {
         long virtualSize = 0;
         String templateFileFullPath = templatePath.endsWith(File.separator) ? templatePath : templatePath + File.separator;
         templateFileFullPath += templateName.endsWith(ImageFormat.VMDK.getFileExtension()) ? templateName : templateName + "." + ImageFormat.VMDK.getFileExtension();
-        try {
-            FileReader fileReader = new FileReader(templateFileFullPath);
-            BufferedReader bufferedReader = new BufferedReader(fileReader);
+        try (
+                FileReader fileReader = new FileReader(templateFileFullPath);
+                BufferedReader bufferedReader = new BufferedReader(fileReader);
+            ) {
             Pattern regex = Pattern.compile("(RW|RDONLY|NOACCESS) (\\d+) (FLAT|SPARSE|ZERO|VMFS|VMFSSPARSE|VMFSDRM|VMFSRAW)");
             String line = null;
             while((line = bufferedReader.readLine()) != null) {
@@ -99,7 +104,6 @@ public class VmdkProcessor extends AdapterBase implements Processor {
                     break;
                 }
             }
-            bufferedReader.close();
         } catch(FileNotFoundException ex) {
             String msg = "Unable to open file '" + templateFileFullPath + "' " + ex.toString();
             s_logger.error(msg);

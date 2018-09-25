@@ -79,6 +79,18 @@ public class SynchronousListener implements Listener {
     }
 
     @Override
+    public void processHostAboutToBeRemoved(long hostId) {
+    }
+
+    @Override
+    public void processHostRemoved(long hostId, long clusterId) {
+    }
+
+    @Override
+    public void processHostAdded(long hostId) {
+    }
+
+    @Override
     public void processConnect(Host agent, StartupCommand cmd, boolean forRebalance) {
     }
 
@@ -116,7 +128,7 @@ public class SynchronousListener implements Listener {
         profiler.stop();
 
         if (s_logger.isTraceEnabled()) {
-            s_logger.trace("Synchronized command - sending completed, time: " + profiler.getDuration() + ", answer: " +
+            s_logger.trace("Synchronized command - sending completed, time: " + profiler.getDurationInMillis() + ", answer: " +
                 (_answers != null ? _answers[0].toString() : "null"));
         }
         return _answers;

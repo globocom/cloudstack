@@ -17,7 +17,7 @@
 """Utilities functions
 """
 # All tests inherit from cloudstackTestCase
-from marvin.cloudstackTestCase import cloudstackTestCase
+from marvin.cloudstackTestCase import cloudstackTestCase, unittest
 # Import Integration Libraries
 from marvin.codes import FAILED, PASS
 # base - contains all resources as entities and defines create, delete,
@@ -33,11 +33,12 @@ from marvin.lib.base import (Account,
                              Resources)
 from marvin.lib.utils import cleanup_resources, validateList
 
-# common - commonly used methods for all tests are listed here
+#common - commonly used methods for all tests are listed here
 from marvin.lib.common import (get_zone,
                                get_domain,
                                get_template,
-                               list_virtual_machines)
+                               list_virtual_machines,
+                               find_storage_pool_type)
 from nose.plugins.attrib import attr
 import os
 import urllib
@@ -116,7 +117,6 @@ def verify_vm(self, vmid):
 
 
 class TestPathVolume(cloudstackTestCase):
-
     @classmethod
     def setUpClass(cls):
         testClient = super(TestPathVolume, cls).getClsTestClient()
@@ -126,6 +126,17 @@ class TestPathVolume(cloudstackTestCase):
         cls.domain = get_domain(cls.apiclient)
         cls.zone = get_zone(cls.apiclient)
         cls.testdata["mode"] = cls.zone.networktype
+        cls.hypervisor = testClient.getHypervisorInfo()
+        cls._cleanup = []
+        cls.insuffStorage = False
+        cls.unsupportedHypervisor = False
+
+        #for LXC if the storage pool of type 'rbd' ex: ceph is not available, skip the test
+        if cls.hypervisor.lower() == 'lxc':
+            if not find_storage_pool_type(cls.apiclient, storagetype='rbd'):
+                cls.insuffStorage   = True
+                return
+
         cls.template = get_template(
             cls.apiclient,
             cls.zone.id,
@@ -136,7 +147,7 @@ class TestPathVolume(cloudstackTestCase):
                 "get_template() failed to return template with description \
                 %s" %
                 cls.testdata["ostype"])
-        cls._cleanup = []
+
         try:
             cls.account = Account.create(cls.apiclient,
                                          cls.testdata["account"],
@@ -210,11 +221,18 @@ class TestPathVolume(cloudstackTestCase):
                                   password=cls.testdata["account"]["password"]
                                   )
             assert response.sessionkey is not None
-            # response should have non null value
+            #response should have non null value
         except Exception as e:
-            cls.tearDownClass()
-            raise e
+                cls.tearDownClass()
+                raise e
         return
+
+    def setUp(self):
+        self.apiclient = self.testClient.getApiClient()
+        self.dbclient = self.testClient.getDbConnection()
+        if self.unsupportedHypervisor or self.insuffStorage:
+            self.skipTest("Skipping test because of insuff resources\
+                    %s" % self.hypervisor)
 
     @classmethod
     def tearDownClass(cls):
@@ -229,7 +247,7 @@ class TestPathVolume(cloudstackTestCase):
             "advancedsg",
             "basic",
         ],
-        required_hardware="false")
+        required_hardware="True")
     def test_01_positive_path(self):
         """
         positive test for volume life cycle
@@ -257,7 +275,10 @@ class TestPathVolume(cloudstackTestCase):
         # 20.Detach data disks from VM2 and delete volume
 
         """
-
+        if self.hypervisor.lower() in ['lxc']:
+            self.skipTest(
+                "feature is not supported in %s" %
+                self.hypervisor)
         # 1. Deploy a vm [vm1] with shared storage and data disk
         self.virtual_machine_1 = VirtualMachine.create(
             self.userapiclient,
@@ -514,15 +535,15 @@ class TestPathVolume(cloudstackTestCase):
         # checking  format of  downloaded volume and assigning to
         # testdata["volume_upload"]
         if "OVA" in self.extract_volume.url.upper():
-            self.testdata["upload_volume"]["format"] = "OVA"
+            self.testdata["configurableData"]["upload_volume"]["format"] = "OVA"
         if "QCOW2" in self.extract_volume.url.upper():
-            self.testdata["upload_volume"]["format"] = "QCOW2"
+            self.testdata["configurableData"]["upload_volume"]["format"] = "QCOW2"
         # 6. Upload volume by providing url of downloaded volume in step 5
         self.upload_response = Volume.upload(
             self.userapiclient,
             zoneid=self.zone.id,
             url=self.extract_volume.url,
-            services=self.testdata["upload_volume"])
+            services=self.testdata["configurableData"]["upload_volume"])
         self.upload_response.wait_for_upload(self.userapiclient
                                              )
         self.debug("uploaded volume id is %s" % self.upload_response.id)
@@ -782,9 +803,9 @@ class TestPathVolume(cloudstackTestCase):
                 raise Exception("Volume deletion failed with error %s" % e)
         # 16.Upload volume of size smaller  than
         # storage.max.volume.upload.size(leaving the negative case)
-        self.testdata["upload_volume"]["format"] = "VHD"
+        self.testdata["configurableData"]["upload_volume"]["format"] = "VHD"
         volume_upload = Volume.upload(self.userapiclient,
-                                      self.testdata["upload_volume"],
+                                      self.testdata["configurableData"]["upload_volume"],
                                       zoneid=self.zone.id
                                       )
         volume_upload.wait_for_upload(self.userapiclient
@@ -813,7 +834,7 @@ class TestPathVolume(cloudstackTestCase):
             "advancedsg",
             "basic",
         ],
-        required_hardware="false")
+        required_hardware="True")
     def test_02_negative_path(self):
         """
         negative test for volume life cycle
@@ -978,24 +999,24 @@ class TestPathVolume(cloudstackTestCase):
         # 11.Upload the volume  by providing the URL of the downloaded
         # volume, but specify a wrong format (not supported by the hypervisor)
         if "OVA" in self.extract_volume.url.upper():
-            self.testdata["upload_volume"]["format"] = "VHD"
+            self.testdata["configurableData"]["upload_volume"]["format"] = "VHD"
         else:
-            self.testdata["upload_volume"]["format"] = "OVA"
+            self.testdata["configurableData"]["upload_volume"]["format"] = "OVA"
         try:
             self.upload_response = Volume.upload(
                 self.userapiclient,
                 zoneid=self.zone.id,
                 url=self.extract_volume.url,
-                services=self.testdata["upload_volume"])
+                services=self.testdata["configurableData"]["upload_volume"])
             self.fail("Volume got uploaded with invalid format")
         except Exception as e:
             self.debug("upload volume failed due %s" % e)
         # 12. Upload the same volume from T4 by providing a wrong URL
-        self.testdata["upload_volume"]["format"] = "VHD"
+        self.testdata["configurableData"]["upload_volume"]["format"] = "VHD"
         if "OVA" in self.extract_volume.url.upper():
-            self.testdata["upload_volume"]["format"] = "OVA"
+            self.testdata["configurableData"]["upload_volume"]["format"] = "OVA"
         if "QCOW2" in self.extract_volume.url.upper():
-            self.testdata["upload_volume"]["format"] = "QCOW2"
+            self.testdata["configurableData"]["upload_volume"]["format"] = "QCOW2"
         u1 = self.extract_volume.url.split('.')
         u1[-2] = "wrong"
         wrong_url = ".".join(u1)
@@ -1004,7 +1025,7 @@ class TestPathVolume(cloudstackTestCase):
                 self.userapiclient,
                 zoneid=self.zone.id,
                 url=wrong_url,
-                services=self.testdata["upload_volume"])
+                services=self.testdata["configurableData"]["upload_volume"])
             self.upload_response.wait_for_upload(self.userapiclient
                                                  )
             self.fail("volume got uploaded with wrong url")
@@ -1016,7 +1037,7 @@ class TestPathVolume(cloudstackTestCase):
                 self.userapiclient,
                 zoneid=self.zone.id,
                 url=self.extract_volume.url,
-                services=self.testdata["upload_volume"],
+                services=self.testdata["configurableData"]["upload_volume"],
                 checksome="123456")
             self.upload_response.wait_for_upload(self.userapiclient
                                                  )
@@ -1055,7 +1076,7 @@ class TestPathVolume(cloudstackTestCase):
                 self.userapiclient,
                 zoneid=self.zone.id,
                 url=self.extract_volume.url,
-                services=self.testdata["upload_volume"])
+                services=self.testdata["configurableData"]["upload_volume"])
             self.upload_response.wait_for_upload(self.userapiclient
                                                  )
             self.fail("volume got uploaded after account reached max limit for\

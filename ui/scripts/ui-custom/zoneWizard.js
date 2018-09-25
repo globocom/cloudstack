@@ -177,7 +177,7 @@
             }
 
             cloudStack.dialog.notice({
-                message: dictionary['message.please.add.at.lease.one.traffic.range']
+                message: _l('message.please.add.at.lease.one.traffic.range')
             });
             return false;
         },
@@ -296,91 +296,89 @@
             var hypervisor = getData($trafficType.closest('.zone-wizard')).zone.hypervisor;
             var zoneType = getData($trafficType.closest('.zone-wizard')).zone.networkType;
             var fields;
-            
+
             if (hypervisor == 'VMware') {
-            	fields = {
-            		vSwitchName: {
-	                    label: 'label.vswitch.name' ,
-	                    defaultValue: trafficData.vSwitchName
-	                },
-	                vlanId: { 
-	                        label: 'label.vlan.id',
-	                	defaultValue: trafficData.vlanId
-	                }	                
-	            };  
-            	
-            	if(zoneType == 'Advanced') {
-	            	if($trafficType.hasClass('guest') || $trafficType.hasClass('public')) {            		
-	            		if(trafficData.vSwitchType == null) {
-	            			 var useDvs = false;
-	                         $.ajax({
-	                             url: createURL('listConfigurations'),
-	                             data: {
-	                                 name: 'vmware.use.dvswitch'
-	                             },
-	                             async: false,
-	                             success: function(json) {
-	                                 if (json.listconfigurationsresponse.configuration[0].value == 'true') {
-	                                     useDvs = true;
-	                                 }
-	                             }
-	                         });    
-	                         if (useDvs == true) { 
-	                        	 var useNexusDvs = false;                                            
-	                             $.ajax({
-	                                 url: createURL('listConfigurations'),
-	                                 data: {
-	                                     name: 'vmware.use.nexus.vswitch'
-	                                 },
-	                                 async: false,
-	                                 success: function(json) {
-	                                     if (json.listconfigurationsresponse.configuration[0].value == 'true') {
-	                                         useNexusDvs = true;
-	                                     }
-	                                 }
-	                             });
-	                             if (useNexusDvs == true) {
-	                            	 trafficData.vSwitchType = 'nexusdvs';
-	                            	 fields.vSwitchName.defaultValue = 'epp0';
-	                             } else {
-	                            	 trafficData.vSwitchType = 'vmwaredvs';
-	                            	 fields.vSwitchName.defaultValue = 'dvSwitch0';
-	                             }   
-	                         } else { //useDvs == false
-	                        	 trafficData.vSwitchType = 'vmwaresvs';
-	                        	 fields.vSwitchName.defaultValue = 'vSwitch0';
-	                         }                         
-	            		}
-	            		
-	            		$.extend(fields, {
-	            		    vSwitchType: {
-	                                label: 'label.vSwitch.type',
-	            		        select: function (args) {            		        	
-	            		            args.response.success({
-	            		                data: [{
-	            		                    id: 'nexusdvs',
-	            		                    description: 'Cisco Nexus 1000v Distributed Virtual Switch'
-	            		                }, {
-	            		                    id: 'vmwaresvs',
-	            		                    description: 'VMware vNetwork Standard Virtual Switch'
-	            		                }, {
-	            		                    id: 'vmwaredvs',
-	            		                    description: 'VMware vNetwork Distributed Virtual Switch'
-	            		                }]
-	            		            });
-	            		        },
-	    		                defaultValue: trafficData.vSwitchType
-	            		    }
-	            		});   
-	            	}  
-            	}
-            } else {    
-	            fields = {
-	                label: {
-	                    label: hypervisor + ' ' + _l('label.traffic.label'),
-	                    defaultValue: trafficData.label
-	                }
-	            };
+                fields = {
+                    vSwitchName: {
+                        label: 'label.vswitch.name' ,
+                        defaultValue: trafficData.vSwitchName
+                    },
+                    vlanId: {
+                            label: 'label.vlan.id',
+                        defaultValue: trafficData.vlanId
+                    }
+                };
+
+                if(zoneType == 'Advanced') {
+                    if(trafficData.vSwitchType == null) {
+                         var useDvs = false;
+                         $.ajax({
+                             url: createURL('listConfigurations'),
+                             data: {
+                                 name: 'vmware.use.dvswitch'
+                             },
+                             async: false,
+                             success: function(json) {
+                                 if (json.listconfigurationsresponse.configuration[0].value == 'true') {
+                                     useDvs = true;
+                                 }
+                             }
+                         });
+                         if (useDvs == true) {
+                             var useNexusDvs = false;
+                             $.ajax({
+                                 url: createURL('listConfigurations'),
+                                 data: {
+                                     name: 'vmware.use.nexus.vswitch'
+                                 },
+                                 async: false,
+                                 success: function(json) {
+                                     if (json.listconfigurationsresponse.configuration[0].value == 'true') {
+                                         useNexusDvs = true;
+                                     }
+                                 }
+                             });
+                             if (useNexusDvs == true) {
+                                 trafficData.vSwitchType = 'nexusdvs';
+                                 fields.vSwitchName.defaultValue = 'epp0';
+                             } else {
+                                 trafficData.vSwitchType = 'vmwaredvs';
+                                 fields.vSwitchName.defaultValue = 'dvSwitch0';
+                             }
+                         } else { //useDvs == false
+                             trafficData.vSwitchType = 'vmwaresvs';
+                             fields.vSwitchName.defaultValue = 'vSwitch0';
+                         }
+                    }
+
+                    $.extend(fields, {
+                        vSwitchType: {
+                                label: 'label.vSwitch.type',
+                            select: function (args) {
+                                args.response.success({
+                                    data: [{
+                                        id: 'nexusdvs',
+                                        description: 'Cisco Nexus 1000v Distributed Virtual Switch'
+                                    }, {
+                                        id: 'vmwaresvs',
+                                        description: 'VMware vNetwork Standard Virtual Switch'
+                                    }, {
+                                        id: 'vmwaredvs',
+                                        description: 'VMware vNetwork Distributed Virtual Switch'
+                                    }]
+                                });
+                            },
+                            defaultValue: trafficData.vSwitchType
+                        }
+                    });
+                }
+            } else {
+                fields = {
+                    label: {
+                        label: hypervisor + ' ' + _l('label.traffic.label'),
+                        defaultValue: trafficData.label
+                    }
+                };
             }
 
             cloudStack.dialog.createForm({
@@ -390,7 +388,7 @@
                     fields: fields
                 },
 
-                after: function(args) {               
+                after: function(args) {
                     $trafficType.data('traffic-type-data', args.data);
                 }
             });
@@ -658,14 +656,14 @@
             var $physicalNetworkItem = $('<div>').addClass('select-container multi');
             var $deleteButton = $('<div>').addClass('button remove physical-network')
                 .attr({
-                    title: 'Remove this physical network'
+                    title: _l('label.remove.this.physical.network')
                 })
                 .append('<span>').addClass('icon').html('&nbsp;');
             var $icon = $('<div>').addClass('physical-network-icon');
 
             var $nameField = $('<div>').addClass('field name').append(
                 $('<div>').addClass('name').append(
-                    $('<label>').html('Physical network name')
+                    $('<label>').html(_l('label.physical.network.name'))
                 ),
                 $('<div>').addClass('value').append(
                     $('<input>').attr({
@@ -701,7 +699,7 @@
             if ($wizard.find('.select-network-model input:radio[name=network-model]:checked').val() == 'Advanced') {
                 $nameField.append(
                     $('<div>').append(
-                        $('<span style=\"font-size:11px;padding-right:5px;padding-left:40px\">').html('Isolation method'),
+                        $('<span style=\"font-size:11px;padding-right:5px;padding-left:40px\">').html(_l('label.isolation.method')),
                         $('<select>').append(
                             $('<option>').attr({
                                 value: 'VLAN'
@@ -713,8 +711,8 @@
                                 value: 'STT'
                             }).html('STT'),
                             $('<option>').attr({
-                                value: 'VNS'
-                            }).html('VNS'),
+                                value: 'BCF_SEGMENT'
+                            }).html('BCF_SEGMENT'),
                             $('<option>').attr({
                                 value: 'SSP'
                             }).html('SSP'),
@@ -727,7 +725,7 @@
                             $('<option>').attr({
                                 value: 'L3VPN'
                             }).html('L3VPN'),
-		                    $('<option>').attr({
+                            $('<option>').attr({
                                 value: 'VSP'
                             }).html('VSP'),
                             $('<option>').attr({
@@ -1038,7 +1036,7 @@
                             };
 
                             var enableZone = function() {
-                                makeMessage(dictionary['message.enabling.zone']);
+                                makeMessage(_l('message.enabling.zone'));
 
                                 enableZoneAction({
                                     formData: data,
@@ -1051,7 +1049,7 @@
 
                                         error: function(message) {
                                             cloudStack.dialog.notice({
-                                                message: dictionary['error.could.not.enable.zone'] + ':</br>' + message
+                                                message: _l('error.could.not.enable.zone') + ':</br>' + message
                                             });
                                         }
                                     }
@@ -1059,7 +1057,7 @@
                             };
 
                             cloudStack.dialog.confirm({
-                                message: dictionary['message.zone.creation.complete.would.you.like.to.enable.this.zone'],
+                                message: _l('message.zone.creation.complete.would.you.like.to.enable.this.zone'),
                                 action: function() {
                                     enableZone();
                                 },
@@ -1083,7 +1081,7 @@
                                 .removeClass('final')
                                 .html('<span>Fix errors</span>')
                                 .click(goNextOverride);
-                            makeMessage(dictionary['error.something.went.wrong.please.correct.the.following'] + ':<br/>' + message, true);
+                            makeMessage(_l('error.something.went.wrong.please.correct.the.following') + ':<br/>' + message, true);
                             $wizard.data('startfn', start);
                         },
                         message: makeMessage
@@ -1211,7 +1209,7 @@
 
                 // Show launch button if last step
                 if ($targetStep.index() == $steps.size() - 1 || options.nextStep) {
-                    $nextButton.find('span').html(options.nextStep ? 'Save changes' : 'Launch zone');
+                    $nextButton.find('span').html(options.nextStep ? _l('label.save.changes') : _l('label.launch.zone'));
                     $nextButton.addClass('final');
 
                     if (options.nextStep) {
@@ -1424,7 +1422,7 @@
             showStep(1);
 
             return $wizard.dialog({
-                title: 'Add zone',
+                title: _l('label.installWizard.addZone.title'),
                 closeOnEscape: false,
                 width: 750,
                 height: 665,

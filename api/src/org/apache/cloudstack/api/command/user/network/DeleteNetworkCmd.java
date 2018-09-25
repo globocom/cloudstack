@@ -17,6 +17,7 @@
 package org.apache.cloudstack.api.command.user.network;
 
 import com.cloud.utils.exception.CloudRuntimeException;
+import org.apache.cloudstack.api.ApiCommandJobType;
 import org.apache.log4j.Logger;
 
 import org.apache.cloudstack.acl.SecurityChecker.AccessType;
@@ -78,7 +79,7 @@ public class DeleteNetworkCmd extends BaseAsyncCmd {
     public void execute() {
         CallContext.current().setEventDetails("Network Id: " + getId());
         try {
-            boolean result = _networkService.deleteNetwork(getId(), isForced());
+        boolean result = _networkService.deleteNetwork(getId(), isForced());
 
             if (result) {
                 SuccessResponse response = new SuccessResponse(getCommandName());
@@ -113,10 +114,19 @@ public class DeleteNetworkCmd extends BaseAsyncCmd {
     }
 
     @Override
+    public Long getInstanceId() {
+        return getId();
+    }
+
+    @Override
+    public ApiCommandJobType getInstanceType() {
+        return ApiCommandJobType.Network;
+    }
+    @Override
     public long getEntityOwnerId() {
         Network network = _networkService.getNetwork(id);
         if (network == null) {
-            throw new InvalidParameterValueException("Networkd id=" + id + " doesn't exist");
+            throw new InvalidParameterValueException("Network ID=" + id + " doesn't exist");
         } else {
             return _networkService.getNetwork(id).getAccountId();
         }

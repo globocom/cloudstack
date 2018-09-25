@@ -49,4 +49,8 @@ public @interface Parameter {
     String since() default "";
 
     RoleType[] authorized() default {};
+
+    ApiArgValidator[] validations() default {};
+
+    boolean acceptedOnAdminPort() default true;
 }

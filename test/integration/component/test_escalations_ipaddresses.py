@@ -153,7 +153,7 @@ class TestIpAddresses(cloudstackTestCase):
                     (exp_val, act_val))
         return return_flag
 
-    @attr(tags=["advanced"], required_hardware="true")
+    @attr(tags=["advanced", "dvs"], required_hardware="true")
     def test_01_list_ipaddresses_pagination(self):
         """
         @summary: Test List IP Addresses pagination
@@ -522,7 +522,7 @@ class TestIpAddresses(cloudstackTestCase):
         Step9: Verifying the details of the Listed IP Address
         """
         if self.hypervisor.lower() in ['hyperv']:
-            raise unittest.SkipTest("This feature is not supported on existing hypervisor. Hence, skipping the test")
+            self.skipTest("This feature is not supported on existing hypervisor. Hence, skipping the test")
         # Listing all the vpc's for a user
         list_vpc_before = VPC.list(self.userapiclient)
         # Verifying No VPCs are listed
@@ -857,7 +857,7 @@ class TestIpAddresses(cloudstackTestCase):
         Step11: Verifying that no Load Balancer Rules are listed
         """
         if self.hypervisor.lower() in ['hyperv']:
-            raise unittest.SkipTest("This feature is not supported on existing hypervisor. Hence, skipping the test")
+            self.skipTest("This feature is not supported on existing hypervisor. Hence, skipping the test")
         # Listing all the vpc's for a user
         list_vpc_before = VPC.list(self.userapiclient)
         # Verifying No VPCs are listed
@@ -1947,12 +1947,12 @@ class TestIpAddresses(cloudstackTestCase):
         self.assertEqual(
             1,
             len(list_ipaddresses_after),
-            "VM Created is not in Runnning state"
+            "VM Created is not in Running state"
         )
         self.assertEquals(
             vm_created.id,
             list_vms_running[0].id,
-            "VM Created is not in Runnning state"
+            "VM Created is not in Running state"
         )
         # Listing Virtual Machines in stopped state in above created network
         list_vms_stopped = VirtualMachine.list(
@@ -2396,8 +2396,8 @@ class TestIpAddresses(cloudstackTestCase):
         # Creating expected and actual values dictionaries
         expected_dict = {
             "ipaddressid": associated_ipaddress.ipaddress.id,
-            "startport": "22",
-                         "endport": "2222",
+            "startport": 22,
+                         "endport": 2222,
                          "protocol": "tcp",
                          "cidrlist": "10.1.1.1/16"
         }
@@ -3035,7 +3035,7 @@ class TestIpAddresses(cloudstackTestCase):
         Step8: Verifying that StaticNat is disabled
         """
         if self.hypervisor.lower() in ['hyperv']:
-            raise unittest.SkipTest("This feature is not supported on existing hypervisor. Hence, skipping the test")
+            self.skipTest("This feature is not supported on existing hypervisor. Hence, skipping the test")
         # Listing all the vpc's for a user
         list_vpc_before = VPC.list(self.userapiclient)
         # Verifying No VPCs are listed
@@ -3454,7 +3454,7 @@ class TestIpAddresses(cloudstackTestCase):
         Step18: Verifying Autoscale policy is updated with condition2
         """
         if self.hypervisor.lower() == 'kvm':
-            raise unittest.SkipTest(
+            self.skipTest(
                 "ScaleVM is not supported on KVM. Hence, skipping the test")
 
         list_physical_networks = PhysicalNetwork.list(
@@ -3733,7 +3733,7 @@ class TestIpAddresses(cloudstackTestCase):
         Step16: Verifying that Autoscale VM is updated
         """
         if self.hypervisor.lower() == 'kvm':
-            raise unittest.SkipTest(
+            self.skipTest(
                 "ScaleVM is not supported on KVM. Hence, skipping the test")
 
         list_physical_networks = PhysicalNetwork.list(
@@ -4060,7 +4060,7 @@ class TestIpAddresses(cloudstackTestCase):
         Step14: Enabling Autoscale VM group and verifying it was enabled
         """
         if self.hypervisor.lower() == 'kvm':
-            raise unittest.SkipTest(
+            self.skipTest(
                 "ScaleVM is not supported on KVM. Hence, skipping the test")
 
         list_physical_networks = PhysicalNetwork.list(

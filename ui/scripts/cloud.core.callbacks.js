@@ -24,7 +24,7 @@ $.urlParam = function(name) {
 
 /*
 This file is meant to help with implementing single signon integration.  If you are using the
-cloud.com default UI, there is no need to touch this file.
+default Apache CloudStack UI, there is no need to touch this file.
 */
 
 /*
@@ -39,9 +39,9 @@ function onLogoutCallback() {
 
     return true; // return true means the login page will show
     /*
-	window.location.replace("http://www.google.com"); //redirect to a different location
-  return false;	//return false means it will stay in the location window.location.replace() sets it to (i.e. "http://www.google.com")
-	*/
+    window.location.replace("http://www.google.com"); //redirect to a different location
+  return false;    //return false means it will stay in the location window.location.replace() sets it to (i.e. "http://www.google.com")
+    */
 }
 
 var g_loginResponse = null;

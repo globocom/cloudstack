@@ -62,6 +62,7 @@ public class UploadVolumeCmd extends BaseAsyncCmd {
     @Parameter(name = ApiConstants.URL,
                type = CommandType.STRING,
                required = true,
+               length = 2048,
                description = "the URL of where the volume is hosted. Possible URL include http:// and https://")
     private String url;
 
@@ -81,7 +82,7 @@ public class UploadVolumeCmd extends BaseAsyncCmd {
     @Parameter(name = ApiConstants.ACCOUNT, type = CommandType.STRING, description = "an optional accountName. Must be used with domainId.")
     private String accountName;
 
-    @Parameter(name = ApiConstants.CHECKSUM, type = CommandType.STRING, description = "the MD5 checksum value of this volume")
+    @Parameter(name = ApiConstants.CHECKSUM, type = CommandType.STRING, description = "the checksum value of this volume. " + ApiConstants.CHECKSUM_PARAMETER_PREFIX_DESCRIPTION)
     private String checksum;
 
     @Parameter(name = ApiConstants.IMAGE_STORE_UUID, type = CommandType.STRING, description = "Image store uuid")

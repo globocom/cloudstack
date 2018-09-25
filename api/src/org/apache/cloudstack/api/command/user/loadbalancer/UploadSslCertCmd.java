@@ -36,9 +36,9 @@ import com.cloud.exception.InsufficientCapacityException;
 import com.cloud.exception.NetworkRuleConflictException;
 import com.cloud.exception.ResourceAllocationException;
 import com.cloud.exception.ResourceUnavailableException;
-import com.cloud.network.lb.CertService;
+import org.apache.cloudstack.network.tls.CertService;
 
-@APICommand(name = "uploadSslCert", description = "Upload a certificate to cloudstack", responseObject = SslCertResponse.class,
+@APICommand(name = "uploadSslCert", description = "Upload a certificate to CloudStack", responseObject = SslCertResponse.class,
         requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
 public class UploadSslCertCmd extends BaseCmd {
     public static final Logger s_logger = Logger.getLogger(UploadSslCertCmd.class.getName());
@@ -64,14 +64,17 @@ public class UploadSslCertCmd extends BaseCmd {
     @Parameter(name = ApiConstants.PASSWORD, type = CommandType.STRING, description = "Password for the private key")
     private String password;
 
-    @Parameter(name = ApiConstants.ACCOUNT, type = CommandType.STRING, description = "account who will own the ssl cert")
+    @Parameter(name = ApiConstants.ACCOUNT, type = CommandType.STRING, description = "account that will own the SSL certificate")
     private String accountName;
 
-    @Parameter(name = ApiConstants.PROJECT_ID, type = CommandType.UUID, entityType = ProjectResponse.class, description = "an optional project for the ssl cert")
+    @Parameter(name = ApiConstants.PROJECT_ID, type = CommandType.UUID, entityType = ProjectResponse.class, description = "an optional project for the SSL certificate")
     private Long projectId;
 
-    @Parameter(name = ApiConstants.DOMAIN_ID, type = CommandType.UUID, entityType = DomainResponse.class, description = "domain ID of the account owning the ssl cert")
+    @Parameter(name = ApiConstants.DOMAIN_ID, type = CommandType.UUID, entityType = DomainResponse.class, description = "domain ID of the account owning the SSL certificate")
     private Long domainId;
+
+    @Parameter(name = ApiConstants.NAME , type = CommandType.STRING, required = true, description = "Name for the uploaded certificate")
+    private String name;
 
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
@@ -105,9 +108,14 @@ public class UploadSslCertCmd extends BaseCmd {
         return projectId;
     }
 
+    public String getName() {
+        return name;
+    }
+
     /////////////////////////////////////////////////////
     /////////////// API Implementation///////////////////
     /////////////////////////////////////////////////////
+
 
     @Override
     public void execute() throws ResourceUnavailableException, InsufficientCapacityException, ServerApiException, ConcurrentOperationException,

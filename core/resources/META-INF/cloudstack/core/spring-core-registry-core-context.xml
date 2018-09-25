@@ -23,10 +23,10 @@
        xmlns:context="http://www.springframework.org/schema/context"
        xmlns:aop="http://www.springframework.org/schema/aop"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
-                      http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
-                      http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.0.xsd
+                      http://www.springframework.org/schema/beans/spring-beans.xsd
+                      http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd
                       http://www.springframework.org/schema/context
-                      http://www.springframework.org/schema/context/spring-context-3.0.xsd"
+                      http://www.springframework.org/schema/context/spring-context.xsd"
                       >
 
     <bean id="userAuthenticatorsRegistry"
@@ -75,7 +75,7 @@
         class="org.apache.cloudstack.spring.lifecycle.registry.ExtensionRegistry">
         <property name="orderConfigKey" value="ha.investigators.order" />
         <property name="orderConfigDefault"
-            value="SimpleInvestigator,XenServerInvestigator,KVMInvestigator,HypervInvestigator,VMwareInvestigator,PingInvestigator,ManagementIPSysVMInvestigator" />
+            value="SimpleInvestigator,XenServerInvestigator,KVMInvestigator,HypervInvestigator,VMwareInvestigator,PingInvestigator,ManagementIPSysVMInvestigator,Ovm3Investigator" />
         <property name="excludeKey" value="ha.investigators.exclude" />
     </bean>
 
@@ -141,7 +141,6 @@
     <bean id="ipDeployersRegistry"
         class="org.apache.cloudstack.spring.lifecycle.registry.ExtensionRegistry">
         <property name="excludeKey" value="ip.deployers.exclude" />
-        <property name="excludeDefault" value="MidoNetElement" />
         <property name="preRegistered">
             <list>
                 <ref bean="VpcVirtualRouter" />
@@ -152,7 +151,6 @@
     <bean id="dhcpProvidersRegistry"
         class="org.apache.cloudstack.spring.lifecycle.registry.ExtensionRegistry">
         <property name="excludeKey" value="dhcp.providers.exclude" />
-        <property name="excludeDefault" value="MidoNetElement" />
         <property name="preRegistered">
             <list>
                 <ref bean="VpcVirtualRouter" />
@@ -257,7 +255,7 @@
         class="org.apache.cloudstack.spring.lifecycle.registry.ExtensionRegistry">
         <property name="orderConfigKey" value="affinity.processors.order" />
         <property name="orderConfigDefault"
-            value="HostAntiAffinityProcessor,ExplicitDedicationProcessor" />
+            value="HostAntiAffinityProcessor,ExplicitDedicationProcessor,HostAffinityProcessor" />
         <property name="excludeKey" value="affinity.processors.exclude" />
     </bean>
 
@@ -313,5 +311,23 @@
         class="org.apache.cloudstack.spring.lifecycle.registry.ExtensionRegistry">
         <property name="excludeKey" value="data.motion.strategies.exclude" />
     </bean>
-    
+
+    <bean id="haProvidersRegistry"
+          class="org.apache.cloudstack.spring.lifecycle.registry.ExtensionRegistry">
+        <property name="orderConfigDefault" value="KVMHAProvider" />
+    </bean>
+
+    <bean id="outOfBandManagementDriversRegistry"
+          class="org.apache.cloudstack.spring.lifecycle.registry.ExtensionRegistry">
+        <property name="orderConfigDefault" value="IPMITOOL" />
+    </bean>
+
+    <bean id="caProvidersRegistry"
+          class="org.apache.cloudstack.spring.lifecycle.registry.ExtensionRegistry">
+    </bean>
+
+    <bean id="directDownloadRegistry"
+          class="org.apache.cloudstack.spring.lifecycle.registry.ExtensionRegistry">
+    </bean>
+
 </beans>

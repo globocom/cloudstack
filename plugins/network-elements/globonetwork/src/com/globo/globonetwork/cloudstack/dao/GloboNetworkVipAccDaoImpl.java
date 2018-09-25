@@ -18,8 +18,6 @@ package com.globo.globonetwork.cloudstack.dao;
 
 import java.util.List;
 
-import javax.ejb.Local;
-
 import org.springframework.stereotype.Component;
 
 import com.cloud.utils.db.DB;
@@ -30,7 +28,6 @@ import com.cloud.utils.db.SearchCriteria.Op;
 import com.globo.globonetwork.cloudstack.GloboNetworkVipAccVO;
 
 @Component
-@Local(value = GloboNetworkVipAccDao.class)
 @DB
 public class GloboNetworkVipAccDaoImpl extends GenericDaoBase<GloboNetworkVipAccVO, Long> implements GloboNetworkVipAccDao {
 

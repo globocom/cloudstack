@@ -74,6 +74,8 @@ public interface Vpc extends ControlledEntity, Identity, InternalIdentity {
 
     boolean isDisplay();
 
+    boolean isRedundant();
+
     /**
      *
      * @return true if VPC is configured to use distributed router to provides one-hop forwarding and hypervisor based ACL
@@ -85,4 +87,8 @@ public interface Vpc extends ControlledEntity, Identity, InternalIdentity {
      * @return true if VPC spans multiple zones in the region
      */
     boolean isRegionLevelVpc();
+
+    boolean isRollingRestart();
+
+    void setRollingRestart(boolean rollingRestart);
 }

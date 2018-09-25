@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.apache.cloudstack.api.command.admin.cluster.ListClustersCmd;
 import org.apache.cloudstack.api.command.admin.config.ListCfgsByCmd;
-import org.apache.cloudstack.api.command.admin.domain.UpdateDomainCmd;
 import org.apache.cloudstack.api.command.admin.guest.AddGuestOsCmd;
 import org.apache.cloudstack.api.command.admin.guest.AddGuestOsMappingCmd;
 import org.apache.cloudstack.api.command.admin.guest.ListGuestOsMappingCmd;
@@ -63,7 +62,6 @@ import com.cloud.alert.Alert;
 import com.cloud.capacity.Capacity;
 import com.cloud.dc.Pod;
 import com.cloud.dc.Vlan;
-import com.cloud.domain.Domain;
 import com.cloud.exception.ConcurrentOperationException;
 import com.cloud.exception.ManagementServerException;
 import com.cloud.exception.ResourceUnavailableException;
@@ -228,15 +226,6 @@ public interface ManagementService {
     VirtualMachine upgradeSystemVM(UpgradeSystemVMCmd cmd);
 
     /**
-     * update an existing domain
-     *
-     * @param cmd
-     *            - the command containing domainId and new domainName
-     * @return Domain object if the command succeeded
-     */
-    Domain updateDomain(UpdateDomainCmd cmd);
-
-    /**
      * Searches for alerts
      *
      * @param c
@@ -299,6 +288,8 @@ public interface ManagementService {
     ArrayList<String> getCloudIdentifierResponse(long userId);
 
     boolean updateHostPassword(UpdateHostPasswordCmd cmd);
+
+    boolean updateClusterPassword(UpdateHostPasswordCmd cmd);
 
     InstanceGroup updateVmGroup(UpdateVMGroupCmd cmd);
 
@@ -399,7 +390,7 @@ public interface ManagementService {
      * @return Ternary<List<? extends Host>, List<? extends Host>, Map<Host, Boolean>> List of all Hosts to which a VM
      *         can be migrated, list of Hosts with enough capacity and hosts requiring storage motion for migration.
      */
-    Ternary<Pair<List<? extends Host>, Integer>, List<? extends Host>, Map<Host, Boolean>> listHostsForMigrationOfVM(Long vmId, Long startIndex, Long pageSize);
+    Ternary<Pair<List<? extends Host>, Integer>, List<? extends Host>, Map<Host, Boolean>> listHostsForMigrationOfVM(Long vmId, Long startIndex, Long pageSize, String keyword);
 
     /**
      * List storage pools for live migrating of a volume. The API returns list of all pools in the cluster to which the
@@ -414,7 +405,7 @@ public interface ManagementService {
     String[] listEventTypes();
 
     Pair<List<? extends HypervisorCapabilities>, Integer> listHypervisorCapabilities(Long id, HypervisorType hypervisorType, String keyword, Long startIndex,
-        Long pageSizeVal);
+            Long pageSizeVal);
 
     HypervisorCapabilities updateHypervisorCapabilities(Long id, Long maxGuestsLimit, Boolean securityGroupEnabled);
 
@@ -429,7 +420,7 @@ public interface ManagementService {
     List<String> listDeploymentPlanners();
 
     VirtualMachine upgradeSystemVM(ScaleSystemVMCmd cmd) throws ResourceUnavailableException, ManagementServerException, VirtualMachineMigrationException,
-        ConcurrentOperationException;
+    ConcurrentOperationException;
 
     void cleanupVMReservations();
 

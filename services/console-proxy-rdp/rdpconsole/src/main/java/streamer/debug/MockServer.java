@@ -27,11 +27,14 @@ import java.util.Arrays;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
+import org.apache.log4j.Logger;
+
 public class MockServer implements Runnable {
+    private static final Logger s_logger = Logger.getLogger(MockServer.class);
 
     private boolean shutdown = false;
     private ServerSocket serverSocket;
-    private Packet[] packets;
+    private final Packet[] packets;
     private Throwable exception;
     private boolean shutdowned;
 
@@ -59,11 +62,10 @@ public class MockServer implements Runnable {
     @Override
     public void run() {
 
-        try {
-            Socket socket = serverSocket.accept();
+        try (Socket socket = serverSocket.accept();) {
 
             if (verbose)
-                System.out.println("[" + this + "] INFO: Clien connected: " + socket.getRemoteSocketAddress() + ".");
+                System.out.println("[" + this + "] INFO: Client connected: " + socket.getRemoteSocketAddress() + ".");
 
             InputStream is = socket.getInputStream();
             OutputStream os = socket.getOutputStream();
@@ -132,18 +134,20 @@ public class MockServer implements Runnable {
                 try {
                     is.close();
                 } catch (Throwable e) {
+                    s_logger.info("[ignored]"
+                            + "in stream close failed: " + e.getLocalizedMessage());
                 }
                 try {
                     os.close();
                 } catch (Throwable e) {
-                }
-                try {
-                    socket.close();
-                } catch (Throwable e) {
+                    s_logger.info("[ignored]"
+                            + "out stream close failed: " + e.getLocalizedMessage());
                 }
                 try {
                     serverSocket.close();
                 } catch (Throwable e) {
+                    s_logger.info("[ignored]"
+                            + "server socket close failed: " + e.getLocalizedMessage());
                 }
             }
         } catch (Throwable e) {

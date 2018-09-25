@@ -36,7 +36,6 @@ import com.cloud.agent.api.MigrateAnswer;
 import com.cloud.agent.api.MigrateCommand;
 import com.cloud.agent.api.PingCommand;
 import com.cloud.agent.api.PingRoutingCommand;
-import com.cloud.agent.api.PingRoutingWithNwGroupsCommand;
 import com.cloud.agent.api.PrepareForMigrationAnswer;
 import com.cloud.agent.api.PrepareForMigrationCommand;
 import com.cloud.agent.api.ReadyAnswer;
@@ -59,31 +58,30 @@ import com.cloud.configuration.Config;
 import com.cloud.host.Host.Type;
 import com.cloud.hypervisor.Hypervisor;
 import com.cloud.resource.ServerResource;
-import com.cloud.utils.Pair;
 import com.cloud.utils.component.ManagerBase;
+import com.cloud.utils.db.QueryBuilder;
+import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.script.OutputInterpreter;
 import com.cloud.utils.script.Script;
 import com.cloud.utils.script.Script2;
 import com.cloud.utils.script.Script2.ParamType;
 import com.cloud.vm.VMInstanceVO;
+import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachine.PowerState;
 import com.cloud.vm.dao.VMInstanceDao;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 import org.apache.log4j.Logger;
 
-import javax.ejb.Local;
 import javax.naming.ConfigurationException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-@Local(value = ServerResource.class)
 public class BareMetalResourceBase extends ManagerBase implements ServerResource {
     private static final Logger s_logger = Logger.getLogger(BareMetalResourceBase.class);
-    protected String _name;
     protected String _uuid;
     protected String _zone;
     protected String _pod;
@@ -109,6 +107,8 @@ public class BareMetalResourceBase extends ManagerBase implements ServerResource
     protected Script2 _bootOrRebootCommand;
     protected String _vmName;
     protected int ipmiRetryTimes = 5;
+    protected boolean provisionDoneNotificationOn = false;
+    protected int isProvisionDoneNotificationTimeout = 1800;
 
     protected ConfigurationDao configDao;
     protected VMInstanceDao vmDao;
@@ -116,7 +116,7 @@ public class BareMetalResourceBase extends ManagerBase implements ServerResource
 
     @Override
     public boolean configure(String name, Map<String, Object> params) throws ConfigurationException {
-        _name = name;
+        setName(name);
         _uuid = (String) params.get("guid");
         try {
             _memCapacity = Long.parseLong((String) params.get(ApiConstants.MEMORY)) * 1024L * 1024L;
@@ -178,7 +178,14 @@ public class BareMetalResourceBase extends ManagerBase implements ServerResource
         }
 
         try {
-            ipmiRetryTimes = Integer.valueOf(configDao.getValue(Config.BaremetalIpmiRetryTimes.key()));
+            ipmiRetryTimes = Integer.parseInt(configDao.getValue(Config.BaremetalIpmiRetryTimes.key()));
+        } catch (Exception e) {
+            s_logger.debug(e.getMessage(), e);
+        }
+
+        try {
+            provisionDoneNotificationOn = Boolean.valueOf(configDao.getValue(Config.BaremetalProvisionDoneNotificationEnabled.key()));
+            isProvisionDoneNotificationTimeout = Integer.parseInt(configDao.getValue(Config.BaremetalProvisionDoneNotificationTimeout.key()));
         } catch (Exception e) {
             s_logger.debug(e.getMessage(), e);
         }
@@ -294,6 +301,7 @@ public class BareMetalResourceBase extends ManagerBase implements ServerResource
                 try {
                     TimeUnit.SECONDS.sleep(1);
                 } catch (InterruptedException e) {
+                    s_logger.debug("[ignored] interupted while waiting to retry running script.");
                 }
                 continue;
             } else if (res == null) {
@@ -315,11 +323,6 @@ public class BareMetalResourceBase extends ManagerBase implements ServerResource
     @Override
     public boolean stop() {
         return true;
-    }
-
-    @Override
-    public String getName() {
-        return _name;
     }
 
     @Override
@@ -383,19 +386,23 @@ public class BareMetalResourceBase extends ManagerBase implements ServerResource
             return null;
         }
 
+        return new PingRoutingCommand(getType(), id, null);
+
+            /*
         if (hostId != null) {
             final List<? extends VMInstanceVO> vms = vmDao.listByHostId(hostId);
             if (vms.isEmpty()) {
-                return new PingRoutingCommand(getType(), id, getHostVmStateReport());
+                return new PingRoutingCommand(getType(), id, null);
             } else {
                 VMInstanceVO vm = vms.get(0);
                 SecurityGroupHttpClient client = new SecurityGroupHttpClient();
                 HashMap<String, Pair<Long, Long>> nwGrpStates = client.sync(vm.getInstanceName(), vm.getId(), vm.getPrivateIpAddress());
-                return new PingRoutingWithNwGroupsCommand(getType(), id, getHostVmStateReport(), nwGrpStates);
+                return new PingRoutingWithNwGroupsCommand(getType(), id, null, nwGrpStates);
             }
         } else {
-            return new PingRoutingCommand(getType(), id, getHostVmStateReport());
+            return new PingRoutingCommand(getType(), id, null);
         }
+            */
     }
 
     protected Answer execute(IpmISetBootDevCommand cmd) {
@@ -536,7 +543,7 @@ public class BareMetalResourceBase extends ManagerBase implements ServerResource
             OutputInterpreter.AllLinesParser interpreter = new OutputInterpreter.AllLinesParser();
             if (!doScript(_getStatusCommand, interpreter)) {
                 success = true;
-                s_logger.warn("Cannot get power status of " + _name + ", assume VM state changed successfully");
+                s_logger.warn("Cannot get power status of " + getName() + ", assume VM state changed successfully");
                 break;
             }
 
@@ -558,7 +565,7 @@ public class BareMetalResourceBase extends ManagerBase implements ServerResource
 
         OutputInterpreter.AllLinesParser interpreter = new OutputInterpreter.AllLinesParser();
         if (!doScript(_getStatusCommand, interpreter)) {
-            return new StartAnswer(cmd, "Cannot get current power status of " + _name);
+            return new StartAnswer(cmd, "Cannot get current power status of " + getName());
         }
 
         if (isPowerOn(interpreter.getLines())) {
@@ -579,6 +586,39 @@ public class BareMetalResourceBase extends ManagerBase implements ServerResource
             }
         }
 
+        if (provisionDoneNotificationOn) {
+            QueryBuilder<VMInstanceVO> q = QueryBuilder.create(VMInstanceVO.class);
+            q.and(q.entity().getInstanceName(), SearchCriteria.Op.EQ, vm.getName());
+            VMInstanceVO vmvo = q.find();
+
+            if (vmvo.getLastHostId() == null) {
+                // this is new created vm
+                long timeout = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(isProvisionDoneNotificationTimeout);
+                while (timeout > System.currentTimeMillis()) {
+                    try {
+                        TimeUnit.SECONDS.sleep(5);
+                    } catch (InterruptedException e) {
+                        s_logger.warn(e.getMessage(), e);
+                    }
+
+                    q = QueryBuilder.create(VMInstanceVO.class);
+                    q.and(q.entity().getInstanceName(), SearchCriteria.Op.EQ, vm.getName());
+                    vmvo = q.find();
+                    if (vmvo == null) {
+                        return new StartAnswer(cmd, String.format("cannot find vm[name:%s] while waiting for baremtal provision done notification", vm.getName()));
+                    }
+
+                    if (VirtualMachine.State.Running == vmvo.getState()) {
+                        return new StartAnswer(cmd);
+                    }
+
+                    s_logger.debug(String.format("still wait for baremetal provision done notification for vm[name:%s], current vm state is %s", vmvo.getInstanceName(), vmvo.getState()));
+                }
+
+                return new StartAnswer(cmd, String.format("timeout after %s seconds, no baremetal provision done notification received. vm[name:%s] failed to start", isProvisionDoneNotificationTimeout, vm.getName()));
+            }
+        }
+
         s_logger.debug("Start bare metal vm " + vm.getName() + "successfully");
         _vmName = vm.getName();
         return new StartAnswer(cmd);
@@ -586,7 +626,7 @@ public class BareMetalResourceBase extends ManagerBase implements ServerResource
 
     protected ReadyAnswer execute(ReadyCommand cmd) {
         // derived resource should check if the PXE server is ready
-        s_logger.debug("Bare metal resource " + _name + " is ready");
+        s_logger.debug("Bare metal resource " + getName() + " is ready");
         return new ReadyAnswer(cmd);
     }
 

@@ -24,7 +24,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
-import javax.ejb.Local;
 
 import com.cloud.exception.CloudException;
 import org.apache.log4j.Logger;
@@ -38,12 +37,11 @@ import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.TransactionLegacy;
 
 @Component
-@Local(value = {UsageStorageDao.class})
 public class UsageStorageDaoImpl extends GenericDaoBase<UsageStorageVO, Long> implements UsageStorageDao {
     public static final Logger s_logger = Logger.getLogger(UsageStorageDaoImpl.class.getName());
 
     protected static final String REMOVE_BY_USERID_STORAGEID = "DELETE FROM usage_storage WHERE account_id = ? AND id = ? AND storage_type = ?";
-    protected static final String UPDATE_DELETED = "UPDATE usage_storage SET deleted = ? WHERE account_id = ? AND id = ? AND storage_type = ? and deleted IS NULL";
+    protected static final String UPDATE_DELETED = "UPDATE usage_storage SET deleted = ? WHERE account_id = ? AND id = ? AND storage_type = ? AND zone_id = ? and deleted IS NULL";
     protected static final String GET_USAGE_RECORDS_BY_ACCOUNT =
         "SELECT id, zone_id, account_id, domain_id, storage_type, source_id, size, created, deleted, virtual_size " + "FROM usage_storage "
             + "WHERE account_id = ? AND ((deleted IS NULL) OR (created BETWEEN ? AND ?) OR " + "      (deleted BETWEEN ? AND ?) OR ((created <= ?) AND (deleted >= ?)))";
@@ -68,6 +66,7 @@ public class UsageStorageDaoImpl extends GenericDaoBase<UsageStorageVO, Long> im
         IdZoneSearch.and("id", IdZoneSearch.entity().getId(), SearchCriteria.Op.EQ);
         IdZoneSearch.and("type", IdZoneSearch.entity().getStorageType(), SearchCriteria.Op.EQ);
         IdZoneSearch.and("dcId", IdZoneSearch.entity().getZoneId(), SearchCriteria.Op.EQ);
+        IdZoneSearch.and("deleted", IdZoneSearch.entity().getDeleted(), SearchCriteria.Op.NULL);
         IdZoneSearch.done();
     }
 
@@ -87,6 +86,7 @@ public class UsageStorageDaoImpl extends GenericDaoBase<UsageStorageVO, Long> im
         sc.setParameters("id", id);
         sc.setParameters("type", type);
         sc.setParameters("dcId", dcId);
+        sc.setParameters("deleted", null);
         return listBy(sc, null);
     }
 
@@ -126,6 +126,7 @@ public class UsageStorageDaoImpl extends GenericDaoBase<UsageStorageVO, Long> im
                         pstmt.setLong(2, usage.getAccountId());
                         pstmt.setLong(3, usage.getId());
                         pstmt.setInt(4, usage.getStorageType());
+                        pstmt.setLong(5, usage.getZoneId());
                         pstmt.executeUpdate();
                     }
                 }catch (SQLException e)

@@ -32,6 +32,7 @@ public interface TemplateService {
 
         public TemplateApiResult(TemplateInfo template) {
             super();
+
             this.template = template;
         }
 
@@ -52,6 +53,8 @@ public interface TemplateService {
 
     AsyncCallFuture<TemplateApiResult> prepareTemplateOnPrimary(TemplateInfo srcTemplate, StoragePool pool);
 
+    AsyncCallFuture<TemplateApiResult> deleteTemplateOnPrimary(TemplateInfo template, StoragePool pool);
+
     void syncTemplateToRegionStore(long templateId, DataStore store);
 
     void handleSysTemplateDownload(HypervisorType hostHyper, Long dcId);
@@ -65,4 +68,6 @@ public interface TemplateService {
     void associateTemplateToZone(long templateId, Long zoneId);
 
     void associateCrosszoneTemplatesToZone(long dcId);
+
+    AsyncCallFuture<TemplateApiResult> createDatadiskTemplateAsync(TemplateInfo parentTemplate, TemplateInfo dataDiskTemplate, String path, String diskId, long fileSize, boolean bootable);
 }

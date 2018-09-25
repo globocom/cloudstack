@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.cloud.agent.api.ModifySshKeysCommand;
 import org.apache.cloudstack.managed.context.ManagedContextRunnable;
 import org.apache.log4j.Logger;
 
@@ -44,6 +45,7 @@ import com.cloud.agent.api.CleanupNetworkRulesCmd;
 import com.cloud.agent.api.Command;
 import com.cloud.agent.api.MaintainCommand;
 import com.cloud.agent.api.MigrateCommand;
+import com.cloud.agent.api.ModifyTargetsCommand;
 import com.cloud.agent.api.PingTestCommand;
 import com.cloud.agent.api.PvlanSetupCommand;
 import com.cloud.agent.api.ReadyCommand;
@@ -109,11 +111,12 @@ public abstract class AgentAttache {
 
     protected AgentManagerImpl _agentMgr;
 
-    public final static String[] s_commandsAllowedInMaintenanceMode = new String[] {MaintainCommand.class.toString(), MigrateCommand.class.toString(),
+    public final static String[] s_commandsAllowedInMaintenanceMode = new String[] { MaintainCommand.class.toString(), MigrateCommand.class.toString(),
         StopCommand.class.toString(), CheckVirtualMachineCommand.class.toString(), PingTestCommand.class.toString(), CheckHealthCommand.class.toString(),
         ReadyCommand.class.toString(), ShutdownCommand.class.toString(), SetupCommand.class.toString(),
-        CleanupNetworkRulesCmd.class.toString(), CheckNetworkCommand.class.toString(), PvlanSetupCommand.class.toString(), CheckOnHostCommand.class.toString()};
-    protected final static String[] s_commandsNotAllowedInConnectingMode = new String[] {StartCommand.class.toString(), CreateCommand.class.toString()};
+        CleanupNetworkRulesCmd.class.toString(), CheckNetworkCommand.class.toString(), PvlanSetupCommand.class.toString(), CheckOnHostCommand.class.toString(),
+        ModifyTargetsCommand.class.toString(), ModifySshKeysCommand.class.toString()};
+    protected final static String[] s_commandsNotAllowedInConnectingMode = new String[] { StartCommand.class.toString(), CreateCommand.class.toString() };
     static {
         Arrays.sort(s_commandsAllowedInMaintenanceMode);
         Arrays.sort(s_commandsNotAllowedInConnectingMode);

@@ -22,6 +22,7 @@ package com.cloud.agent.resource.virtualnetwork;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
+import org.joda.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +35,11 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import javax.naming.ConfigurationException;
 
+import org.apache.cloudstack.ca.SetupCertificateAnswer;
+import org.apache.cloudstack.ca.SetupCertificateCommand;
+import org.apache.cloudstack.ca.SetupKeyStoreCommand;
+import org.apache.cloudstack.ca.SetupKeystoreAnswer;
+import org.apache.cloudstack.utils.security.KeyStoreUtils;
 import org.apache.log4j.Logger;
 
 import com.cloud.agent.api.Answer;
@@ -49,6 +55,7 @@ import com.cloud.agent.api.routing.AggregationControlCommand.Action;
 import com.cloud.agent.api.routing.GetRouterAlertsCommand;
 import com.cloud.agent.api.routing.GroupAnswer;
 import com.cloud.agent.api.routing.NetworkElementCommand;
+import com.cloud.agent.resource.virtualnetwork.facade.AbstractConfigItemFacade;
 import com.cloud.utils.ExecutionResult;
 import com.cloud.utils.NumbersUtil;
 import com.cloud.utils.exception.CloudRuntimeException;
@@ -72,7 +79,8 @@ public class VirtualRoutingResource {
     private int _sleep;
     private int _retry;
     private int _port;
-    private int _eachTimeout;
+    private Duration _eachTimeout;
+    private Map<String, Object> _params;
 
     private String _cfgVersion = "1.0";
 
@@ -103,6 +111,14 @@ public class VirtualRoutingResource {
 
             if (cmd.isQuery()) {
                 return executeQueryCommand(cmd);
+            }
+
+            if (cmd instanceof SetupKeyStoreCommand) {
+                return execute((SetupKeyStoreCommand) cmd);
+            }
+
+            if (cmd instanceof SetupCertificateCommand) {
+                return execute((SetupCertificateCommand) cmd);
             }
 
             if (cmd instanceof AggregationControlCommand) {
@@ -136,6 +152,37 @@ public class VirtualRoutingResource {
         }
     }
 
+    private Answer execute(final SetupKeyStoreCommand cmd) {
+        final String args = String.format("/usr/local/cloud/systemvm/conf/agent.properties " +
+                        "/usr/local/cloud/systemvm/conf/%s " +
+                        "%s %d " +
+                        "/usr/local/cloud/systemvm/conf/%s",
+                KeyStoreUtils.KS_FILENAME,
+                cmd.getKeystorePassword(),
+                cmd.getValidityDays(),
+                KeyStoreUtils.CSR_FILENAME);
+        ExecutionResult result = _vrDeployer.executeInVR(cmd.getRouterAccessIp(), KeyStoreUtils.KS_SETUP_SCRIPT, args);
+        return new SetupKeystoreAnswer(result.getDetails());
+    }
+
+    private Answer execute(final SetupCertificateCommand cmd) {
+        final String args = String.format("/usr/local/cloud/systemvm/conf/agent.properties " +
+                        "/usr/local/cloud/systemvm/conf/%s %s " +
+                        "/usr/local/cloud/systemvm/conf/%s \"%s\" " +
+                        "/usr/local/cloud/systemvm/conf/%s \"%s\" " +
+                        "/usr/local/cloud/systemvm/conf/%s \"%s\"",
+                KeyStoreUtils.KS_FILENAME,
+                KeyStoreUtils.SSH_MODE,
+                KeyStoreUtils.CERT_FILENAME,
+                cmd.getEncodedCertificate(),
+                KeyStoreUtils.CACERT_FILENAME,
+                cmd.getEncodedCaCertificates(),
+                KeyStoreUtils.PKEY_FILENAME,
+                cmd.getEncodedPrivateKey());
+        ExecutionResult result = _vrDeployer.executeInVR(cmd.getRouterAccessIp(), KeyStoreUtils.KS_IMPORT_SCRIPT, args);
+        return new SetupCertificateAnswer(result.isSuccess());
+    }
+
     private Answer executeQueryCommand(NetworkElementCommand cmd) {
         if (cmd instanceof CheckRouterCommand) {
             return execute((CheckRouterCommand)cmd);
@@ -152,10 +199,10 @@ public class VirtualRoutingResource {
     }
 
     private ExecutionResult applyConfigToVR(String routerAccessIp, ConfigItem c) {
-        return applyConfigToVR(routerAccessIp, c, VRScripts.DEFAULT_EXECUTEINVR_TIMEOUT);
+        return applyConfigToVR(routerAccessIp, c, VRScripts.VR_SCRIPT_EXEC_TIMEOUT);
     }
 
-    private ExecutionResult applyConfigToVR(String routerAccessIp, ConfigItem c, int timeout) {
+    private ExecutionResult applyConfigToVR(String routerAccessIp, ConfigItem c, Duration timeout) {
         if (c instanceof FileConfigItem) {
             FileConfigItem configItem = (FileConfigItem)c;
             return _vrDeployer.createFileInVR(routerAccessIp, configItem.getFilePath(), configItem.getFileName(), configItem.getFileContents());
@@ -168,6 +215,8 @@ public class VirtualRoutingResource {
 
 
     private Answer applyConfig(NetworkElementCommand cmd, List<ConfigItem> cfg) {
+
+
         if (cfg.isEmpty()) {
             return new Answer(cmd, true, "Nothing to do");
         }
@@ -176,7 +225,12 @@ public class VirtualRoutingResource {
         List<String> details = new ArrayList<String>();
         boolean finalResult = false;
         for (ConfigItem configItem : cfg) {
-            ExecutionResult result = applyConfigToVR(cmd.getRouterAccessIp(), configItem);
+            long startTimestamp = System.currentTimeMillis();
+            ExecutionResult result = applyConfigToVR(cmd.getRouterAccessIp(), configItem, VRScripts.VR_SCRIPT_EXEC_TIMEOUT);
+            if (s_logger.isDebugEnabled()) {
+                long elapsed = System.currentTimeMillis() - startTimestamp;
+                s_logger.debug("Processing " + configItem + " took " + elapsed + "ms");
+            }
             if (result == null) {
                 result = new ExecutionResult(false, "null execution result");
             }
@@ -189,6 +243,7 @@ public class VirtualRoutingResource {
         if (cmd.getAnswersCount() != results.size()) {
             s_logger.warn("Expected " + cmd.getAnswersCount() + " answers while executing " + cmd.getClass().getSimpleName() + " but received " + results.size());
         }
+
 
         if (results.size() == 1) {
             return new Answer(cmd, finalResult, results.get(0).getDetails());
@@ -249,8 +304,18 @@ public class VirtualRoutingResource {
         return new GetDomRVersionAnswer(cmd, result.getDetails(), lines[0], lines[1]);
     }
 
+    public boolean configureHostParams(final Map<String, String> params) {
+        if (_params.get("router.aggregation.command.each.timeout") == null) {
+            String value = (String)params.get("router.aggregation.command.each.timeout");
+            _eachTimeout = Duration.standardSeconds(NumbersUtil.parseInt(value, 10));
+        }
+
+        return true;
+    }
+
     public boolean configure(final String name, final Map<String, Object> params) throws ConfigurationException {
         _name = name;
+        _params = params;
 
         String value = (String)params.get("ssh.sleep");
         _sleep = NumbersUtil.parseInt(value, 10) * 1000;
@@ -262,7 +327,10 @@ public class VirtualRoutingResource {
         _port = NumbersUtil.parseInt(value, 3922);
 
         value = (String)params.get("router.aggregation.command.each.timeout");
-        _eachTimeout = NumbersUtil.parseInt(value, 3);
+        _eachTimeout = Duration.standardSeconds(NumbersUtil.parseInt(value, (int)VRScripts.VR_SCRIPT_EXEC_TIMEOUT.getStandardSeconds()));
+        if (s_logger.isDebugEnabled()){
+            s_logger.debug("The router.aggregation.command.each.timeout in seconds is set to " + _eachTimeout.getStandardSeconds());
+        }
 
         if (_vrDeployer == null) {
             throw new ConfigurationException("Unable to find the resource for VirtualRouterDeployer!");
@@ -317,7 +385,15 @@ public class VirtualRoutingResource {
     }
 
     private List<ConfigItem> generateCommandCfg(NetworkElementCommand cmd) {
-        return ConfigHelper.generateCommandCfg(cmd);
+        /*
+         * [TODO] Still have to migrate LoadBalancerConfigCommand and BumpUpPriorityCommand
+         * [FIXME] Have a look at SetSourceNatConfigItem
+         */
+        s_logger.debug("Transforming " + cmd.getClass().getCanonicalName() + " to ConfigItems");
+
+        final AbstractConfigItemFacade configItemFacade = AbstractConfigItemFacade.getInstance(cmd.getClass());
+
+        return configItemFacade.generateConfig(cmd);
     }
 
     private Answer execute(AggregationControlCommand cmd) {
@@ -357,12 +433,12 @@ public class VirtualRoutingResource {
                 FileConfigItem fileConfigItem = new FileConfigItem(VRScripts.CONFIG_CACHE_LOCATION, cfgFileName, sb.toString());
                 ScriptConfigItem scriptConfigItem = new ScriptConfigItem(VRScripts.VR_CFG, "-c " + VRScripts.CONFIG_CACHE_LOCATION + cfgFileName);
                 // 120s is the minimal timeout
-                int timeout = answerCounts * _eachTimeout;
-                if (timeout < 120) {
-                    timeout = 120;
+                Duration timeout = _eachTimeout.withDurationAdded(_eachTimeout.getStandardSeconds(), answerCounts);
+                if (s_logger.isDebugEnabled()){
+                    s_logger.debug("Aggregate action timeout in seconds is " + timeout.getStandardSeconds());
                 }
 
-                ExecutionResult result = applyConfigToVR(cmd.getRouterAccessIp(), fileConfigItem);
+                ExecutionResult result = applyConfigToVR(cmd.getRouterAccessIp(), fileConfigItem, timeout);
                 if (!result.isSuccess()) {
                     return new Answer(cmd, false, result.getDetails());
                 }

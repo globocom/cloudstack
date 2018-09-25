@@ -36,6 +36,7 @@ import com.cloud.exception.OperationTimedoutException;
 import com.cloud.exception.ResourceUnavailableException;
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
 import com.cloud.network.Network;
+import com.cloud.offering.DiskOffering;
 import com.cloud.offering.DiskOfferingInfo;
 import com.cloud.offering.ServiceOffering;
 import com.cloud.storage.StoragePool;
@@ -48,12 +49,17 @@ import com.cloud.utils.fsm.NoTransitionException;
  */
 public interface VirtualMachineManager extends Manager {
 
-    static final ConfigKey<Boolean> ExecuteInSequence = new ConfigKey<Boolean>("Advanced", Boolean.class, "execute.in.sequence.hypervisor.commands", "false",
-            "If set to true, StartCommand, StopCommand, CopyCommand, MigrateCommand will be synchronized on the agent side."
-                    + " If set to false, these commands become asynchronous. Default value is false.", false);
+    ConfigKey<Boolean> ExecuteInSequence = new ConfigKey<>("Advanced", Boolean.class, "execute.in.sequence.hypervisor.commands", "false",
+            "If set to true, start, stop, reboot, copy and migrate commands will be serialized on the agent side. If set to false the commands are executed in parallel. Default value is false.", false);
 
-    public interface Topics {
-        public static final String VM_POWER_STATE = "vm.powerstate";
+    ConfigKey<String> VmConfigDriveLabel = new ConfigKey<>("Hidden", String.class, "vm.configdrive.label", "config-2",
+            "The default label name for the config drive", false);
+
+    ConfigKey<Boolean> VmConfigDriveOnPrimaryPool = new ConfigKey<>("Advanced", Boolean.class, "vm.configdrive.primarypool.enabled", "false",
+            "If config drive need to be created and hosted on primary storage pool. Currently only supported for KVM.", true);
+
+    interface Topics {
+        String VM_POWER_STATE = "vm.powerstate";
     }
 
     /**
@@ -72,11 +78,12 @@ public interface VirtualMachineManager extends Manager {
      * @param auxiliaryNetworks additional networks to attach the VMs to.
      * @param plan How to deploy the VM.
      * @param hyperType Hypervisor type
+     * @param datadiskTemplateToDiskOfferingMap data disks to be created from datadisk templates and attached to the VM
      * @throws InsufficientCapacityException If there are insufficient capacity to deploy this vm.
      */
     void allocate(String vmInstanceName, VirtualMachineTemplate template, ServiceOffering serviceOffering, DiskOfferingInfo rootDiskOfferingInfo,
         List<DiskOfferingInfo> dataDiskOfferings, LinkedHashMap<? extends Network, List<? extends NicProfile>> auxiliaryNetworks, DeploymentPlan plan,
-        HypervisorType hyperType) throws InsufficientCapacityException;
+        HypervisorType hyperType, Map<String, Map<Integer, String>> extraDhcpOptions, Map<Long, DiskOffering> datadiskTemplateToDiskOfferingMap) throws InsufficientCapacityException;
 
     void allocate(String vmInstanceName, VirtualMachineTemplate template, ServiceOffering serviceOffering,
         LinkedHashMap<? extends Network, List<? extends NicProfile>> networkProfiles, DeploymentPlan plan, HypervisorType hyperType) throws InsufficientCapacityException;
@@ -86,6 +93,8 @@ public interface VirtualMachineManager extends Manager {
     void start(String vmUuid, Map<VirtualMachineProfile.Param, Object> params, DeploymentPlan planToDeploy, DeploymentPlanner planner);
 
     void stop(String vmUuid) throws ResourceUnavailableException;
+
+    void stopForced(String vmUuid) throws ResourceUnavailableException;
 
     void expunge(String vmUuid) throws ResourceUnavailableException;
 
@@ -106,7 +115,7 @@ public interface VirtualMachineManager extends Manager {
 
     void advanceExpunge(String vmUuid) throws ResourceUnavailableException, OperationTimedoutException, ConcurrentOperationException;
 
-    void destroy(String vmUuid) throws AgentUnavailableException, OperationTimedoutException, ConcurrentOperationException;
+    void destroy(String vmUuid, boolean expunge) throws AgentUnavailableException, OperationTimedoutException, ConcurrentOperationException;
 
     void migrateAway(String vmUuid, long hostId) throws InsufficientServerCapacityException;
 
@@ -189,6 +198,9 @@ public interface VirtualMachineManager extends Manager {
      */
     VirtualMachineTO toVmTO(VirtualMachineProfile profile);
 
+    boolean replugNic(Network network, NicTO nic, VirtualMachineTO vm, ReservationContext context, DeployDestination dest) throws ConcurrentOperationException,
+            ResourceUnavailableException, InsufficientCapacityException;
+
     VirtualMachine reConfigureVm(String vmUuid, ServiceOffering newServiceOffering, boolean sameHost) throws ResourceUnavailableException, ConcurrentOperationException,
             InsufficientServerCapacityException;
 
@@ -196,4 +208,6 @@ public interface VirtualMachineManager extends Manager {
         ConcurrentOperationException, ResourceUnavailableException;
 
     void migrateForScale(String vmUuid, long srcHostId, DeployDestination dest, Long newSvcOfferingId) throws ResourceUnavailableException, ConcurrentOperationException;
+
+    boolean getExecuteInSequence(HypervisorType hypervisorType);
 }

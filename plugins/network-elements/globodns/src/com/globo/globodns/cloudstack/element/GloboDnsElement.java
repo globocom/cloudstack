@@ -17,6 +17,7 @@
 
 package com.globo.globodns.cloudstack.element;
 
+import com.cloud.network.element.DnsServiceProvider;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -24,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -60,7 +60,6 @@ import com.cloud.network.Network.Service;
 import com.cloud.network.PhysicalNetwork;
 import com.cloud.network.PhysicalNetworkServiceProvider;
 import com.cloud.network.dao.PhysicalNetworkDao;
-import com.cloud.network.element.NetworkElement;
 import com.cloud.offering.NetworkOffering;
 import com.cloud.resource.ResourceManager;
 import com.cloud.resource.ResourceStateAdapter;
@@ -87,8 +86,7 @@ import com.globo.globodns.cloudstack.commands.ValidateLbRecordCommand;
 import com.globo.globodns.cloudstack.resource.GloboDnsResource;
 
 @Component
-@Local(NetworkElement.class)
-public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter, NetworkElement, GloboDnsElementService, Configurable {
+public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter, DnsServiceProvider, GloboDnsElementService, Configurable {
 
     private static final Logger s_logger = Logger.getLogger(GloboDnsElement.class);
 
@@ -165,8 +163,8 @@ public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter
             throw new InvalidParameterValueException("VM name should contain only lower case letters and digits: " + vmName + " - " + vm);
         }
 
-        boolean isIpv6 = nic.getIp6Address() != null;
-        String ipAddress = isIpv6 ? nic.getIp6Address() : nic.getIp4Address();
+        boolean isIpv6 = nic.getIPv6Address() != null;
+        String ipAddress = isIpv6 ? nic.getIPv6Address() : nic.getIPv4Address();
 
 
         GloboResourceConfigurationVO forceConfig = _globoResourceConfigDao.getFirst(GloboResourceType.VM_NIC, nic.getUuid(), GloboResourceKey.skipDnsError);
@@ -208,9 +206,12 @@ public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter
             throw new CloudRuntimeException("Could not find zone associated to this network");
         }
 
-        boolean isIpv6 = nic.getIp6Address() != null;
-        String ipAddress = isIpv6 ? nic.getIp6Address() : nic.getIp4Address();
-        RemoveRecordCommand cmd = new RemoveRecordCommand(vm.getHostName().toLowerCase(), ipAddress, network.getNetworkDomain(), isIpv6);
+
+        boolean isIpv6 = nic.getIPv6Address() != null;
+        String ipAddress = isIpv6 ? nic.getIPv6Address() : nic.getIPv4Address();
+
+        RemoveRecordCommand cmd = new RemoveRecordCommand(hostNameOfVirtualMachine(vm), ipAddress, network.getNetworkDomain(), isIpv6);
+
         callCommand(cmd, zoneId);
 
         List<GloboResourceConfigurationVO> configurationList = _globoResourceConfigDao.getConfiguration(GloboResourceType.VM_NIC, nic.getUuid(), GloboResourceKey.isDNSRegistered);
@@ -224,6 +225,10 @@ public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter
     @Override
     public boolean shutdown(Network network, ReservationContext context, boolean cleanup) throws ConcurrentOperationException, ResourceUnavailableException {
         return true;
+    }
+
+    protected String hostNameOfVirtualMachine(VirtualMachineProfile vm) {
+        return vm.getHostName().toLowerCase();
     }
 
     @Override
@@ -562,5 +567,20 @@ public class GloboDnsElement extends AdapterBase implements ResourceStateAdapter
         }
 
         return answer;
+    }
+
+    @Override
+    public boolean addDnsEntry(Network network, NicProfile nic, VirtualMachineProfile vm, DeployDestination dest, ReservationContext context) throws ConcurrentOperationException, InsufficientCapacityException, ResourceUnavailableException {
+        return true;
+    }
+
+    @Override
+    public boolean configDnsSupportForSubnet(Network network, NicProfile nic, VirtualMachineProfile vm, DeployDestination dest, ReservationContext context) throws ConcurrentOperationException, InsufficientCapacityException, ResourceUnavailableException {
+        return true;
+    }
+
+    @Override
+    public boolean removeDnsSupportForSubnet(Network network) throws ResourceUnavailableException {
+        return true;
     }
 }

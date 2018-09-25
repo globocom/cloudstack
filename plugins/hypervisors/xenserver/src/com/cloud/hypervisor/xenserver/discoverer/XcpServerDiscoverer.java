@@ -54,9 +54,9 @@ import com.cloud.hypervisor.xenserver.resource.XenServer600Resource;
 import com.cloud.hypervisor.xenserver.resource.XenServer610Resource;
 import com.cloud.hypervisor.xenserver.resource.XenServer620Resource;
 import com.cloud.hypervisor.xenserver.resource.XenServer620SP1Resource;
+import com.cloud.hypervisor.xenserver.resource.XenServer650Resource;
 import com.cloud.hypervisor.xenserver.resource.XenServerConnectionPool;
 import com.cloud.hypervisor.xenserver.resource.Xenserver625Resource;
-import com.cloud.hypervisor.xenserver.resource.XenServer650Resource;
 import com.cloud.resource.Discoverer;
 import com.cloud.resource.DiscovererBase;
 import com.cloud.resource.ResourceStateAdapter;
@@ -85,7 +85,6 @@ import org.apache.cloudstack.hypervisor.xenserver.XenserverConfigs;
 import org.apache.log4j.Logger;
 import org.apache.xmlrpc.XmlRpcException;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 import javax.persistence.EntityExistsException;
@@ -99,7 +98,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-@Local(value = Discoverer.class)
+
 public class XcpServerDiscoverer extends DiscovererBase implements Discoverer, Listener, ResourceStateAdapter {
     private static final Logger s_logger = Logger.getLogger(XcpServerDiscoverer.class);
     protected String _publicNic;
@@ -112,16 +111,15 @@ public class XcpServerDiscoverer extends DiscovererBase implements Discoverer, L
     protected String _guestNic;
     protected boolean _setupMultipath;
     protected String _instance;
-    private String xs620snapshothotfix = "Xenserver-Vdi-Copy-HotFix";
 
     @Inject
     protected AlertManager _alertMgr;
     @Inject
     protected AgentManager _agentMgr;
     @Inject
-    VMTemplateDao _tmpltDao;
+    private VMTemplateDao _tmpltDao;
     @Inject
-    HostPodDao _podDao;
+    private HostPodDao _podDao;
 
     protected XcpServerDiscoverer() {
     }
@@ -159,7 +157,7 @@ public class XcpServerDiscoverer extends DiscovererBase implements Discoverer, L
                 PoolPatch poolPatch = PoolPatch.getByUuid(conn, hotFixUuid);
                 for(HostPatch patch : patches) {
                     PoolPatch pp = patch.getPoolPatch(conn);
-                    if (pp.equals(poolPatch) && patch.getApplied(conn)) {
+                    if (pp != null && pp.equals(poolPatch) && patch.getApplied(conn)) {
                         s_logger.debug("host " + hostIp + " does have " + hotFixUuid +" Hotfix.");
                         return true;
                     }
@@ -408,8 +406,6 @@ public class XcpServerDiscoverer extends DiscovererBase implements Discoverer, L
             return new XenServer600Resource();
         else if (prodBrand.equals("XenServer") && prodVersion.equals("6.1.0"))
             return new XenServer610Resource();
-        else if (prodBrand.equals("XenServer") && prodVersion.equals("6.5.0"))
-            return new XenServer650Resource();
         else if (prodBrand.equals("XenServer") && prodVersion.equals("6.2.0")) {
             if (hotfix != null && hotfix.equals(XenserverConfigs.XSHotFix62ESP1004)) {
                 return new Xenserver625Resource();
@@ -426,9 +422,18 @@ public class XcpServerDiscoverer extends DiscovererBase implements Discoverer, L
             }
         } else if (prodBrand.equals("XCP_Kronos")) {
             return new XcpOssResource();
+        } else if (prodBrand.equals("XenServer") || prodBrand.equals("XCP-ng")) {
+            final String[] items = prodVersion.split("\\.");
+            if ((Integer.parseInt(items[0]) > 6) ||
+                    (Integer.parseInt(items[0]) == 6 && Integer.parseInt(items[1]) >= 4)) {
+                s_logger.warn("defaulting to xenserver650 resource for product brand: " + prodBrand + " with product " +
+                        "version: " + prodVersion);
+                //default to xenserver650 resource.
+                return new XenServer650Resource();
+            }
         }
         String msg =
-                "Only support XCP 1.0.0, 1.1.0, 1.4.x, 1.5 beta, 1.6.x; XenServer 5.6,  XenServer 5.6 FP1, XenServer 5.6 SP2, Xenserver 6.0, 6.0.2, 6.1.0, 6.2.0, 6.5.0 but this one is " +
+                "Only support XCP 1.0.0, 1.1.0, 1.4.x, 1.5 beta, 1.6.x; XenServer 5.6,  XenServer 5.6 FP1, XenServer 5.6 SP2, Xenserver 6.0, 6.0.2, 6.1.0, 6.2.0, >6.4.0 but this one is " +
                         prodBrand + " " + prodVersion;
         s_logger.warn(msg);
         throw new RuntimeException(msg);
@@ -531,7 +536,7 @@ public class XcpServerDiscoverer extends DiscovererBase implements Discoverer, L
             id = _tmpltDao.getNextInSequence(Long.class, "id");
             VMTemplateVO template =
                     VMTemplateVO.createPreHostIso(id, isoName, isoName, ImageFormat.ISO, true, true, TemplateType.PERHOST, null, null, true, 64, Account.ACCOUNT_ID_SYSTEM,
-                            null, "xen-pv-drv-iso", false, 1, false, HypervisorType.XenServer);
+                            null, "XenServer Tools Installer ISO (xen-pv-drv-iso)", false, 1, false, HypervisorType.XenServer);
             _tmpltDao.persist(template);
         } else {
             id = tmplt.getId();
@@ -539,6 +544,10 @@ public class XcpServerDiscoverer extends DiscovererBase implements Discoverer, L
             tmplt.setUrl(null);
             _tmpltDao.update(id, tmplt);
         }
+    }
+
+    @Override
+    public void processHostAdded(long hostId) {
     }
 
     @Override
@@ -626,6 +635,14 @@ public class XcpServerDiscoverer extends DiscovererBase implements Discoverer, L
     @Override
     public boolean processDisconnect(long agentId, Status state) {
         return false;
+    }
+
+    @Override
+    public void processHostAboutToBeRemoved(long hostId) {
+    }
+
+    @Override
+    public void processHostRemoved(long hostId, long clusterId) {
     }
 
     @Override

@@ -1,60 +1,33 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
-# Sample debian/rules that uses debhelper.
-#
-# This file was originally written by Joey Hess and Craig Small.
-# As a special exception, when this file is copied by dh-make into a
-# dh-make output file, you may use that output file without restriction.
-# This special exception was added by Craig Small in version 0.37 of dh-make.
-#
-# Modified to make a template file for a multi-binary package with separated
-# build-arch and build-indep targets  by Bill Allombert 2001
-
-DEBVERS := $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
-VERSION := $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[~-].*//')
-MVNADD := $(shell if echo '$(DEBVERS)' | grep -q snapshot; then echo ; fi )
+VERSION := $(shell grep '^  <version>' pom.xml| cut -d'>' -f2 |cut -d'<' -f1)
 PACKAGE = $(shell dh_listpackages|head -n 1|cut -d '-' -f 1)
 SYSCONFDIR = "/etc"
 DESTDIR = "debian/tmp"
 
-# Uncomment this to turn on verbose mode.
-export DH_VERBOSE=1
+%:
+	dh $@ --with python2,systemd
 
-# This has to be exported to make some magic below work.
-export DH_OPTIONS
-
-configure: configure-stamp
-configure-stamp:
-	dh_testdir
+override_dh_auto_configure:
 	cp packaging/debian/replace.properties replace.properties.tmp
 	echo VERSION=${VERSION} >> replace.properties.tmp
-	touch configure-stamp
 
-build: build-indep
+override_dh_auto_build:
+	mvn clean package -Psystemvm,developer -Dsystemvm \
+	    -Dcs.replace.properties=replace.properties.tmp \
+	    -Dmaven.repo.local=$(HOME)/.m2/repository \
+	     ${ACS_BUILD_OPTS}
 
-build-indep: build-indep-stamp
-
-build-indep-stamp: configure
-	mvn -T C1.5 clean package -Pawsapi -DskipTests -Dsystemvm \
-        -Dcs.replace.properties=replace.properties.tmp \
-		${ACS_BUILD_OPTS}
-	touch $@
-
-clean:
-	dh_testdir
-	dh_testroot
-	rm -f build-arch-stamp build-indep-stamp configure-stamp
+override_dh_auto_clean:
+	dh_auto_clean
 	rm -f replace.properties.tmp
-	dh_clean
 
-install:
-	dh_testdir
-	dh_testroot
-	dh_prep -s
-
+override_dh_auto_install:
 	# Common packages
 	mkdir -p $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)
 	mkdir -p $(DESTDIR)/$(SYSCONFDIR)/init.d
+	mkdir -p $(DESTDIR)/$(SYSCONFDIR)/default
+
 	mkdir -p $(DESTDIR)/var/cache/$(PACKAGE)
 	mkdir -p $(DESTDIR)/var/log/$(PACKAGE)
 	mkdir -p $(DESTDIR)/var/lib/$(PACKAGE)
@@ -64,13 +37,22 @@ install:
 	# cloudstack-agent
 	mkdir $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/agent
 	mkdir $(DESTDIR)/$(SYSCONFDIR)/profile.d
-	mkdir $(DESTDIR)/var/log/$(PACKAGE)/agent
 	mkdir $(DESTDIR)/usr/share/$(PACKAGE)-agent
 	mkdir $(DESTDIR)/usr/share/$(PACKAGE)-agent/plugins
-	install -D agent/target/cloud-agent-$(VERSION)$(MVNADD).jar $(DESTDIR)/usr/share/$(PACKAGE)-agent/lib/$(PACKAGE)-agent.jar
-	install -D plugins/hypervisors/kvm/target/cloud-plugin-hypervisor-kvm-$(VERSION)$(MVNADD).jar $(DESTDIR)/usr/share/$(PACKAGE)-agent/lib/
+	install -D agent/target/cloud-agent-$(VERSION).jar $(DESTDIR)/usr/share/$(PACKAGE)-agent/lib/$(PACKAGE)-agent.jar
+	install -D plugins/hypervisors/kvm/target/cloud-plugin-hypervisor-kvm-$(VERSION).jar $(DESTDIR)/usr/share/$(PACKAGE)-agent/lib/
 	install -D plugins/hypervisors/kvm/target/dependencies/* $(DESTDIR)/usr/share/$(PACKAGE)-agent/lib/
-	install -D packaging/debian/init/cloud-agent $(DESTDIR)/$(SYSCONFDIR)/init.d/$(PACKAGE)-agent
+
+	install -m0755 packaging/debian/$(PACKAGE)-agent.init $(DESTDIR)/$(SYSCONFDIR)/init.d/$(PACKAGE)-agent
+	install -d -m0755 debian/$(PACKAGE)-agent/lib/systemd/system
+	# Fix libvirt service name for Debian/Ubuntu
+	sed -i 's/Requires=libvirtd.service/Requires=libvirt-bin.service/g' packaging/systemd/$(PACKAGE)-agent.service
+	sed -i 's/After=libvirtd.service/After=libvirt-bin.service/g' packaging/systemd/$(PACKAGE)-agent.service
+	install -m0644 packaging/systemd/$(PACKAGE)-agent.service debian/$(PACKAGE)-agent/lib/systemd/system/$(PACKAGE)-agent.service
+	install -m0644 packaging/systemd/$(PACKAGE)-agent.default $(DESTDIR)/$(SYSCONFDIR)/default/$(PACKAGE)-agent
+
+	install -D -m0644 agent/target/transformed/cloudstack-agent.logrotate $(DESTDIR)/$(SYSCONFDIR)/logrotate.d/cloudstack-agent
+
 	install -D agent/target/transformed/cloud-setup-agent $(DESTDIR)/usr/bin/cloudstack-setup-agent
 	install -D agent/target/transformed/cloud-ssh $(DESTDIR)/usr/bin/cloudstack-ssh
 	install -D agent/target/transformed/cloudstack-agent-profile.sh $(DESTDIR)/$(SYSCONFDIR)/profile.d/cloudstack-agent-profile.sh
@@ -84,39 +66,35 @@ install:
 	mkdir -p $(DESTDIR)/$(SYSCONFDIR)/security/limits.d/
 	mkdir -p $(DESTDIR)/$(SYSCONFDIR)/sudoers.d/
 	mkdir -p $(DESTDIR)/usr/share/$(PACKAGE)-management
-	mkdir -p $(DESTDIR)/usr/share/$(PACKAGE)-management/webapps/client
-	mkdir -p $(DESTDIR)/usr/share/$(PACKAGE)-management/webapps7080
-	mkdir $(DESTDIR)/usr/share/$(PACKAGE)-management/setup
+	mkdir -p $(DESTDIR)/usr/share/$(PACKAGE)-management/lib
+	mkdir -p $(DESTDIR)/usr/share/$(PACKAGE)-management/setup
 	mkdir $(DESTDIR)/var/log/$(PACKAGE)/management
 	mkdir $(DESTDIR)/var/cache/$(PACKAGE)/management
-	mkdir $(DESTDIR)/var/cache/$(PACKAGE)/management/work
-	mkdir $(DESTDIR)/var/cache/$(PACKAGE)/management/temp
 	mkdir $(DESTDIR)/var/log/$(PACKAGE)/ipallocator
 	mkdir $(DESTDIR)/var/lib/$(PACKAGE)/management
 	mkdir $(DESTDIR)/var/lib/$(PACKAGE)/mnt
 	cp -r client/target/utilities/scripts/db/* $(DESTDIR)/usr/share/$(PACKAGE)-management/setup/
-	cp -r client/target/cloud-client-ui-$(VERSION)$(MVNADD)/* $(DESTDIR)/usr/share/$(PACKAGE)-management/webapps/client/
+	cp -r client/target/classes/META-INF/webapp $(DESTDIR)/usr/share/$(PACKAGE)-management/webapp
 	cp server/target/conf/* $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/server/
 	cp client/target/conf/* $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/management/
+	cp client/target/cloud-client-ui-$(VERSION).jar $(DESTDIR)/usr/share/$(PACKAGE)-management/lib/cloudstack-$(VERSION).jar
+	cp client/target/lib/*jar $(DESTDIR)/usr/share/$(PACKAGE)-management/lib/
 
 	# nast hack for a couple of configuration files
 	mv $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/server/cloudstack-limits.conf $(DESTDIR)/$(SYSCONFDIR)/security/limits.d/
-	mv $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/server/cloudstack-sudoers $(DESTDIR)/$(SYSCONFDIR)/sudoers.d/cloudstack
-	chmod 0440 $(DESTDIR)/$(SYSCONFDIR)/sudoers.d/cloudstack
+	mv $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/server/cloudstack-sudoers $(DESTDIR)/$(SYSCONFDIR)/sudoers.d/$(PACKAGE)
+	chmod 0440 $(DESTDIR)/$(SYSCONFDIR)/sudoers.d/$(PACKAGE)
 
-	ln -s tomcat6-nonssl.conf $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/management/tomcat6.conf
-	ln -s server-nonssl.xml $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/management/server.xml
 	install -D packaging/debian/init/cloud-management $(DESTDIR)/$(SYSCONFDIR)/init.d/$(PACKAGE)-management
 	install -D client/target/utilities/bin/cloud-update-xenserver-licenses $(DESTDIR)/usr/bin/cloudstack-update-xenserver-licenses
-	ln -s /usr/share/tomcat6/bin $(DESTDIR)/usr/share/$(PACKAGE)-management/bin
 	# Remove configuration in /ur/share/cloudstack-management/webapps/client/WEB-INF
 	# This should all be in /etc/cloudstack/management
-	rm $(DESTDIR)/usr/share/$(PACKAGE)-management/webapps/client/WEB-INF/classes/*.*
 	ln -s ../../..$(SYSCONFDIR)/$(PACKAGE)/management $(DESTDIR)/usr/share/$(PACKAGE)-management/conf
-	ln -s ../../../usr/share/tomcat6/lib $(DESTDIR)/usr/share/$(PACKAGE)-management/lib
 	ln -s ../../../var/log/$(PACKAGE)/management $(DESTDIR)/usr/share/$(PACKAGE)-management/logs
-	ln -s ../../../var/cache/$(PACKAGE)/management/temp $(DESTDIR)/usr/share/$(PACKAGE)-management/temp
-	ln -s ../../../var/cache/$(PACKAGE)/management/work $(DESTDIR)/usr/share/$(PACKAGE)-management/work
+
+	install -d -m0755 debian/$(PACKAGE)-management/lib/systemd/system
+	install -m0644 packaging/systemd/$(PACKAGE)-management.service debian/$(PACKAGE)-management/lib/systemd/system/$(PACKAGE)-management.service
+	install -m0644 packaging/systemd/$(PACKAGE)-management.default $(DESTDIR)/$(SYSCONFDIR)/default/$(PACKAGE)-management
 
 	# cloudstack-common
 	mkdir -p $(DESTDIR)/usr/share/$(PACKAGE)-common
@@ -137,60 +115,42 @@ install:
 	install -D client/target/utilities/bin/cloud-sysvmadm $(DESTDIR)/usr/bin/cloudstack-sysvmadm
 	install -D systemvm/dist/systemvm.iso $(DESTDIR)/usr/share/$(PACKAGE)-common/vms/systemvm.iso
 	# We need jasypt for cloud-install-sys-tmplt, so this is a nasty hack to get it into the right place
-	install -D agent/target/dependencies/jasypt-1.9.0.jar $(DESTDIR)/usr/share/$(PACKAGE)-common/lib
+	install -D agent/target/dependencies/jasypt-1.9.2.jar $(DESTDIR)/usr/share/$(PACKAGE)-common/lib
 
 	# cloudstack-python
-	mkdir -p $(DESTDIR)/usr/lib/python2.7/dist-packages
-	cp -r python/lib/cloud* $(DESTDIR)/usr/lib/python2.7/dist-packages
+	mkdir -p $(DESTDIR)/usr/share/pyshared
+	cp -r python/lib/cloud* $(DESTDIR)/usr/share/pyshared
 
 	# cloudstack-usage
 	mkdir $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/usage
-	mkdir $(DESTDIR)/var/log/$(PACKAGE)/usage
 	mkdir $(DESTDIR)/usr/share/$(PACKAGE)-usage
 	mkdir $(DESTDIR)/usr/share/$(PACKAGE)-usage/plugins
-	install -D usage/target/cloud-usage-$(VERSION)$(MVNADD).jar $(DESTDIR)/usr/share/$(PACKAGE)-usage/lib/$(PACKAGE)-usage.jar
+	install -D usage/target/cloud-usage-$(VERSION).jar $(DESTDIR)/usr/share/$(PACKAGE)-usage/lib/$(PACKAGE)-usage.jar
 	install -D usage/target/dependencies/* $(DESTDIR)/usr/share/$(PACKAGE)-usage/lib/
 	cp usage/target/transformed/db.properties $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/usage/
 	cp usage/target/transformed/log4j-cloud_usage.xml $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/usage/log4j-cloud.xml
-	install -D packaging/debian/init/cloud-usage $(DESTDIR)/$(SYSCONFDIR)/init.d/$(PACKAGE)-usage
 
-	# cloudstack-awsapi
-	mkdir $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/awsapi
-	mkdir $(DESTDIR)/var/log/$(PACKAGE)/awsapi
-	mkdir $(DESTDIR)/usr/share/$(PACKAGE)-bridge
-	mkdir -p $(DESTDIR)/usr/share/$(PACKAGE)-bridge/webapps/awsapi
-	mkdir $(DESTDIR)/usr/share/$(PACKAGE)-bridge/setup
-	ln -s /usr/share/$(PACKAGE)-bridge/webapps/awsapi $(DESTDIR)/usr/share/$(PACKAGE)-management/webapps7080/awsapi
-	cp -r awsapi/target/cloud-awsapi-$(VERSION)$(MVNADD)/* $(DESTDIR)/usr/share/$(PACKAGE)-bridge/webapps/awsapi
-	install -D awsapi-setup/setup/cloud-setup-bridge $(DESTDIR)/usr/bin/cloudstack-setup-bridge
-	install -D awsapi-setup/setup/cloudstack-aws-api-register $(DESTDIR)/usr/bin/cloudstack-aws-api-register
-	cp -r awsapi-setup/db/mysql/* $(DESTDIR)/usr/share/$(PACKAGE)-bridge/setup
-	for i in cloud-bridge.properties commons-logging.properties crypto.properties xes.keystore ec2-service.properties; do \
-		mv $(DESTDIR)/usr/share/$(PACKAGE)-bridge/webapps/awsapi/WEB-INF/classes/$$i $(DESTDIR)/$(SYSCONFDIR)/$(PACKAGE)/management/; \
-	done
-	rm $(DESTDIR)/usr/share/$(PACKAGE)-bridge/webapps/awsapi/WEB-INF/classes/log4j-vmops.xml
-	rm $(DESTDIR)/usr/share/$(PACKAGE)-bridge/webapps/awsapi/WEB-INF/classes/log4j.properties
-	rm $(DESTDIR)/usr/share/$(PACKAGE)-bridge/webapps/awsapi/WEB-INF/classes/db.properties
-	rm $(DESTDIR)/usr/share/$(PACKAGE)-bridge/webapps/awsapi/WEB-INF/classes/LICENSE.txt
-	rm $(DESTDIR)/usr/share/$(PACKAGE)-bridge/webapps/awsapi/WEB-INF/classes/NOTICE.txt
-	rm $(DESTDIR)/usr/share/$(PACKAGE)-bridge/webapps/awsapi/WEB-INF/classes/services.xml
-	rm -rf $(DESTDIR)/usr/share/$(PACKAGE)-bridge/webapps/awsapi/WEB-INF/classes/META-INF
+	install -D -m0755 packaging/debian/$(PACKAGE)-usage.init $(DESTDIR)/$(SYSCONFDIR)/init.d/$(PACKAGE)-usage
+	install -d -m0755 debian/$(PACKAGE)-usage/lib/systemd/system
+	install -m0644 packaging/systemd/$(PACKAGE)-usage.service debian/$(PACKAGE)-usage/lib/systemd/system/$(PACKAGE)-usage.service
+	install -m0644 packaging/systemd/$(PACKAGE)-usage.default $(DESTDIR)/$(SYSCONFDIR)/default/$(PACKAGE)-usage
 
-	dh_installdirs
-	dh_install
-	dh_python2
+	# cloudstack-marvin
+	mkdir -p $(DESTDIR)/usr/share/$(PACKAGE)-marvin
+	cp tools/marvin/dist/Marvin-*.tar.gz $(DESTDIR)/usr/share/$(PACKAGE)-marvin/
 
-binary: install
-	dh_install
-	dh_installchangelogs
+	# cloudstack-integration-tests
+	mkdir -p $(DESTDIR)/usr/share/$(PACKAGE)-integration-tests
+	cp -r test/integration/* $(DESTDIR)/usr/share/$(PACKAGE)-integration-tests/
+
+override_dh_installinit:
+	dh_installinit -pcloudstack-management -pcloudstack-agent -pcloudstack-usage --onlyscripts --no-start
+
+override_dh_systemd_enable:
+	dh_systemd_enable -pcloudstack-management -pcloudstack-agent -pcloudstack-usage
+
+override_dh_strip_nondeterminism:
+	# Disable dh_strip_nondeterminism to speed up the build
+
+override_dh_installdocs:
 	dh_installdocs -A tools/whisker/LICENSE tools/whisker/NOTICE INSTALL.md
-	dh_installman
-	dh_link
-	dh_strip
-	dh_compress
-	dh_fixperms
-	dh_makeshlibs
-	dh_installdeb
-	dh_gencontrol
-	dh_md5sums
-	dh_builddeb

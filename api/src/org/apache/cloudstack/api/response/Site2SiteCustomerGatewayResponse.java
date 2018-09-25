@@ -51,7 +51,7 @@ public class Site2SiteCustomerGatewayResponse extends BaseResponse implements Co
     private String guestCidrList;
 
     @SerializedName(ApiConstants.IPSEC_PSK)
-    @Param(description = "IPsec preshared-key of customer gateway")
+    @Param(description = "IPsec preshared-key of customer gateway", isSensitive = true)
     private String ipsecPsk;
 
     @SerializedName(ApiConstants.IKE_POLICY)
@@ -73,6 +73,10 @@ public class Site2SiteCustomerGatewayResponse extends BaseResponse implements Co
     @SerializedName(ApiConstants.DPD)
     @Param(description = "if DPD is enabled for customer gateway")
     private Boolean dpd;
+
+    @SerializedName(ApiConstants.FORCE_ENCAP)
+    @Param(description = "if Force NAT Encapsulation is enabled for customer gateway")
+    private Boolean encap;
 
     @SerializedName(ApiConstants.ACCOUNT)
     @Param(description = "the owner")
@@ -141,6 +145,8 @@ public class Site2SiteCustomerGatewayResponse extends BaseResponse implements Co
     public void setDpd(Boolean dpd) {
         this.dpd = dpd;
     }
+
+    public void setEncap(Boolean encap) { this.encap = encap; }
 
     public void setRemoved(Date removed) {
         this.removed = removed;

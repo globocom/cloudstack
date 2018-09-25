@@ -53,7 +53,6 @@ import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 import java.util.ArrayList;
@@ -63,7 +62,6 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@Local({GloboACLService.class, PluggableService.class})
 public class GloboACLManager implements GloboACLService, Configurable, PluggableService {
 
     @Inject
@@ -100,7 +98,7 @@ public class GloboACLManager implements GloboACLService, Configurable, Pluggable
             ListACLRulesCommand cmd = new ListACLRulesCommand(environmentId, vlan.getVlanNum(), network.getId());
             GloboACLRulesResponse response = (GloboACLRulesResponse) callCommand(cmd, network.getDataCenterId());
             for(GloboACLRulesResponse.ACLRule r : response.getRules()){
-                rules.add((createFirewallRuleVO(network.getId(), r)));
+                rules.add((createFirewallRuleVO(network.getId(), network.getCidr(), r)));
             }
         }catch(CloudRuntimeException ex){
             // ACL API returns an error when VLAN is inactive
@@ -111,11 +109,13 @@ public class GloboACLManager implements GloboACLService, Configurable, Pluggable
         return rules;
     }
 
-    private FirewallRuleVO createFirewallRuleVO(Long networkId, GloboACLRulesResponse.ACLRule rule) {
+    private FirewallRuleVO createFirewallRuleVO(Long networkId,String cidr, GloboACLRulesResponse.ACLRule rule) {
+        List<String> destinations = Arrays.asList(rule.getDestination());
+        List<String> sources = Arrays.asList(cidr); //TODO check this data
         return new FirewallRuleVO(
             rule.getId(), null, rule.getPortStart(), rule.getPortEnd(), rule.getProtocol(), networkId,
             CallContext.current().getCallingAccountId(), 0L,
-            FirewallRule.Purpose.Firewall, Arrays.asList(rule.getDestination()), rule.getIcmpCode(), rule.getIcmpType(), null,
+            FirewallRule.Purpose.Firewall, sources, destinations, rule.getIcmpCode(), rule.getIcmpType(), null,
             FirewallRule.TrafficType.Egress, FirewallRule.FirewallRuleType.User
         );
     }

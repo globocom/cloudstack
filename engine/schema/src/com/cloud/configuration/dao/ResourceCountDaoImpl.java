@@ -16,14 +16,20 @@
 // under the License.
 package com.cloud.configuration.dao;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import javax.ejb.Local;
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 
+import com.cloud.domain.DomainVO;
+import com.cloud.user.AccountVO;
+import com.cloud.utils.db.JoinBuilder;
 import org.springframework.stereotype.Component;
 
 import com.cloud.configuration.Resource;
@@ -39,9 +45,9 @@ import com.cloud.utils.db.GenericDaoBase;
 import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.TransactionLegacy;
+import com.cloud.utils.exception.CloudRuntimeException;
 
 @Component
-@Local(value = {ResourceCountDao.class})
 public class ResourceCountDaoImpl extends GenericDaoBase<ResourceCountVO, Long> implements ResourceCountDao {
     private final SearchBuilder<ResourceCountVO> TypeSearch;
 
@@ -61,11 +67,21 @@ public class ResourceCountDaoImpl extends GenericDaoBase<ResourceCountVO, Long> 
         TypeSearch.done();
 
         AccountSearch = createSearchBuilder();
+        DomainSearch = createSearchBuilder();
+    }
+
+    @PostConstruct
+    protected void configure() {
         AccountSearch.and("accountId", AccountSearch.entity().getAccountId(), SearchCriteria.Op.NNULL);
+        SearchBuilder<AccountVO> joinAccount = _accountDao.createSearchBuilder();
+        joinAccount.and("notremoved", joinAccount.entity().getRemoved(), SearchCriteria.Op.NULL);
+        AccountSearch.join("account", joinAccount, AccountSearch.entity().getAccountId(), joinAccount.entity().getId(), JoinBuilder.JoinType.INNER);
         AccountSearch.done();
 
-        DomainSearch = createSearchBuilder();
         DomainSearch.and("domainId", DomainSearch.entity().getDomainId(), SearchCriteria.Op.NNULL);
+        SearchBuilder<DomainVO> joinDomain = _domainDao.createSearchBuilder();
+        joinDomain.and("notremoved", joinDomain.entity().getRemoved(), SearchCriteria.Op.NULL);
+        DomainSearch.join("domain", joinDomain, DomainSearch.entity().getDomainId(), joinDomain.entity().getId(), JoinBuilder.JoinType.INNER);
         DomainSearch.done();
     }
 
@@ -236,4 +252,41 @@ public class ResourceCountDaoImpl extends GenericDaoBase<ResourceCountVO, Long> 
         return 0;
     }
 
+    private String baseSqlCountComputingResourceAllocatedToAccount = "Select "
+            + " SUM((CASE "
+            + "        WHEN so.%s is not null THEN so.%s "
+            + "        ELSE CONVERT(vmd.value, UNSIGNED INTEGER) "
+            + "    END)) as total "
+            + " from vm_instance vm "
+            + " join service_offering_view so on so.id = vm.service_offering_id "
+            + " left join user_vm_details vmd on vmd.vm_id = vm.id and vmd.name = '%s' "
+            + " where vm.type = 'User' and state not in ('Destroyed', 'Error', 'Expunging') and display_vm = true and account_id = ? ";
+
+    @Override
+    public long countCpuNumberAllocatedToAccount(long accountId) {
+        String sqlCountCpuNumberAllocatedToAccount = String.format(baseSqlCountComputingResourceAllocatedToAccount, ResourceType.cpu, ResourceType.cpu, "cpuNumber");
+        return executeSqlCountComputingResourcesForAccount(accountId, sqlCountCpuNumberAllocatedToAccount);
+    }
+
+    @Override
+    public long countMemoryAllocatedToAccount(long accountId) {
+        String serviceOfferingRamSizeField = "ram_size";
+        String sqlCountCpuNumberAllocatedToAccount = String.format(baseSqlCountComputingResourceAllocatedToAccount, serviceOfferingRamSizeField, serviceOfferingRamSizeField, "memory");
+        return executeSqlCountComputingResourcesForAccount(accountId, sqlCountCpuNumberAllocatedToAccount);
+    }
+
+    private long executeSqlCountComputingResourcesForAccount(long accountId, String sqlCountComputingResourcesAllocatedToAccount) {
+        try (TransactionLegacy tx = TransactionLegacy.currentTxn()) {
+            PreparedStatement pstmt = tx.prepareAutoCloseStatement(sqlCountComputingResourcesAllocatedToAccount);
+            pstmt.setLong(1, accountId);
+
+            ResultSet rs = pstmt.executeQuery();
+            if (!rs.next()) {
+              throw new CloudRuntimeException(String.format("An unexpected case happened while counting allocated computing resources for account: " + accountId));
+            }
+            return rs.getLong("total");
+        } catch (SQLException e) {
+            throw new CloudRuntimeException(e);
+        }
+    }
 }

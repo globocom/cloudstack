@@ -16,6 +16,15 @@
 // under the License.
 package com.cloud.configuration;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.StringTokenizer;
+
+import org.apache.cloudstack.engine.orchestration.service.NetworkOrchestrationService;
+import org.apache.cloudstack.engine.subsystem.api.storage.StoragePoolAllocator;
+import org.apache.cloudstack.framework.config.ConfigKey;
+
 import com.cloud.agent.AgentManager;
 import com.cloud.consoleproxy.ConsoleProxyManager;
 import com.cloud.ha.HighAvailabilityManager;
@@ -29,15 +38,11 @@ import com.cloud.storage.snapshot.SnapshotManager;
 import com.cloud.template.TemplateManager;
 import com.cloud.vm.UserVmManager;
 import com.cloud.vm.snapshot.VMSnapshotManager;
-import org.apache.cloudstack.engine.orchestration.service.NetworkOrchestrationService;
-import org.apache.cloudstack.engine.subsystem.api.storage.StoragePoolAllocator;
-import org.apache.cloudstack.framework.config.ConfigKey;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.StringTokenizer;
-
+/**
+ * @deprecated use the more dynamic ConfigKey
+ */
+@Deprecated
 public enum Config {
 
     // Alert
@@ -181,14 +186,6 @@ public enum Config {
             "storage.pool.max.waitseconds",
             "3600",
             "Timeout (in seconds) to synchronize storage pool operations.",
-            null),
-    StorageTemplateCleanupEnabled(
-            "Storage",
-            ManagementServer.class,
-            Boolean.class,
-            "storage.template.cleanup.enabled",
-            "true",
-            "Enable/disable template cleanup activity, only take effect when overall storage cleanup is enabled",
             null),
     PrimaryStorageDownloadWait(
             "Storage",
@@ -404,7 +401,7 @@ public enum Config {
     MaxNumberOfSecondaryIPsPerNIC(
             "Network", ManagementServer.class, Integer.class,
             "vm.network.nic.max.secondary.ipaddresses", "256",
-            "Specify the number of secondary ip addresses per nic per vm", null),
+            "Specify the number of secondary ip addresses per nic per vm. Default value 10 is used, if not specified.", null),
 
     EnableServiceMonitoring(
             "Network", ManagementServer.class, Boolean.class,
@@ -438,15 +435,7 @@ public enum Config {
             "Console proxy command port that is used to communicate with management server",
             null),
     ConsoleProxyRestart("Console Proxy", AgentManager.class, Boolean.class, "consoleproxy.restart", "true", "Console proxy restart flag, defaulted to true", null),
-    ConsoleProxyUrlDomain("Console Proxy", AgentManager.class, String.class, "consoleproxy.url.domain", "", "Console proxy url domain", null),
-    ConsoleProxyLoadscanInterval(
-            "Console Proxy",
-            AgentManager.class,
-            String.class,
-            "consoleproxy.loadscan.interval",
-            "10000",
-            "The time interval(in milliseconds) to scan console proxy working-load info",
-            null),
+    ConsoleProxyUrlDomain("Console Proxy", AgentManager.class, String.class, "consoleproxy.url.domain", "", "Console proxy url domain", "domainName"),
     ConsoleProxySessionMax(
             "Console Proxy",
             AgentManager.class,
@@ -497,10 +486,7 @@ public enum Config {
             null),
 
     // Snapshots
-    SnapshotHourlyMax("Snapshots", SnapshotManager.class, Integer.class, "snapshot.max.hourly", "8", "Maximum hourly snapshots for a volume", null),
-    SnapshotDailyMax("Snapshots", SnapshotManager.class, Integer.class, "snapshot.max.daily", "8", "Maximum daily snapshots for a volume", null),
-    SnapshotWeeklyMax("Snapshots", SnapshotManager.class, Integer.class, "snapshot.max.weekly", "8", "Maximum weekly snapshots for a volume", null),
-    SnapshotMonthlyMax("Snapshots", SnapshotManager.class, Integer.class, "snapshot.max.monthly", "8", "Maximum monthly snapshots for a volume", null),
+
     SnapshotPollInterval(
             "Snapshots",
             SnapshotManager.class,
@@ -510,14 +496,6 @@ public enum Config {
             "The time interval in seconds when the management server polls for snapshots to be scheduled.",
             null),
     SnapshotDeltaMax("Snapshots", SnapshotManager.class, Integer.class, "snapshot.delta.max", "16", "max delta snapshots between two full snapshots.", null),
-    BackupSnapshotAfterTakingSnapshot(
-            "Hidden",
-            SnapshotManager.class,
-            Boolean.class,
-            "snapshot.backup.rightafter",
-            "true",
-            "backup snapshot right after snapshot is taken",
-            null),
     KVMSnapshotEnabled("Hidden", SnapshotManager.class, Boolean.class, "kvm.snapshot.enabled", "false", "whether snapshot is enabled for KVM hosts", null),
 
     // Advanced
@@ -588,7 +566,7 @@ public enum Config {
             "The interval (in milliseconds) when host stats are retrieved from agents.",
             null),
     HostRetry("Advanced", AgentManager.class, Integer.class, "host.retry", "2", "Number of times to retry hosts for creating a volume", null),
-    IntegrationAPIPort("Advanced", ManagementServer.class, Integer.class, "integration.api.port", null, "Default API port", null),
+    IntegrationAPIPort("Advanced", ManagementServer.class, Integer.class, "integration.api.port", null, "Default API port. To disable set it to 0 or negative.", null),
     InvestigateRetryInterval(
             "Advanced",
             HighAvailabilityManager.class,
@@ -663,15 +641,6 @@ public enum Config {
             "600",
             "Time in seconds between retries to stop or destroy a vm",
             null),
-    StorageCleanupInterval(
-            "Advanced",
-            StorageManager.class,
-            Integer.class,
-            "storage.cleanup.interval",
-            "86400",
-            "The interval (in seconds) to wait before running the storage cleanup thread.",
-            null),
-    StorageCleanupEnabled("Advanced", StorageManager.class, Boolean.class, "storage.cleanup.enabled", "true", "Enables/disables the storage cleanup thread.", null),
     UpdateWait("Advanced", AgentManager.class, Integer.class, "update.wait", "600", "Time to wait (in seconds) before alerting on a updating agent", null),
     XapiWait("Advanced", AgentManager.class, Integer.class, "xapiwait", "60", "Time (in seconds) to wait for XAPI to return", null),
     MigrateWait("Advanced", AgentManager.class, Integer.class, "migratewait", "3600", "Time (in seconds) to wait for VM migrate finish", null),
@@ -714,7 +683,7 @@ public enum Config {
             String.class,
             "hypervisor.list",
             HypervisorType.Hyperv + "," + HypervisorType.KVM + "," + HypervisorType.XenServer + "," + HypervisorType.VMware + "," + HypervisorType.BareMetal + "," +
-                HypervisorType.Ovm + "," + HypervisorType.LXC,
+                HypervisorType.Ovm + "," + HypervisorType.LXC + "," + HypervisorType.Ovm3,
             "The list of hypervisors that this deployment will use.",
             "hypervisorList"),
     ManagementNetwork("Advanced", ManagementServer.class, String.class, "management.network.cidr", null, "The cidr of management server network", null),
@@ -765,7 +734,7 @@ public enum Config {
             "secstorage.ssl.cert.domain",
             "",
             "SSL certificate used to encrypt copy traffic between zones",
-            null),
+            "domainName"),
     SecStorageCapacityStandby(
             "Advanced",
             AgentManager.class,
@@ -831,7 +800,14 @@ public enum Config {
             "600",
             "Time Interval to fetch the LB health check states (in sec)",
             null),
-
+    NCCCmdTimeOut(
+            "Advanced",
+            ManagementServer.class,
+            Long.class,
+            "ncc.command.timeout",
+            "600000", // 10 minutes
+            "Command Timeout Interval (in millisec)",
+            null),
     DirectAttachNetworkEnabled(
             "Advanced",
             ManagementServer.class,
@@ -882,6 +858,7 @@ public enum Config {
             "The interval (in milliseconds) when vm stats are retrieved from agents.",
             null),
     VmDiskStatsInterval("Advanced", ManagementServer.class, Integer.class, "vm.disk.stats.interval", "0", "Interval (in seconds) to report vm disk statistics.", null),
+    VolumeStatsInterval("Advanced", ManagementServer.class, Integer.class, "volume.stats.interval", "60000", "Interval (in seconds) to report volume statistics.", null),
     VmTransitionWaitInterval(
             "Advanced",
             ManagementServer.class,
@@ -897,14 +874,6 @@ public enum Config {
             "vm.disk.throttling.iops_read_rate",
             "0",
             "Default disk I/O read rate in requests per second allowed in User vm's disk.",
-            null),
-    VmPasswordLength(
-            "Advanced",
-            ManagementServer.class,
-            Integer.class,
-            "vm.password.length",
-            "6",
-            "Specifies the length of a randomly generated password",
             null),
     VmDiskThrottlingIopsWriteRate(
             "Advanced",
@@ -930,7 +899,14 @@ public enum Config {
             "0",
             "Default disk I/O writerate in bytes per second allowed in User vm's disk.",
             null),
-
+    KvmAutoConvergence(
+            "Advanced",
+            ManagementServer.class,
+            Boolean.class,
+            "kvm.auto.convergence",
+            "false",
+            "Setting this to 'true' allows KVM to use auto convergence to complete VM migration (libvirt version 1.2.3+ and QEMU version 1.6+)",
+            null),
     ControlCidr(
             "Advanced",
             ManagementServer.class,
@@ -970,7 +946,7 @@ public enum Config {
             String.class,
             "vm.allocation.algorithm",
             "random",
-            "'random', 'firstfit', 'userdispersing', 'userconcentratedpod_random', 'userconcentratedpod_firstfit' : Order in which hosts within a cluster will be considered for VM/volume allocation.",
+            "'random', 'firstfit', 'userdispersing', 'userconcentratedpod_random', 'userconcentratedpod_firstfit', 'firstfitleastconsumed' : Order in which hosts within a cluster will be considered for VM/volume allocation.",
             null),
     VmDeploymentPlanner(
             "Advanced",
@@ -1067,6 +1043,29 @@ public enum Config {
     OvmPrivateNetwork("Hidden", ManagementServer.class, String.class, "ovm.private.network.device", null, "Specify the private bridge on host for private network", null),
     OvmGuestNetwork("Hidden", ManagementServer.class, String.class, "ovm.guest.network.device", null, "Specify the private bridge on host for private network", null),
 
+    // Ovm3
+    Ovm3PublicNetwork("Hidden", ManagementServer.class, String.class, "ovm3.public.network.device", null, "Specify the public bridge on host for public network", null),
+    Ovm3PrivateNetwork("Hidden", ManagementServer.class, String.class, "ovm3.private.network.device", null, "Specify the private bridge on host for private network", null),
+    Ovm3GuestNetwork("Hidden", ManagementServer.class, String.class, "ovm3.guest.network.device", null, "Specify the guest bridge on host for guest network", null),
+    Ovm3StorageNetwork("Hidden", ManagementServer.class, String.class, "ovm3.storage.network.device", null, "Specify the storage bridge on host for storage network", null),
+    Ovm3HeartBeatTimeout(
+            "Advanced",
+            ManagementServer.class,
+            Integer.class,
+            "ovm3.heartbeat.timeout",
+            "120",
+            "timeout used for primary storage check, upon timeout a panic is triggered.",
+            null),
+    Ovm3HeartBeatInterval(
+            "Advanced",
+            ManagementServer.class,
+            Integer.class,
+            "ovm3.heartbeat.interval",
+            "1",
+            "interval used to check primary storage availability.",
+            null),
+
+
     // XenServer
     XenServerPublicNetwork(
             "Hidden",
@@ -1140,14 +1139,6 @@ public enum Config {
             "false",
             "Enable/Disable Nexus/Vmware dvSwitch in VMware environment",
             null),
-    VmwarePortsPerDVPortGroup(
-            "Network",
-            ManagementServer.class,
-            Integer.class,
-            "vmware.ports.per.dvportgroup",
-            "256",
-            "Default number of ports per Vmware dvPortGroup in VMware environment",
-            null),
     VmwareCreateFullClone(
             "Advanced",
             ManagementServer.class,
@@ -1195,7 +1186,7 @@ public enum Config {
             String.class,
             "vmware.root.disk.controller",
             "ide",
-            "Specify the default disk controller for root volumes, valid values are scsi, ide",
+            "Specify the default disk controller for root volumes, valid values are scsi, ide, osdefault. Please check documentation for more details on each of these values.",
             null),
     VmwareSystemVmNicDeviceType(
             "Advanced",
@@ -1214,33 +1205,7 @@ public enum Config {
             "Specify whether or not to recycle hung worker VMs",
             null),
     VmwareHungWorkerTimeout("Advanced", ManagementServer.class, Long.class, "vmware.hung.wokervm.timeout", "7200", "Worker VM timeout in seconds", null),
-    VmwareEnableNestedVirtualization(
-            "Advanced",
-            ManagementServer.class,
-            Boolean.class,
-            "vmware.nested.virtualization",
-            "false",
-            "When set to true this will enable nested virtualization when this is supported by the hypervisor",
-            null),
     VmwareVcenterSessionTimeout("Advanced", ManagementServer.class, Long.class, "vmware.vcenter.session.timeout", "1200", "VMware client timeout in seconds", null),
-
-    // Midonet
-    MidoNetAPIServerAddress(
-            "Network",
-            ManagementServer.class,
-            String.class,
-            "midonet.apiserver.address",
-            "http://localhost:8081",
-            "Specify the address at which the Midonet API server can be contacted (if using Midonet)",
-            null),
-    MidoNetProviderRouterId(
-            "Network",
-            ManagementServer.class,
-            String.class,
-            "midonet.providerrouter.id",
-            "d7c5e6a3-e2f4-426b-b728-b7ce6a0448e5",
-            "Specifies the UUID of the Midonet provider router (if using Midonet)",
-            null),
 
     // KVM
     KvmPublicNetwork("Hidden", ManagementServer.class, String.class, "kvm.public.network.device", null, "Specify the public bridge on host for public network", null),
@@ -1314,7 +1279,7 @@ public enum Config {
             Integer.class,
             "usage.sanity.check.interval",
             null,
-            "Interval (in days) to check sanity of usage data",
+            "Interval (in days) to check sanity of usage data. To disable set it to 0 or negative.",
             null),
     UsageAggregationTimezone("Usage", ManagementServer.class, String.class, "usage.aggregation.timezone", "GMT", "The timezone to use for usage stats aggregation", null),
     TrafficSentinelIncludeZones(
@@ -1465,15 +1430,6 @@ public enum Config {
             "The default maximum secondary storage space (in GiB) that can be used for an account",
             null),
 
-    ResourceCountCheckInterval(
-            "Advanced",
-            ManagementServer.class,
-            Long.class,
-            "resourcecount.check.interval",
-            "0",
-            "Time (in seconds) to wait before retrying resource count check task. Default is 0 which is to never run the task",
-            "Seconds"),
-
     //disabling lb as cluster sync does not work with distributed cluster
     SubDomainNetworkAccess(
             "Advanced",
@@ -1510,23 +1466,17 @@ public enum Config {
             "Percentage (as a value between 0 and 1) of connected agents after which agent load balancing will start happening",
             null),
 
-    JSONDefaultContentType(
-            "Advanced",
-            ManagementServer.class,
-            String.class,
-            "json.content.type",
-            "application/json; charset=UTF-8",
-            "Http response content type for JSON",
-            null),
-
-    EnableSecureSessionCookie(
-            "Advanced",
-            ManagementServer.class,
-            Boolean.class,
-            "enable.secure.session.cookie",
-            "false",
-            "Session cookie's secure flag is enabled if true. Use this only when using HTTPS",
-            null),
+    DefaultMaxDomainUserVms("Domain Defaults", ManagementServer.class, Long.class, "max.domain.user.vms", "40", "The default maximum number of user VMs that can be deployed for a domain", null),
+    DefaultMaxDomainPublicIPs("Domain Defaults", ManagementServer.class, Long.class, "max.domain.public.ips", "40", "The default maximum number of public IPs that can be consumed by a domain", null),
+    DefaultMaxDomainTemplates("Domain Defaults", ManagementServer.class, Long.class, "max.domain.templates", "40", "The default maximum number of templates that can be deployed for a domain", null),
+    DefaultMaxDomainSnapshots("Domain Defaults", ManagementServer.class, Long.class, "max.domain.snapshots", "40", "The default maximum number of snapshots that can be created for a domain", null),
+    DefaultMaxDomainVolumes("Domain Defaults", ManagementServer.class, Long.class, "max.domain.volumes", "40", "The default maximum number of volumes that can be created for a domain", null),
+    DefaultMaxDomainNetworks("Domain Defaults", ManagementServer.class, Long.class, "max.domain.networks", "40", "The default maximum number of networks that can be created for a domain", null),
+    DefaultMaxDomainVpcs("Domain Defaults", ManagementServer.class, Long.class, "max.domain.vpcs", "40", "The default maximum number of vpcs that can be created for a domain", null),
+    DefaultMaxDomainCpus("Domain Defaults", ManagementServer.class, Long.class, "max.domain.cpus", "80", "The default maximum number of cpu cores that can be used for a domain", null),
+    DefaultMaxDomainMemory("Domain Defaults", ManagementServer.class, Long.class, "max.domain.memory", "81920", "The default maximum memory (in MB) that can be used for a domain", null),
+    DefaultMaxDomainPrimaryStorage("Domain Defaults", ManagementServer.class, Long.class, "max.domain.primary.storage", "400", "The default maximum primary storage space (in GiB) that can be used for a domain", null),
+    DefaultMaxDomainSecondaryStorage("Domain Defaults", ManagementServer.class, Long.class, "max.domain.secondary.storage", "800", "The default maximum secondary storage space (in GiB) that can be used for a domain", null),
 
     DefaultMaxProjectUserVms(
             "Project Defaults",
@@ -1760,22 +1710,6 @@ public enum Config {
             "The maximum number of retrying times to search for an available IPv6 address in the table",
             null),
 
-    BaremetalEnableCompleteNotification(
-            "Advanced",
-            ManagementServer.class,
-            Boolean.class,
-            "baremetal.provision.done.notification",
-            "false",
-            "Enable provision done notification through virtual router",
-            null),
-    BaremetalPeerHypervisorType(
-            "Advanced",
-            ManagementServer.class,
-            String.class,
-            "baremetal.peer.hypervisor.type",
-            "Vmware",
-            "Hypervisor[Xenserver/KVM/VMWare] used to spring up virtual router for baremetal instances. The cluster having this hypervisor type must be in the same zone with baremetal cluster",
-            null),
     BaremetalInternalStorageServer(
             "Advanced",
             ManagementServer.class,
@@ -1783,6 +1717,30 @@ public enum Config {
             "baremetal.internal.storage.server.ip",
             null,
             "the ip address of server that stores kickstart file, kernel, initrd, ISO for advanced networking baremetal provisioning",
+            null),
+    BaremetalProvisionDoneNotificationEnabled(
+            "Advanced",
+            ManagementServer.class,
+            Boolean.class,
+            "baremetal.provision.done.notification.enabled",
+            "true",
+            "whether to enable baremetal provison done notification",
+            null),
+    BaremetalProvisionDoneNotificationTimeout(
+            "Advanced",
+            ManagementServer.class,
+            Integer.class,
+            "baremetal.provision.done.notification.timeout",
+            "1800",
+            "the max time to wait before treating a baremetal provision as failure if no provision done notification is not received, in secs",
+            null),
+    BaremetalProvisionDoneNotificationPort(
+            "Advanced",
+            ManagementServer.class,
+            Integer.class,
+            "baremetal.provision.done.notification.port",
+            "8080",
+            "the port that listens baremetal provision done notification. Should be the same to port management server listening on for now. Please change it to management server port if it's not default 8080",
             null),
     ExternalBaremetalSystemUrl(
             "Advanced",
@@ -1859,42 +1817,6 @@ public enum Config {
                 + "If it is set to -1, then it means always use single-part upload to upload object to S3. ",
             null),
 
-    // Ldap
-    LdapBasedn("Advanced", ManagementServer.class, String.class, "ldap.basedn", null, "Sets the basedn for LDAP", null),
-    LdapBindPassword("Advanced", ManagementServer.class, String.class, "ldap.bind.password", null, "Sets the bind password for LDAP", null),
-    LdapBindPrincipal("Advanced", ManagementServer.class, String.class, "ldap.bind.principal", null, "Sets the bind principal for LDAP", null),
-    LdapEmailAttribute("Advanced", ManagementServer.class, String.class, "ldap.email.attribute", "mail", "Sets the email attribute used within LDAP", null),
-    LdapFirstnameAttribute(
-            "Advanced",
-            ManagementServer.class,
-            String.class,
-            "ldap.firstname.attribute",
-            "givenname",
-            "Sets the firstname attribute used within LDAP",
-            null),
-    LdapLastnameAttribute("Advanced", ManagementServer.class, String.class, "ldap.lastname.attribute", "sn", "Sets the lastname attribute used within LDAP", null),
-    LdapUsernameAttribute("Advanced", ManagementServer.class, String.class, "ldap.username.attribute", "uid", "Sets the username attribute used within LDAP", null),
-    LdapUserObject("Advanced", ManagementServer.class, String.class, "ldap.user.object", "inetOrgPerson", "Sets the object type of users within LDAP", null),
-    LdapSearchGroupPrinciple(
-            "Advanced",
-            ManagementServer.class,
-            String.class,
-            "ldap.search.group.principle",
-            null,
-            "Sets the principle of the group that users must be a member of",
-            null),
-    LdapTrustStore("Advanced", ManagementServer.class, String.class, "ldap.truststore", null, "Sets the path to the truststore to use for SSL", null),
-    LdapTrustStorePassword("Advanced", ManagementServer.class, String.class, "ldap.truststore.password", null, "Sets the password for the truststore", null),
-    LdapGroupObject("Advanced", ManagementServer.class, String.class, "ldap.group.object", "groupOfUniqueNames", "Sets the object type of groups within LDAP", null),
-    LdapGroupUniqueMemberAttribute(
-            "Advanced",
-            ManagementServer.class,
-            String.class,
-            "ldap.group.user.uniquemember",
-            "uniquemember",
-            "Sets the attribute for uniquemembers within a group",
-            null),
-
     // VMSnapshots
     VMSnapshotMax("Advanced", VMSnapshotManager.class, Integer.class, "vmsnapshot.max", "10", "Maximum vm snapshots for a vm", null),
     VMSnapshotCreateWait("Advanced", VMSnapshotManager.class, Integer.class, "vmsnapshot.create.wait", "1800", "In second, timeout for create vm snapshot", null),
@@ -1941,7 +1863,7 @@ public enum Config {
             NetworkOrchestrationService.class,
             Integer.class,
             "router.aggregation.command.each.timeout",
-            "3",
+            "600",
             "timeout in seconds for each Virtual Router command being aggregated. The final aggregation command timeout would be determined by this timeout * commands counts ",
             null),
 
@@ -1950,7 +1872,12 @@ public enum Config {
     PublishAlertEvent("Advanced", ManagementServer.class, Boolean.class, "publish.alert.events", "true", "enable or disable publishing of alert events on the event bus", null),
     PublishResourceStateEvent("Advanced", ManagementServer.class, Boolean.class, "publish.resource.state.events", "true", "enable or disable publishing of alert events on the event bus", null),
     PublishUsageEvent("Advanced", ManagementServer.class, Boolean.class, "publish.usage.events", "true", "enable or disable publishing of usage events on the event bus", null),
-    PublishAsynJobEvent("Advanced", ManagementServer.class, Boolean.class, "publish.async.job.events", "true", "enable or disable publishing of usage events on the event bus", null);
+    PublishAsynJobEvent("Advanced", ManagementServer.class, Boolean.class, "publish.async.job.events", "true", "enable or disable publishing of usage events on the event bus", null),
+
+    // StatsCollector
+    StatsOutPutGraphiteHost("Advanced", ManagementServer.class, String.class, "stats.output.uri", "", "URI to additionally send StatsCollector statistics to", null),
+
+    SSVMPSK("Hidden", ManagementServer.class, String.class, "upload.post.secret.key", "", "PSK with SSVM", null);
 
     private final String _category;
     private final Class<?> _componentClass;
@@ -1995,6 +1922,7 @@ public enum Config {
         Configs.put("Developer", new ArrayList<Config>());
         Configs.put("Hidden", new ArrayList<Config>());
         Configs.put("Account Defaults", new ArrayList<Config>());
+        Configs.put("Domain Defaults", new ArrayList<Config>());
         Configs.put("Project Defaults", new ArrayList<Config>());
         Configs.put("Secure", new ArrayList<Config>());
 
@@ -2018,17 +1946,6 @@ public enum Config {
         _scope = ConfigKey.Scope.Global.toString();
     }
 
-    private Config(String category, Class<?> componentClass, Class<?> type, String name, String defaultValue, String description, String range, String scope) {
-        _category = category;
-        _componentClass = componentClass;
-        _type = type;
-        _name = name;
-        _defaultValue = defaultValue;
-        _description = description;
-        _range = range;
-        _scope = scope;
-    }
-
     public String getCategory() {
         return _category;
     }
@@ -2047,10 +1964,6 @@ public enum Config {
 
     public Class<?> getType() {
         return _type;
-    }
-
-    public Class<?> getComponentClass() {
-        return _componentClass;
     }
 
     public String getScope() {
@@ -2119,9 +2032,5 @@ public enum Config {
             categories.add((String)key);
         }
         return categories;
-    }
-
-    public static List<Config> getConfigListByScope(String scope) {
-        return s_scopeLevelConfigsMap.get(scope);
     }
 }

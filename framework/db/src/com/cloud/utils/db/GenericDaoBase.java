@@ -44,7 +44,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-
+import com.google.common.base.Strings;
 import javax.naming.ConfigurationException;
 import javax.persistence.AttributeOverride;
 import javax.persistence.Column;
@@ -135,6 +135,7 @@ public abstract class GenericDaoBase<T, ID extends Serializable> extends Compone
     protected Map<String, Object> _discriminatorValues;
     protected String _selectByIdSql;
     protected String _count;
+    protected String _distinctIdSql;
 
     protected Field _idField;
 
@@ -157,6 +158,7 @@ public abstract class GenericDaoBase<T, ID extends Serializable> extends Compone
     protected static final String FOR_UPDATE_CLAUSE = " FOR UPDATE ";
     protected static final String SHARE_MODE_CLAUSE = " LOCK IN SHARE MODE";
     protected static final String SELECT_LAST_INSERT_ID_SQL = "SELECT LAST_INSERT_ID()";
+    public static final Date DATE_TO_NULL = new Date(Long.MIN_VALUE);
 
     protected static final SequenceFetcher s_seqFetcher = SequenceFetcher.getInstance();
 
@@ -212,6 +214,7 @@ public abstract class GenericDaoBase<T, ID extends Serializable> extends Compone
         final SqlGenerator generator = new SqlGenerator(_entityBeanType);
         _partialSelectSql = generator.buildSelectSql(false);
         _count = generator.buildCountSql();
+        _distinctIdSql= generator.buildDistinctIdSql();
         _partialQueryCacheSelectSql = generator.buildSelectSql(true);
         _embeddedFields = generator.getEmbeddedFields();
         _insertSqls = generator.buildInsertSqls();
@@ -940,12 +943,18 @@ public abstract class GenericDaoBase<T, ID extends Serializable> extends Compone
     @DB()
     @SuppressWarnings("unchecked")
     public T findById(final ID id) {
+        T result = null;
         if (_cache != null) {
             final Element element = _cache.get(id);
-            return element == null ? lockRow(id, null) : (T)element.getObjectValue();
+            if (element == null) {
+                result = lockRow(id, null);
+            } else {
+                result = (T)element.getObjectValue();
+            }
         } else {
-            return lockRow(id, null);
+            result = lockRow(id, null);
         }
+        return result;
     }
 
     @Override
@@ -966,8 +975,19 @@ public abstract class GenericDaoBase<T, ID extends Serializable> extends Compone
 
     @Override
     @DB()
-    public T findByIdIncludingRemoved(ID id) {
-        return findById(id, true, null);
+    public T findByIdIncludingRemoved(final ID id) {
+        T result = null;
+        if (_cache != null) {
+            final Element element = _cache.get(id);
+            if (element == null) {
+                result = findById(id, true, null);
+            } else {
+                result = (T)element.getObjectValue();
+            }
+        } else {
+            result = findById(id, true, null);
+        }
+        return result;
     }
 
     @Override
@@ -1300,6 +1320,22 @@ public abstract class GenericDaoBase<T, ID extends Serializable> extends Compone
 
     @Override
     @DB()
+    public Pair<List<T>, Integer> searchAndDistinctCount(final SearchCriteria<T> sc, final Filter filter) {
+        List<T> objects = search(sc, filter, null, false);
+        Integer count = getDistinctCount(sc);
+        return new Pair<List<T>, Integer>(objects, count);
+    }
+
+    @Override
+    @DB()
+    public Pair<List<T>, Integer> searchAndDistinctCount(final SearchCriteria<T> sc, final Filter filter, final String[] distinctColumns) {
+        List<T> objects = search(sc, filter, null, false);
+        Integer count = getDistinctCount(sc, distinctColumns);
+        return new Pair<List<T>, Integer>(objects, count);
+    }
+
+    @Override
+    @DB()
     public List<T> search(final SearchCriteria<T> sc, final Filter filter, final boolean enableQueryCache) {
         return search(sc, filter, null, false, enableQueryCache);
     }
@@ -1510,7 +1546,7 @@ public abstract class GenericDaoBase<T, ID extends Serializable> extends Compone
             }
         } else if (attr.field.getType() == Date.class) {
             final Date date = (Date)value;
-            if (date == null) {
+            if (date == null || date.equals(DATE_TO_NULL)) {
                 pstmt.setObject(j, null);
                 return;
             }
@@ -1841,6 +1877,110 @@ public abstract class GenericDaoBase<T, ID extends Serializable> extends Compone
         return builder.create();
     }
 
+    public Integer getDistinctCount(SearchCriteria<T> sc) {
+        String clause = sc != null ? sc.getWhereClause() : null;
+        if (clause != null && clause.length() == 0) {
+            clause = null;
+        }
+
+        final StringBuilder str = createDistinctIdSelect(sc, clause != null);
+        if (clause != null) {
+            str.append(clause);
+        }
+
+        Collection<JoinBuilder<SearchCriteria<?>>> joins = null;
+        if (sc != null) {
+            joins = sc.getJoins();
+            if (joins != null) {
+                addJoins(str, joins);
+            }
+        }
+
+        // we have to disable group by in getting count, since count for groupBy clause will be different.
+        //List<Object> groupByValues = addGroupBy(str, sc);
+        final TransactionLegacy txn = TransactionLegacy.currentTxn();
+        final String sql = "SELECT COUNT(*) FROM (" + str.toString() + ") AS tmp";
+
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = txn.prepareAutoCloseStatement(sql);
+            int i = 1;
+            if (clause != null) {
+                for (final Pair<Attribute, Object> value : sc.getValues()) {
+                    prepareAttribute(i++, pstmt, value.first(), value.second());
+                }
+            }
+
+            if (joins != null) {
+                i = addJoinAttributes(i, pstmt, joins);
+            }
+
+            /*
+            if (groupByValues != null) {
+                for (Object value : groupByValues) {
+                    pstmt.setObject(i++, value);
+                }
+            }
+             */
+
+            final ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                return rs.getInt(1);
+            }
+            return 0;
+        } catch (final SQLException e) {
+            throw new CloudRuntimeException("DB Exception on: " + pstmt, e);
+        } catch (final Throwable e) {
+            throw new CloudRuntimeException("Caught: " + pstmt, e);
+        }
+    }
+
+    public Integer getDistinctCount(SearchCriteria<T> sc, String[] distinctColumns) {
+        String clause = sc != null ? sc.getWhereClause() : null;
+        if (Strings.isNullOrEmpty(clause)) {
+            clause = null;
+        }
+
+        final StringBuilder str = createDistinctSelect(sc, clause != null, distinctColumns);
+        if (clause != null) {
+            str.append(clause);
+        }
+
+        Collection<JoinBuilder<SearchCriteria<?>>> joins = null;
+        if (sc != null) {
+            joins = sc.getJoins();
+            if (joins != null) {
+                addJoins(str, joins);
+            }
+        }
+
+        final TransactionLegacy txn = TransactionLegacy.currentTxn();
+        final String sql = "SELECT COUNT(*) FROM (" + str.toString() + ") AS tmp";
+
+        try (PreparedStatement pstmt = txn.prepareAutoCloseStatement(sql)) {
+            int i = 1;
+            if (clause != null) {
+                for (final Pair<Attribute, Object> value : sc.getValues()) {
+                    prepareAttribute(i++, pstmt, value.first(), value.second());
+                }
+            }
+
+            if (joins != null) {
+                i = addJoinAttributes(i, pstmt, joins);
+            }
+
+            final ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                return rs.getInt(1);
+            }
+            return 0;
+        } catch (final SQLException e) {
+            throw new CloudRuntimeException("DB Exception in executing: " + sql, e);
+        } catch (final Throwable e) {
+            throw new CloudRuntimeException("Caught exception in : " + sql, e);
+        }
+    }
+
     public Integer getCount(SearchCriteria<T> sc) {
         String clause = sc != null ? sc.getWhereClause() : null;
         if (clause != null && clause.length() == 0) {
@@ -1911,9 +2051,34 @@ public abstract class GenericDaoBase<T, ID extends Serializable> extends Compone
     }
 
     @DB()
+    protected StringBuilder createDistinctIdSelect(SearchCriteria<?> sc, final boolean whereClause) {
+        StringBuilder sql = new StringBuilder(_distinctIdSql);
+
+        if (!whereClause) {
+            sql.delete(sql.length() - (_discriminatorClause == null ? 6 : 4), sql.length());
+        }
+
+        return sql;
+    }
+
+    @DB()
     protected Pair<List<T>, Integer> listAndCountIncludingRemovedBy(final SearchCriteria<T> sc, final Filter filter) {
         List<T> objects = searchIncludingRemoved(sc, filter, null, false);
         Integer count = getCount(sc);
         return new Pair<List<T>, Integer>(objects, count);
+    }
+
+    @DB()
+    protected StringBuilder createDistinctSelect(SearchCriteria<?> sc, final boolean whereClause, String[] distinctColumns) {
+        final SqlGenerator generator = new SqlGenerator(_entityBeanType);
+        String distinctSql = generator.buildDistinctSql(distinctColumns);
+
+        StringBuilder sql = new StringBuilder(distinctSql);
+
+        if (!whereClause) {
+            sql.delete(sql.length() - (_discriminatorClause == null ? 6 : 4), sql.length());
+        }
+
+        return sql;
     }
 }

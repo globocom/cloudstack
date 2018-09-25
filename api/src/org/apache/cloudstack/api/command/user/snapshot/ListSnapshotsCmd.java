@@ -34,8 +34,8 @@ import org.apache.cloudstack.api.response.ZoneResponse;
 import com.cloud.storage.Snapshot;
 import com.cloud.utils.Pair;
 
-@APICommand(name = "listSnapshots", description = "Lists all available snapshots for the account.", responseObject = SnapshotResponse.class, entityType = {Snapshot.class},
-        requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
+@APICommand(name = "listSnapshots", description = "Lists all available snapshots for the account.", responseObject = SnapshotResponse.class, entityType = {
+        Snapshot.class }, requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
 public class ListSnapshotsCmd extends BaseListTaggedResourcesCmd {
     public static final Logger s_logger = Logger.getLogger(ListSnapshotsCmd.class.getName());
 
@@ -47,6 +47,9 @@ public class ListSnapshotsCmd extends BaseListTaggedResourcesCmd {
 
     @Parameter(name = ApiConstants.ID, type = CommandType.UUID, entityType = SnapshotResponse.class, description = "lists snapshot by snapshot ID")
     private Long id;
+
+    @Parameter(name=ApiConstants.IDS, type=CommandType.LIST, collectionType=CommandType.UUID, entityType=SnapshotResponse.class, description="the IDs of the snapshots, mutually exclusive with id", since = "4.9")
+    private List<Long> ids;
 
     @Parameter(name = ApiConstants.INTERVAL_TYPE, type = CommandType.STRING, description = "valid values are HOURLY, DAILY, WEEKLY, and MONTHLY.")
     private String intervalType;
@@ -119,5 +122,9 @@ public class ListSnapshotsCmd extends BaseListTaggedResourcesCmd {
         response.setResponseName(getCommandName());
 
         setResponseObject(response);
+    }
+
+    public List<Long> getIds() {
+        return ids;
     }
 }

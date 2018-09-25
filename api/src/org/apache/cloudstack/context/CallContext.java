@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.UUID;
 
+import com.cloud.projects.Project;
 import org.apache.log4j.Logger;
 import org.apache.log4j.NDC;
 
@@ -59,6 +60,7 @@ public class CallContext {
     private User user;
     private long userId;
     private final Map<Object, Object> context = new HashMap<Object, Object>();
+    private Project project;
 
     private String ndcContext;
 
@@ -89,8 +91,19 @@ public class CallContext {
         context.put(key, value);
     }
 
+    /**
+     * @param key any not null key object
+     * @return the value of the key from context map
+     * @throws NullPointerException if the specified key is nul
+     */
     public Object getContextParameter(Object key) {
-        return context.get(key);
+        Object value = context.get(key);
+        //check if the value is present in the toString value of the key
+        //due to a bug in the way we update the key by serializing and deserializing, it sometimes gets toString value of the key. @see com.cloud.api.ApiAsyncJobDispatcher#runJob
+        if(value == null ) {
+            value = context.get(key.toString());
+        }
+        return value;
     }
 
     public long getCallingUserId() {
@@ -316,6 +329,14 @@ public class CallContext {
 
     public void setEventDescription(String eventDescription) {
         this.eventDescription = eventDescription;
+    }
+
+    public Project getProject() {
+        return this.project;
+    }
+
+    public void setProject(Project project) {
+        this.project = project;
     }
 
     /**

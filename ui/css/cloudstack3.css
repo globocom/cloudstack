@@ -46,7 +46,7 @@ div.toolbar,
 
 /*+}*/
 body {
-  min-width: 1024px;
+  min-width: 1224px;
   font-family: sans-serif;
   overflow: auto;
   background: #EDE8E8;
@@ -61,7 +61,7 @@ body.install-wizard {
 }
 
 #main-area {
-  width: 1024px;
+  width: 1224px;
   height: 729px;
   margin: auto;
   border: 1px solid #D4D4D4;
@@ -96,8 +96,8 @@ a:hover {
 
 /*Table*/
 table {
-  width: 740px;
-  max-width: 777px;
+  width: 955px;
+  max-width: 977px;
   margin: 15px 15px 12px 12px;
   font-size: 13px;
   text-align: left;
@@ -146,7 +146,7 @@ table thead th.sorted.asc {
 
 table tbody td,
 table th {
-  padding: 10px 5px 8px;
+  padding: 10px 5px 6px;
   border-right: 1px solid #BFBFBF;
   color: #282828;
   clear: none;
@@ -480,8 +480,8 @@ body.login {
 }
 
 .login .logo {
-  width: 250px;
-  height: 31px;
+  width: 290px;
+  height: 40px;
   float: left;
   margin: 72px 0 0 209px;
   background: url(../images/logo-login.png) no-repeat 0 0;
@@ -530,6 +530,7 @@ div.list-view table tbody td span {
   display: block;
   float: left;
   max-width: 89%;
+  word-break: break-all;
   word-wrap: break-word;
   text-indent: 0;
   margin-left: 12px;
@@ -1297,7 +1298,7 @@ div.panel div.list-view {
 }
 
 .detail-view div.list-view {
-  width: 730px;
+  width: 930px;
   border: 1px solid #DAD4D4;
   margin: 41px auto auto !important;
   height: 536px !important;
@@ -1305,12 +1306,11 @@ div.panel div.list-view {
 }
 
 div.panel div.list-view div.data-table table {
-  width: 755px;
-  margin-top: 44px;
+  width: 955px;
 }
 
 .detail-view div.list-view div.data-table table {
-  width: 703px !important;
+  width: 903px !important;
 }
 
 .detail-view div.list-view div.data-table table td {
@@ -1321,7 +1321,7 @@ div.panel div.list-view div.fixed-header {
   position: absolute;
   top: 29px;
   left: 12px;
-  width: 760px;
+  width: 960px;
   height: 47px;
   display: table;
   background-color: #F7F7F7;
@@ -1330,9 +1330,9 @@ div.panel div.list-view div.fixed-header {
 }
 
 .detail-view div.list-view div.fixed-header {
-  width: 703px !important;
+  width: 903px !important;
   top: 49px !important;
-  left: 32px !important;
+  left: 29px !important;
   background: #FFFFFF;
 }
 
@@ -1354,7 +1354,7 @@ div.panel div.list-view div.fixed-header table {
   position: relative;
   left: 0px;
   top: 18px;
-  width: 755px;
+  width: 955px;
   /*+box-shadow:0px 4px 10px #DFE1E3;*/
   -moz-box-shadow: 0px 4px 10px #DFE1E3;
   -webkit-box-shadow: 0px 4px 10px #DFE1E3;
@@ -1393,7 +1393,7 @@ div.list-view td.state span {
   -webkit-text-shadow: 0px 1px 1px #FFFFFF;
   -o-text-shadow: 0px 1px 1px #FFFFFF;
   text-shadow: 0px 1px 1px #FFFFFF;
-  background: url(../images/sprites.png) 1px -536px;
+  background: url(../images/sprites.png) 1px -526px;
 }
 
 div.list-view td.state.on span {
@@ -1407,7 +1407,90 @@ div.list-view td.state.off span {
   background-image: url(../images/sprites.png);
   background-repeat: no-repeat;
   color: #B90606;
-  background-position: 1px -496px;
+  background-position: 1px -492px;
+}
+
+div.list-view td.state.warning span {
+  background-image: url(../images/sprites.png);
+  background-repeat: no-repeat;
+  color: #B90606;
+  background-position: 1px -558px;
+}
+
+div.list-view td.state.transition span {
+  background-image: url(../images/sprites.png);
+  background-repeat: no-repeat;
+  color: #B90606;
+  background-position: 1px -432px;
+}
+
+div.list-view td.state.suitable span {
+  background: url(../images/icons.png) no-repeat scroll 1px -224px;
+  color: #008000;
+  height: 18px;
+}
+
+div.list-view td.state.suitable-storage-migration-required span {
+  width: 200px;
+}
+
+div.list-view td.state.notsuitable span {
+  background: url(../images/icons.png) no-repeat scroll 1px -190px;
+  color: #B90606;
+  height: 19px;
+  width: 100px;
+}
+
+div.list-view td.state.notsuitable-storage-migration-required span {
+    width: 220px !important;
+}
+
+.horizontal-overflow tbody td, .horizontal-overflow thead th {
+  min-width: 40px;
+  padding: 10px 10px 5px 0px;
+}
+
+.horizontal-overflow th.quick-view {
+  padding-left: 5px;
+}
+
+.groupable-header {
+  background: url(../images/bg-table-head.png);
+  border-left: 1px solid #C6C3C3;
+  border-right: 1px solid #C6C3C3;
+}
+
+.groupable-header-columns th {
+  border: none;
+}
+
+table.horizontal-overflow td.state {
+  width: 55px;
+  min-width: 55px;
+  max-width: 55px;
+}
+
+table.no-split td.first {
+  min-width: 150px;
+}
+
+.groupable-header-border {
+  border-left: 1px solid #C6C3C3;
+  border-right: 1px solid #C6C3C3;
+}
+
+td.alert-notification-threshold {
+  color: #E87900;
+  background-color: rgba(255, 231, 175, 0.75);
+}
+
+td.alert-disable-threshold {
+  color: #F50000;
+  background-color: rgba(255, 190, 190, 0.75);
+}
+
+span.compact {
+  height: 16px;
 }
 
 /** Quick view tooltip*/
@@ -1828,7 +1911,7 @@ div.list-view td.state.off span {
 }
 
 .detail-group table {
-  width: 96%;
+  width: 98%;
   font-size: 12px;
   border-bottom: 1px solid #DFDFDF;
   filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#f7f7f7', endColorstr='#eaeaea',GradientType=0 );
@@ -2298,6 +2381,7 @@ div.detail-group.actions td {
   height: 35px;
   float: right;
   padding: 0;
+  min-width: 120px;
 }
 
 .details.group-multiple div.detail-group.actions .detail-actions .action {
@@ -2425,7 +2509,7 @@ div.detail-group.actions td {
 }
 
 #header.nologo div.logo {
-  width: 1024px;
+  width: 1224px;
   height: 47px;
   margin: auto;
   background: url(../images/logo.png) no-repeat 0 center;
@@ -2436,7 +2520,7 @@ div.detail-group.actions td {
 }
 
 #header div.controls {
-  width: 1026px;
+  width: 1226px;
   height: 48px;
   position: relative;
   margin: 27px auto 0;
@@ -2478,7 +2562,7 @@ div.detail-group.actions td {
   padding: 1px 0 0;
   /*+placement:shift -174px -57px;*/
   position: relative;
-  left: -174px;
+  left: -239px;
   top: -57px;
 }
 
@@ -2544,7 +2628,7 @@ div.detail-group.actions td {
   margin: 0;
   position: absolute;
   top: -47px;
-  left: 890px;
+  left: 1025px;
   cursor: default !important;
   display: inline-block;
   float: left;
@@ -2557,8 +2641,8 @@ div.detail-group.actions td {
   padding: 9px 18px 7px 12px;
   border-right: none;
   /*[empty]border-top:;*/
-  min-width: 75px;
-  max-width: 120px;
+  min-width: 110px;
+  max-width: 220px;
   text-align: center;
   height: 12px;
   overflow: hidden;
@@ -2818,6 +2902,10 @@ div.detail-group.actions td {
   background-position: -82px -686px;
 }
 
+#navigation ul li.vmsnapshots span.icon {
+  background: url(../images/sprites.png) no-repeat -34px -666px;
+}
+
 #navigation ul li.affinityGroups span.icon {
   background-position: -73px -87px;
 }
@@ -2901,6 +2989,15 @@ div.detail-group.actions td {
   background-position: -366px -239px;
 }
 
+#navigation ul li.roles span.icon {
+  background-position: -460px -80px;
+}
+
+#navigation ul li.roles.active span.icon,
+#navigation ul li.roles:hover span.icon {
+  background-position: -469px -750px;
+}
+
 #navigation ul li.accounts span.icon {
   background-position: -458px -19px;
 }
@@ -2943,9 +3040,9 @@ div.detail-group.actions td {
 
 /*Browser*/
 #browser {
-  width: 794px;
+  width: 994px;
   height: 100%;
-  max-width: 794px;
+  max-width: 994px;
   position: relative;
   float: left;
   overflow: hidden;
@@ -3067,7 +3164,7 @@ div.detail-group.actions td {
 }
 
 .detail-view .ui-tabs-panel div.toolbar {
-  width: 768px;
+  width: 968px;
   background: transparent;
   border: none;
   margin-top: 8px;
@@ -3176,14 +3273,14 @@ div.toolbar div.button.main-action,
   font-size: 12px;
   font-weight: 100;
   color: #000000;
-  margin: 0 14px 0 0;
+  margin: 0 10px 0 0;
   cursor: pointer;
   /*+text-shadow:0px 1px 1px #DEE5EA;*/
   -moz-text-shadow: 0px 1px 1px #DEE5EA;
   -webkit-text-shadow: 0px 1px 1px #DEE5EA;
   -o-text-shadow: 0px 1px 1px #DEE5EA;
   text-shadow: 0px 1px 1px #DEE5EA;
-  padding: 5px 7px 5px 6px;
+  padding: 5px 5px 5px 5px;
   background: #F7F7F7;
   background: rgb(247, 247, 247);
   background: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiA/Pgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgdmlld0JveD0iMCAwIDEgMSIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGxpbmVhckdyYWRpZW50IGlkPSJncmFkLXVjZ2ctZ2VuZXJhdGVkIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjAlIiB5MT0iMCUiIHgyPSIwJSIgeTI9IjEwMCUiPgogICAgPHN0b3Agb2Zmc2V0PSIxJSIgc3RvcC1jb2xvcj0iI2Y3ZjdmNyIgc3RvcC1vcGFjaXR5PSIxIi8+CiAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlYWVhZWEiIHN0b3Atb3BhY2l0eT0iMSIvPgogIDwvbGluZWFyR3JhZGllbnQ+CiAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0idXJsKCNncmFkLXVjZ2ctZ2VuZXJhdGVkKSIgLz4KPC9zdmc+);
@@ -3276,7 +3373,7 @@ div.toolbar div.button.main-action span.icon {
 
 div.toolbar div.button.refresh {
   float: right;
-  margin: 0 15px 0 0;
+  margin: 0 20px 0 0;
 }
 
 div.toolbar div.button.refresh span {
@@ -3566,7 +3663,7 @@ div.toolbar div.section-switcher div.section-select {
 }
 
 div.toolbar div.section-switcher div.section-select select {
-  width: 142px;
+  width: 100px;
   height: 21px;
   margin-right: 13px;
   font-size: 12px;
@@ -3595,7 +3692,7 @@ div.toolbar div.section-switcher div.section-select label {
 /*Breadcrumbs*/
 div.toolbar div.filters {
   margin: 5px 0px 0 12px;
-  width: 168px;
+  width: 200px;
   float: left;
 }
 
@@ -4351,7 +4448,7 @@ textarea {
 #user-options {
   background: #FFFFFF;
   z-index: 10000;
-  width: 104px;
+  width: 150px;
   position: absolute;
   padding: 15px;
   top: 30px;
@@ -4399,7 +4496,7 @@ textarea {
 }
 
 .dashboard.admin .dashboard-container.sub {
-  width: 368px;
+  width: 468px;
 }
 
 .dashboard.admin .dashboard-container.sub .button.view-all,
@@ -4457,8 +4554,8 @@ textarea {
 
 /**** Head*/
 .dashboard.admin .dashboard-container.head {
-  width: 766px;
-  height: 331px;
+  width: 966px;
+  height: 431px;
   margin: 9px 0 0;
   float: left;
 }
@@ -4517,8 +4614,8 @@ textarea {
 
 /**** Charts / stats*/
 .dashboard.admin .zone-stats {
-  width: 774px;
-  height: 316px;
+  width: 974px;
+  height: 416px;
   overflow: auto;
   overflow-x: hidden;
   /*+placement:shift 0px 0px;*/
@@ -4528,7 +4625,7 @@ textarea {
 }
 
 .dashboard.admin .zone-stats ul {
-  width: 796px;
+  width: 996px;
   /*+placement:shift -2px 11px;*/
   position: relative;
   left: -2px;
@@ -4536,7 +4633,7 @@ textarea {
 }
 
 .dashboard.admin .zone-stats ul li {
-  width: 388px;
+  width: 488px;
   font-size: 14px;
   height: 79px;
   float: left;
@@ -4556,7 +4653,7 @@ textarea {
 }
 
 .dashboard.admin .zone-stats ul li .label {
-  width: 111px;
+  width: 161px;
   float: left;
   font-weight: 100;
   border-bottom: 1px solid #E2E2E2;
@@ -4717,7 +4814,7 @@ textarea {
 .dashboard.admin .dashboard-container.sub.alerts {
   float: left;
   margin: 0 12px 0 0;
-  height: 270px;
+  height: 170px;
   overflow: hidden;
   position: relative;
 }
@@ -4727,7 +4824,7 @@ textarea {
 }
 
 .dashboard.admin .dashboard-container.sub.alerts ul {
-  width: 368px;
+  width: 468px;
   height: 234px;
   overflow: auto;
   overflow-x: hidden;
@@ -5187,7 +5284,7 @@ textarea {
 }
 
 .system-chart.dashboard.admin .dashboard-container {
-  width: 740px;
+  width: 930px;
   border: none;
 }
 
@@ -5208,7 +5305,7 @@ textarea {
 }
 
 .system-chart.dashboard.admin .dashboard-container .stats .chart {
-  width: 136px;
+  width: 300px;
 }
 
 /** Compute*/
@@ -5225,7 +5322,7 @@ textarea {
 }
 
 .system-chart.compute ul.resources li.zone {
-  left: 96px;
+  left: 196px;
 }
 
 .system-chart.compute ul.resources li.zone .label {
@@ -5237,32 +5334,32 @@ textarea {
 }
 
 .system-chart.compute ul.resources li.pods {
-  left: 199px;
+  left: 299px;
   top: 112px;
 }
 
 .system-chart.compute ul.resources li.clusters {
-  left: 296px;
+  left: 396px;
   top: 189px;
 }
 
 .system-chart.compute ul.resources li.hosts {
-  left: 407px;
+  left: 507px;
   top: 265px;
 }
 
 .system-chart.compute ul.resources li.primaryStorage {
-  left: 407px;
+  left: 507px;
   top: 375px;
 }
 
 .system-chart.compute ul.resources li.secondaryStorage {
-  left: 199px;
+  left: 299px;
   top: 497px;
 }
 
 .system-chart.compute ul.resources li.ucs {
-  left: 199px;
+  left: 299px;
   top: 406px;
 }
 
@@ -5620,7 +5717,7 @@ label.error {
 }
 
 .multi-wizard .progress ul {
-  width: 780px;
+  width: 900px;
   height: 40px;
   float: left;
   clear: both;
@@ -6192,7 +6289,7 @@ label.error {
 }
 
 /*** Data disk offering*/
-.multi-wizard.instance-wizard .data-disk-offering .content .section {
+.multi-wizard.instance-wizard .content .section {
   padding: 9px 0 16px;
   margin: 12px 0 15px 8px;
 }
@@ -6489,6 +6586,12 @@ label.error {
 .instance-wizard .step.service-offering .custom-size .field input {
   width: 88%;
   margin-left: 26px;
+}
+
+.instance-wizard .step.service-offering .custom-size .field label.error {
+  position: relative;
+  top: 0;
+  left: 0;
 }
 
 .instance-wizard .step.service-offering .custom-iops .field input {
@@ -8177,6 +8280,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
 .detail-view .multi-edit select {
   width: 93%;
   font-size: 10px;
+  min-width: 80px;
 }
 
 .multi-edit input {
@@ -8222,6 +8326,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
 
 .multi-edit th.add-rule,
 .multi-edit td.add-rule {
+  border-right: 1px solid #cdcccc;
 }
 
 .multi-edit .data-table td.add-vm:hover {
@@ -8325,6 +8430,16 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
   background: transparent;
   color: #808B95;
   font-weight: bold;
+}
+
+.multi-edit-add-list div.form-container {
+  width: auto !important;
+  height: auto;
+  text-align: center;
+}
+
+.multi-edit-add-list div.form-container div.name label {
+  display: inline;
 }
 
 .multi-edit .data .data-body {
@@ -8629,7 +8744,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
 
 .security-rules .multi-edit .range input {
   width: 44px;
-  margin: 0 0 0 8px;
+  margin: 0;
 }
 
 /*Recurring snapshots*/
@@ -9127,7 +9242,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
 .network-chart li.firewall {
   /*+placement:shift 282px 188px;*/
   position: relative;
-  left: 282px;
+  left: 356px;
   top: 188px;
   position: absolute;
 }
@@ -9135,7 +9250,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
 .network-chart li.loadBalancing {
   /*+placement:shift 167px 342px;*/
   position: relative;
-  left: 167px;
+  left: 237px;
   top: 342px;
   position: absolute;
 }
@@ -9143,7 +9258,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
 .network-chart li.portForwarding {
   /*+placement:shift 401px 342px;*/
   position: relative;
-  left: 401px;
+  left: 480px;
   top: 342px;
   position: absolute;
 }
@@ -9220,7 +9335,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
 /*System Dashboard*/
 .system-dashboard {
   height: 258px;
-  width: 762px;
+  width: 962px;
   display: block;
   /*+border-radius:3px;*/
   -moz-border-radius: 3px;
@@ -9318,7 +9433,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
   position: relative;
   left: 18px;
   top: 110px;
-  width: 78%;
+  width: 83%;
   position: absolute;
   text-align: center;
   padding: 8px 0;
@@ -9333,7 +9448,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
 
 .system-dashboard .status_box li {
   height: 178px;
-  width: 178px;
+  width: 228px;
   padding: 0;
   margin: 0 0 0 8px;
   /*+border-radius:3px;*/
@@ -9357,7 +9472,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
   padding: 65px 80px 5px;
   /*+placement:shift 31px 19px;*/
   position: relative;
-  left: 31px;
+  left: 51px;
   top: 19px;
   position: absolute;
   /*+opacity:56%;*/
@@ -9394,7 +9509,7 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
   /*+placement:shift 13px 5px;*/
   position: relative;
   left: 13px;
-  top: 5px;
+  top: 13px;
   font-weight: 100;
 }
 
@@ -10153,13 +10268,17 @@ div.container div.panel div#details-tab-addloadBalancer.detail-group div.loadBal
 }
 
 .project-dashboard-view .users .system-dashboard li .header {
-  width: 77px;
-  /*+placement:shift 7px 110px;*/
-  position: relative;
-  left: 7px;
-  top: 110px;
-  position: absolute;
-  text-align: center;
+    width: 77px;
+    max-width: 77px;
+    /*+placement:shift 7px 110px;*/
+    position: relative;
+    left: 7px;
+    top: 110px;
+    position: absolute;
+    text-align: center;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 /**** Info box*/
@@ -11591,7 +11710,8 @@ div.ui-dialog div.health-check div.health-check-description {
 }
 
 div.ui-dialog div.health-check div.form-container form div.form-item {
-  width: 58% margin-left:116px;
+  width: 58%;
+  margin-left:116px;
   margin-top: -16px;
   margin-bottom: 30px;
 }
@@ -12511,6 +12631,33 @@ div.ui-dialog div.autoscaler div.field-group div.form-container form div.form-it
   background-position: -70px -1311px;
 }
 
+/*CA Cert*/
+.cacert-download {
+  display: inline-block;
+  position: relative;
+  height: 30px;
+  float: right;
+  cursor: pointer;
+  position: absolute;
+  left: 1175px;
+  top: 20px;
+}
+
+.cacert-download .icon {
+  display: inline-block;
+  float: left;
+  display: block;
+  width: 32px;
+  height: 30px;
+  background: url(../images/sprites.png) -142px -348px;
+  position: absolute;
+}
+
+.cacert-download:hover .icon,
+.cacert-download.active .icon {
+  background-position: -368px -348px;
+}
+
 /*Action icons*/
 .action.edit .icon {
   background-position: 1px -1px;
@@ -12520,11 +12667,13 @@ div.ui-dialog div.autoscaler div.field-group div.form-container form div.form-it
   background-position: 1px -583px;
 }
 
-.start .icon {
+.start .icon,
+.startByAdmin .icon {
   background-position: -169px -1px;
 }
 
-.start:hover .icon {
+.start:hover .icon,
+.startByAdmin:hover .icon {
   background-position: -169px -583px;
 }
 
@@ -12588,6 +12737,22 @@ div.ui-dialog div.autoscaler div.field-group div.form-container form div.form-it
   background-position: 0px -707px;
 }
 
+.viewMetrics .icon {
+  background-position: -40px -32px;
+}
+
+.viewMetrics:hover .icon {
+  background-position: -40px -32px;
+}
+
+.refreshMetrics .icon {
+  background-position: 0px -62px;
+}
+
+.refreshMetrics:hover .icon {
+  background-position: 0px -62px;
+}
+
 .attach .icon,
 .attachISO .icon,
 .attachDisk .icon,
@@ -12617,14 +12782,24 @@ div.ui-dialog div.autoscaler div.field-group div.form-container form div.form-it
   background-position: -101px -647px;
 }
 
+.secureKVMHost .icon,
 .resetPassword .icon,
 .changePassword .icon {
   background-position: -68px -30px;
 }
 
+.secureKVMHost:hover .icon,
 .resetPassword:hover .icon,
 .changePassword:hover .icon {
   background-position: -68px -612px;
+}
+
+.resetSSHKeyForVirtualMachine .icon {
+  background-position: -196px -3px;
+}
+
+.resetSSHKeyForVirtualMachine:hover .icon {
+  background-position: -195px -586px;
 }
 
 .changeService .icon {
@@ -12655,17 +12830,13 @@ div.ui-dialog div.autoscaler div.field-group div.form-container form div.form-it
 
 .downloadVolume .icon,
 .downloadTemplate .icon,
-.downloadISO .icon,
-.replaceacllist .icon,
-.replaceACL .icon {
+.downloadISO .icon {
   background-position: -35px -125px;
 }
 
 .downloadVolume:hover .icon,
 .downloadTemplate:hover .icon,
-.downloadISO:hover .icon,
-.replaceacllist:hover .icon,
-.replaceACL:hover .icon {
+.downloadISO:hover .icon {
   background-position: -35px -707px;
 }
 
@@ -12756,6 +12927,86 @@ div.ui-dialog div.autoscaler div.field-group div.form-container form div.form-it
   background-position: -137px -614px;
 }
 
+.blankHAForHost .icon {
+  background-position: -266px -31px;
+}
+
+.blankHAForHost:hover .icon {
+  background-position: -266px -31px;
+}
+
+.configureHAForHost .icon {
+  background-position: -270px -148px;
+}
+
+.configureHAForHost:hover .icon {
+  background-position: -270px -728px;
+}
+
+.enableHA .icon {
+  background-position: -265px -93px;
+}
+
+.enableHA:hover .icon {
+  background-position: -265px -673px;
+}
+
+.disableHA .icon {
+  background-position: -265px -120px;
+}
+
+.disableHA:hover .icon {
+  background-position: -265px -700px;
+}
+
+.blankOutOfBandManagement .icon {
+  background-position: -266px -31px;
+}
+
+.blankOutOfBandManagement:hover .icon {
+  background-position: -266px -31px;
+}
+
+.configureOutOfBandManagement .icon {
+  background-position: -168px -31px;
+}
+
+.configureOutOfBandManagement:hover .icon {
+  background-position: -168px -613px;
+}
+
+.enableOutOfBandManagement .icon {
+  background-position: -138px -65px;
+}
+
+.enableOutOfBandManagement:hover .icon {
+  background-position: -138px -647px;
+}
+
+.disableOutOfBandManagement .icon {
+  background-position: -138px -123px;
+}
+
+.disableOutOfBandManagement:hover .icon {
+  background-position: -138px -705px;
+}
+
+.issueOutOfBandManagementPowerAction .icon {
+  background-position: -266px -3px;
+}
+
+.issueOutOfBandManagementPowerAction:hover .icon {
+  background-position: -265px -584px;
+}
+
+.changeOutOfBandManagementPassword .icon {
+  background-position: -68px -30px;
+}
+
+.changeOutOfBandManagementPassword:hover .icon {
+  background-position: -68px -612px;
+}
+
 .enableMaintenanceMode .icon {
   background-position: -138px -65px;
 }
@@ -12826,6 +13077,8 @@ div.ui-dialog div.autoscaler div.field-group div.form-container form div.form-it
   background-position: -167px -677px;
 }
 
+.revertSnapshot .icon,
+.revertToVMSnapshot .icon,
 .restoreVM .icon,
 .restore .icon,
 .recover .icon {
@@ -12841,6 +13094,8 @@ div.ui-dialog div.autoscaler div.field-group div.form-container form div.form-it
   background-position: -167px -66px;
 }
 
+.revertSnapshot:hover .icon,
+.revertToVMSnapshot:hover .icon,
 .restoreVM:hover .icon,
 .restore:hover .icon {
   background-position: -168px -613px;
@@ -12978,10 +13233,16 @@ div.ui-dialog div.autoscaler div.field-group div.form-container form div.form-it
   background-position: -228px -646px;
 }
 
+.replaceacllist .icon,
+.replaceACL .icon,
+.updateIpaddr .icon,
 .changeAffinity .icon {
   background-position: -264px -2px;
 }
 
+.replaceacllist:hover .icon,
+.replaceACL:hover .icon,
+.updateIpaddr:hover .icon,
 .changeAffinity:hover .icon {
   background-position: -263px -583px;
 }
@@ -13000,6 +13261,14 @@ div.ui-dialog div.autoscaler div.field-group div.form-container form div.form-it
 
 .addAccount:hover .icon {
   background-position: -230px -677px;
+}
+
+.linktoldap .icon {
+  background-position: -197px -65px;
+}
+
+.linktoldap:hover .icon {
+  background-position: -197px -647px;
 }
 
 .label-hovered {
@@ -13209,9 +13478,69 @@ div.gpugroups div.list-view {
   padding: 0 0 3px 18px;
 }
 
+ul.ui-autocomplete.ui-menu {
+  width: 250px;
+  background: #ddd;
+  font-size: 13px;
+  padding: 5px;
+}
+
+.multi-edit-add-list .ui-button.migrateok,
+.multi-edit-add-list .ui-button.migratecancel {
+  top: -5px !important;
+}
+
+.migrate-vm-available-host-list div.text-search {
+  right: 30px;
+}
+
+.migrate-vm-available-host-list div.ui-widget-content {
+  display: block !important;
+}
+
+.list-view-select table th.availableHostSuitability,
+.list-view-select table td.availableHostSuitability {
+  max-width: 250px;
+}
+.copy-template-destination-list div.text-search {
+  right: 5px;
+}
+
+.copy-template-destination-list div.ui-widget-content {
+  display: block !important;
+}
+
+div.panel.copy-template-destination-list div.list-view div.fixed-header{
+  width: 500px;
+}
+
+.copy-template-destination-list.panel div.list-view div.data-table table{
+  width: 595px;
+}
+
+.copy-template-destination-list .list-view .toolbar {
+  width: 654px;
+}
+
+.multi-edit-add-list .ui-button.copytemplateok{
+  left: 330px;
+}
+
+.multi-edit-add-list .ui-button.copytemplatecancel {
+    left: 310px;
+}
+
 div.toolbar div.button.rm_custom span.icon{
   background: url(../images/sprites.png) -6px -93px;
 }
 div.toolbar div.button.add_custom span.icon{
   background: url(../images/sprites.png) -35px -63px;
+}
+
+.rootAdminAddL2Network{
+  display: none;
+}
+
+.rootAdminAddGuestNetwork{
+  display: none;
 }

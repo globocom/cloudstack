@@ -100,6 +100,7 @@ public class SecurityGroupUsageParser {
             }
 
             if (sgCreateDate.after(endDate)) {
+                //Ignore records created after endDate
                 continue;
             }
 

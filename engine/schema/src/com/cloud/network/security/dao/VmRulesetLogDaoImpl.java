@@ -25,7 +25,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import javax.ejb.Local;
 
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -37,7 +36,6 @@ import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.TransactionLegacy;
 
 @Component
-@Local(value = {VmRulesetLogDao.class})
 public class VmRulesetLogDaoImpl extends GenericDaoBase<VmRulesetLogVO, Long> implements VmRulesetLogDao {
     protected static final Logger s_logger = Logger.getLogger(VmRulesetLogDaoImpl.class);
     private SearchBuilder<VmRulesetLogVO> VmIdSearch;
@@ -104,7 +102,7 @@ public class VmRulesetLogDaoImpl extends GenericDaoBase<VmRulesetLogVO, Long> im
                     try {
                         Thread.sleep(delayMs);
                     } catch (InterruptedException ie) {
-
+                        s_logger.debug("[ignored] interupted while inserting security group rule log.");
                     }
                 } else
                     s_logger.warn("Caught another deadlock exception while retrying inserting security group rule log, giving up");

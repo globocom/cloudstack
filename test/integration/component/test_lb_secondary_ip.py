@@ -112,6 +112,14 @@ class TestAssignLBRule(cloudstackTestCase):
         cls.testdata["virtual_machine"]["template"] = template.id
         cls._cleanup = []
         try:
+            cls.hypervisor = cloudstackTestClient.getHypervisorInfo()
+            # As Hyperv is GUI based VM, it requires more resources to be
+            # able to SSH properly to it
+            if cls.hypervisor.lower() == 'hyperv':
+                cls.testdata["service_offering"]["name"] = "Medium Instance"
+                cls.testdata["service_offering"]["memory"] = "1024"
+                cls.testdata["service_offering"]["cpuspeed"] = "1024"
+
             cls.service_offering = ServiceOffering.create(
                 cls.api_client,
                 cls.testdata["service_offering"])
@@ -431,6 +439,14 @@ class TestFailureScenarios(cloudstackTestCase):
         cls._cleanup = []
 
         try:
+            cls.hypervisor = cloudstackTestClient.getHypervisorInfo()
+            # As Hyperv is GUI based VM, it requires more resources to be
+            # able to SSH properly to it
+            if cls.hypervisor.lower() == 'hyperv':
+                cls.testdata["service_offering"]["name"] = "Medium Instance"
+                cls.testdata["service_offering"]["memory"] = "1024"
+                cls.testdata["service_offering"]["cpuspeed"] = "1024"
+
             cls.service_offering = ServiceOffering.create(
                 cls.api_client,
                 cls.testdata["service_offering"])
@@ -686,6 +702,14 @@ class TestListLBRuleInstances(cloudstackTestCase):
         cls._cleanup = []
 
         try:
+            cls.hypervisor = cloudstackTestClient.getHypervisorInfo()
+            # As Hyperv is GUI based VM, it requires more resources to be
+            # able to SSH properly to it
+            if cls.hypervisor.lower() == 'hyperv':
+                cls.testdata["service_offering"]["name"] = "Medium Instance"
+                cls.testdata["service_offering"]["memory"] = "1024"
+                cls.testdata["service_offering"]["cpuspeed"] = "1024"
+
             cls.service_offering = ServiceOffering.create(
                 cls.api_client,
                 cls.testdata["service_offering"])
@@ -869,6 +893,14 @@ class TestLbRuleFunctioning(cloudstackTestCase):
         cls._cleanup = []
 
         try:
+            cls.hypervisor = cloudstackTestClient.getHypervisorInfo()
+            # As Hyperv is GUI based VM, it requires more resources to be
+            # able to SSH properly to it
+            if cls.hypervisor.lower() == 'hyperv':
+                cls.testdata["service_offering"]["name"] = "Medium Instance"
+                cls.testdata["service_offering"]["memory"] = "1024"
+                cls.testdata["service_offering"]["cpuspeed"] = "1024"
+
             cls.service_offering = ServiceOffering.create(
                 cls.api_client,
                 cls.testdata["service_offering"])
@@ -933,13 +965,27 @@ class TestLbRuleFunctioning(cloudstackTestCase):
                                   self.virtual_machine.username,
                                   self.virtual_machine.password
                                   )
-            cmd = "ip addr add {0}/24 broadcast {0} dev eth0".format(
-                self.secondaryip.ipaddress)
+            response = sshClient.execute("netstat -i")
+            # Sample Reponse:
+            # [u'Kernel Interface table',
+            # u'Iface MTU Met RX-OK RX-ERR RX-DRP RX-OVR TX-OK TX-ERR TX-DRP TX-OVR Flg',
+            # u'eth2 1500  0   29     0     0       0      38    0       0     0    BMRU',
+            # u'lo   16436 0   4      0     0       0       4    0       0
+            # 0    LRU']}
+
+            # We need to extract default interface out of the response
+            defaultEthernetDevice = str(response[2].split()[0])
+
+            cmd = "ip addr add {0}/24 broadcast {0} dev {1}".format(
+                self.secondaryip.ipaddress, defaultEthernetDevice)
             sshClient.execute(cmd)
             sshClient.execute("ip addr show")
 
             # Deleting NAT rule after configuring secondary IP
             nat_rule.delete(self.apiclient)
+
+            self.testdata["lbrule"]["publicport"] = 22
+            self.testdata["lbrule"]["privateport"] = 22
 
             self.lb_rule = LoadBalancerRule.create(
                 self.apiclient,
@@ -968,7 +1014,7 @@ class TestLbRuleFunctioning(cloudstackTestCase):
             raise Exception("Warning: Exception during cleanup : %s" % e)
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_11_ssh_to_secondary_ip(self):
         """SSH to VM using LB rule assigned to secondary IP of VM
 
@@ -1000,7 +1046,7 @@ class TestLbRuleFunctioning(cloudstackTestCase):
         return
 
     @unittest.skip("Failing-WIP")
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_12_ssh_to_primary_secondary_ip(self):
         """SSH to VM using LB rule assigned to primary and secondary IP of VM
 
@@ -1046,7 +1092,7 @@ class TestLbRuleFunctioning(cloudstackTestCase):
                       )
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_13_delete_lb_rule(self):
         """SSH to VM after deleting LB rule
 
@@ -1088,7 +1134,7 @@ class TestLbRuleFunctioning(cloudstackTestCase):
                       )
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_14_remove_lb_rule_secondary_ip(self):
         """ssh to vm after removing secondary ip from load balancer rule
 
@@ -1139,7 +1185,7 @@ class TestLbRuleFunctioning(cloudstackTestCase):
             self.fail("Exception during SSH : %s" % e)
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_15_remove_lb_rule_primary_ip(self):
         """ssh to vm after removing secondary ip from load balancer rule
 
@@ -1190,7 +1236,7 @@ class TestLbRuleFunctioning(cloudstackTestCase):
             self.fail("Exception during SSH : %s" % e)
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_16_delete_vm_from_lb_rule(self):
         """ssh to vm after removing secondary ip from load balancer rule
 
@@ -1241,7 +1287,7 @@ class TestLbRuleFunctioning(cloudstackTestCase):
                       )
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_20_destroy_recover_vm(self):
         """Verify LB rules after destroying and recovering VM
 
@@ -1293,7 +1339,7 @@ class TestLbRuleFunctioning(cloudstackTestCase):
                           with secondary ip assigned to lb rule")
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_21_modify_lb_rule_algorithm(self):
         """Verify LB rule functioning with different algorithm
 
@@ -1361,6 +1407,14 @@ class TestNetworkOperations(cloudstackTestCase):
         cls._cleanup = []
 
         try:
+            cls.hypervisor = cloudstackTestClient.getHypervisorInfo()
+            # As Hyperv is GUI based VM, it requires more resources to be
+            # able to SSH properly to it
+            if cls.hypervisor.lower() == 'hyperv':
+                cls.testdata["service_offering"]["name"] = "Medium Instance"
+                cls.testdata["service_offering"]["memory"] = "1024"
+                cls.testdata["service_offering"]["cpuspeed"] = "1024"
+
             cls.service_offering = ServiceOffering.create(
                 cls.api_client,
                 cls.testdata["service_offering"])
@@ -1424,13 +1478,27 @@ class TestNetworkOperations(cloudstackTestCase):
                                   self.virtual_machine.username,
                                   self.virtual_machine.password
                                   )
-            cmd = "ip addr add {0}/24 broadcast {0} dev eth0".format(
-                self.secondaryip.ipaddress)
+            response = sshClient.execute("netstat -i")
+            # Sample Reponse:
+            # [u'Kernel Interface table',
+            # u'Iface MTU Met RX-OK RX-ERR RX-DRP RX-OVR TX-OK TX-ERR TX-DRP TX-OVR Flg',
+            # u'eth2 1500  0   29     0     0       0      38    0       0     0    BMRU',
+            # u'lo   16436 0   4      0     0       0       4    0       0
+            # 0    LRU']}
+
+            # We need to extract default interface out of the response
+            defaultEthernetDevice = str(response[2].split()[0])
+
+            cmd = "ip addr add {0}/24 broadcast {0} dev {1}".format(
+                self.secondaryip.ipaddress, defaultEthernetDevice)
             sshClient.execute(cmd)
             sshClient.execute("ip addr show")
 
             # Deleting NAT rule after configuring secondary IP
             nat_rule.delete(self.apiclient)
+
+            self.testdata["lbrule"]["publicport"] = 22
+            self.testdata["lbrule"]["privateport"] = 22
 
             self.lb_rule = LoadBalancerRule.create(
                 self.apiclient,
@@ -1459,7 +1527,7 @@ class TestNetworkOperations(cloudstackTestCase):
             raise Exception("Warning: Exception during cleanup : %s" % e)
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_17_restart_router(self):
         """Verify LB rules after restarting router VM
 
@@ -1525,7 +1593,7 @@ class TestNetworkOperations(cloudstackTestCase):
             self.fail("Exception during SSH : %s" % e)
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_18_restart_network_cleanup_true(self):
         """Verfy LB rules after restarting the network with cleanup flag set to True
 
@@ -1585,7 +1653,7 @@ class TestNetworkOperations(cloudstackTestCase):
             self.fail("Exception during SSH : %s" % e)
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_19_restart_network_cleanup_false(self):
         """Verfy LB rules after restarting the network with cleanup flag set to False
 
@@ -1645,7 +1713,7 @@ class TestNetworkOperations(cloudstackTestCase):
             self.fail("Exception during SSH : %s" % e)
         return
 
-    @attr(tags=["advanced", "selfservice"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_22_network_gc(self):
         """Verify LB rule functioning to secondary IP after network GC
 
@@ -1775,7 +1843,7 @@ class TestExternalLoadBalancer(cloudstackTestCase):
         cls.testdata["virtual_machine"]["template"] = template.id
         cls._cleanup = []
         cls.testdata["configurableData"]\
-        ["netscaler"]["lbdevicededicated"] = False
+            ["netscaler"]["lbdevicededicated"] = False
 
         try:
             cls.netscaler = add_netscaler(
@@ -1787,6 +1855,14 @@ class TestExternalLoadBalancer(cloudstackTestCase):
             raise unittest.SkipTest("Failed to add netscaler device: %s" % e)
 
         try:
+            cls.hypervisor = cloudstackTestClient.getHypervisorInfo()
+            # As Hyperv is GUI based VM, it requires more resources to be
+            # able to SSH properly to it
+            if cls.hypervisor.lower() == 'hyperv':
+                cls.testdata["service_offering"]["name"] = "Medium Instance"
+                cls.testdata["service_offering"]["memory"] = "1024"
+                cls.testdata["service_offering"]["cpuspeed"] = "1024"
+
             cls.service_offering = ServiceOffering.create(
                 cls.api_client,
                 cls.testdata["service_offering"])
@@ -1896,13 +1972,27 @@ class TestExternalLoadBalancer(cloudstackTestCase):
                               self.virtual_machine.username,
                               self.virtual_machine.password
                               )
-        cmd = "ip addr add {0}/24 broadcast {0} dev eth0".format(
-            self.secondaryip.ipaddress)
+        response = sshClient.execute("netstat -i")
+        # Sample Reponse:
+        # [u'Kernel Interface table',
+        # u'Iface MTU Met RX-OK RX-ERR RX-DRP RX-OVR TX-OK TX-ERR TX-DRP TX-OVR Flg',
+        # u'eth2 1500  0   29     0     0       0      38    0       0     0    BMRU',
+        # u'lo   16436 0   4      0     0       0       4    0       0     0
+        # LRU']}
+
+        # We need to extract default interface out of the response
+        defaultEthernetDevice = str(response[2].split()[0])
+
+        cmd = "ip addr add {0}/24 broadcast {0} dev {1}".format(
+            secondaryip.ipaddress, defaultEthernetDevice)
         sshClient.execute(cmd)
         sshClient.execute("ip addr show")
 
         # Deleting NAT rule after configuring secondary IP
         nat_rule.delete(self.apiclient)
+
+        self.testdata["lbrule"]["publicport"] = 22
+        self.testdata["lbrule"]["privateport"] = 22
 
         lb_rule = LoadBalancerRule.create(
             self.apiclient,

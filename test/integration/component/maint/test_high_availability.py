@@ -20,7 +20,7 @@
 """
 # Import Local Modules
 from nose.plugins.attrib import attr
-from marvin.cloudstackTestCase import cloudstackTestCase
+from marvin.cloudstackTestCase import cloudstackTestCase, unittest
 from marvin.cloudstackAPI import (prepareHostForMaintenance,
                                   cancelHostMaintenance)
 from marvin.lib.utils import cleanup_resources
@@ -102,7 +102,7 @@ class Services:
                 "displaytext": "Public Template",
                 "name": "Public template",
                 "ostype": 'CentOS 5.3 (64-bit)',
-                "url": "http://download.cloud.com/releases/2.0.0/UbuntuServer-10-04-64bit.vhd.bz2",
+                "url": "http://download.cloudstack.org/releases/2.0.0/UbuntuServer-10-04-64bit.vhd.bz2",
                 "hypervisor": 'XenServer',
                 "format": 'VHD',
                 "isfeatured": True,
@@ -139,6 +139,9 @@ class TestHighAvailability(cloudstackTestCase):
             cls.zone.id,
             cls.services["ostype"]
         )
+        cls.hypervisor = cls.testClient.getHypervisorInfo()
+        if cls.hypervisor.lower() in ['lxc']:
+            raise unittest.SkipTest("Template creation from root volume is not supported in LXC")
         cls.services["virtual_machine"]["zoneid"] = cls.zone.id
         cls.services["virtual_machine"]["template"] = cls.template.id
 

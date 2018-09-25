@@ -22,7 +22,6 @@ import java.util.Date;
 import java.util.List;
 
 import javax.annotation.PostConstruct;
-import javax.ejb.Local;
 import javax.inject.Inject;
 
 import org.apache.cloudstack.resourcedetail.dao.UserIpAddressDetailsDao;
@@ -47,7 +46,6 @@ import com.cloud.utils.db.TransactionLegacy;
 import com.cloud.utils.net.Ip;
 
 @Component
-@Local(value = {IPAddressDao.class})
 @DB
 public class IPAddressDaoImpl extends GenericDaoBase<IPAddressVO, Long> implements IPAddressDao {
     private static final Logger s_logger = Logger.getLogger(IPAddressDaoImpl.class);
@@ -55,7 +53,9 @@ public class IPAddressDaoImpl extends GenericDaoBase<IPAddressVO, Long> implemen
     protected SearchBuilder<IPAddressVO> AllFieldsSearch;
     protected SearchBuilder<IPAddressVO> VlanDbIdSearchUnallocated;
     protected GenericSearchBuilder<IPAddressVO, Integer> AllIpCount;
+    protected GenericSearchBuilder<IPAddressVO, Integer> AllIpCountForDc;
     protected GenericSearchBuilder<IPAddressVO, Integer> AllocatedIpCount;
+    protected GenericSearchBuilder<IPAddressVO, Integer> AllocatedIpCountForDc;
     protected GenericSearchBuilder<IPAddressVO, Integer> AllIpCountForDashboard;
     protected SearchBuilder<IPAddressVO> DeleteAllExceptGivenIp;
     protected GenericSearchBuilder<IPAddressVO, Long> AllocatedIpCountForAccount;
@@ -100,12 +100,23 @@ public class IPAddressDaoImpl extends GenericDaoBase<IPAddressVO, Long> implemen
         AllIpCount.and("vlan", AllIpCount.entity().getVlanId(), Op.EQ);
         AllIpCount.done();
 
+        AllIpCountForDc = createSearchBuilder(Integer.class);
+        AllIpCountForDc.select(null, Func.COUNT, AllIpCountForDc.entity().getAddress());
+        AllIpCountForDc.and("dc", AllIpCountForDc.entity().getDataCenterId(), Op.EQ);
+        AllIpCountForDc.done();
+
         AllocatedIpCount = createSearchBuilder(Integer.class);
         AllocatedIpCount.select(null, Func.COUNT, AllocatedIpCount.entity().getAddress());
         AllocatedIpCount.and("dc", AllocatedIpCount.entity().getDataCenterId(), Op.EQ);
         AllocatedIpCount.and("vlan", AllocatedIpCount.entity().getVlanId(), Op.EQ);
         AllocatedIpCount.and("allocated", AllocatedIpCount.entity().getAllocatedTime(), Op.NNULL);
         AllocatedIpCount.done();
+
+        AllocatedIpCountForDc = createSearchBuilder(Integer.class);
+        AllocatedIpCountForDc.select(null, Func.COUNT, AllocatedIpCountForDc.entity().getAddress());
+        AllocatedIpCountForDc.and("dc", AllocatedIpCountForDc.entity().getDataCenterId(), Op.EQ);
+        AllocatedIpCountForDc.and("allocated", AllocatedIpCountForDc.entity().getAllocatedTime(), Op.NNULL);
+        AllocatedIpCountForDc.done();
 
         AllIpCountForDashboard = createSearchBuilder(Integer.class);
         AllIpCountForDashboard.select(null, Func.COUNT, AllIpCountForDashboard.entity().getAddress());
@@ -124,8 +135,9 @@ public class IPAddressDaoImpl extends GenericDaoBase<IPAddressVO, Long> implemen
         AllocatedIpCountForAccount.select(null, Func.COUNT, AllocatedIpCountForAccount.entity().getAddress());
         AllocatedIpCountForAccount.and("account", AllocatedIpCountForAccount.entity().getAllocatedToAccountId(), Op.EQ);
         AllocatedIpCountForAccount.and("allocated", AllocatedIpCountForAccount.entity().getAllocatedTime(), Op.NNULL);
-        AllocatedIpCountForAccount.and("network", AllocatedIpCountForAccount.entity().getAssociatedWithNetworkId(), Op.NNULL);
-        AllocatedIpCountForAccount.done();
+        AllocatedIpCountForAccount.and().op("network", AllocatedIpCountForAccount.entity().getAssociatedWithNetworkId(), Op.NNULL);
+        AllocatedIpCountForAccount.or("vpc", AllocatedIpCountForAccount.entity().getVpcId(), Op.NNULL);
+        AllocatedIpCountForAccount.cp();AllocatedIpCountForAccount.done();
 
         CountFreePublicIps = createSearchBuilder(Long.class);
         CountFreePublicIps.select(null, Func.COUNT, null);
@@ -285,6 +297,14 @@ public class IPAddressDaoImpl extends GenericDaoBase<IPAddressVO, Long> implemen
     }
 
     @Override
+    public int countIPs(long dcId, boolean onlyCountAllocated) {
+        SearchCriteria<Integer> sc = onlyCountAllocated ? AllocatedIpCountForDc.create() : AllIpCountForDc.create();
+        sc.setParameters("dc", dcId);
+
+        return customSearch(sc, null).get(0);
+    }
+
+    @Override
     public int countIPs(long dcId, long vlanId, boolean onlyCountAllocated) {
         SearchCriteria<Integer> sc = onlyCountAllocated ? AllocatedIpCount.create() : AllIpCount.create();
         sc.setParameters("dc", dcId);
@@ -438,6 +458,14 @@ public class IPAddressDaoImpl extends GenericDaoBase<IPAddressVO, Long> implemen
         SearchCriteria<IPAddressVO> sc = AllFieldsSearch.create();
         sc.setParameters("associatedWithVmId", vmId);
         return listBy(sc);
+    }
+
+    @Override
+    public IPAddressVO findByVmIdAndNetworkId(long networkId, long vmId) {
+        SearchCriteria<IPAddressVO> sc = AllFieldsSearch.create();
+        sc.setParameters("network", networkId);
+        sc.setParameters("associatedWithVmId", vmId);
+        return findOneBy(sc);
     }
 
     @Override

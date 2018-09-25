@@ -179,13 +179,13 @@ class TestTemplate(cloudstackTestCase):
         self.services["template"]["url"] = builtin_info[0] 
         self.services["template"]["hypervisor"] = builtin_info[1]     
         self.services["template"]["format"] = builtin_info[2]
-
+        temp = self.services["template"]
         self.debug("Registering a new template")
 
         # Register new template
         template = Template.register(
                                         self.apiclient,
-                                        self.services["template"],
+                                        temp,
                                         zoneid=self.zone.id,
                                         account=self.account.name,
                                         domainid=self.account.domainid,
@@ -325,7 +325,7 @@ class TestNATRules(cloudstackTestCase):
         except Exception as e:
             raise Exception("Warning: Exception during cleanup : %s" % e)
 
-    @attr(tags=["advanced"], required_hardware="false")
+    @attr(tags=["advanced", "dvs"], required_hardware="false")
     def test_01_firewall_rules_port_fw(self):
         """"Checking firewall rules deletion after static NAT disable"""
 
@@ -409,7 +409,7 @@ class TestNATRules(cloudstackTestCase):
                         )
         self.assertEqual(
                             firewall_response[0].startport,
-                            str(self.services["firewall_rule"]["startport"]),
+                            self.services["firewall_rule"]["startport"],
                             "Firewall rule is not with specific port"
                         )
 
@@ -663,7 +663,14 @@ class TestRouterRestart(cloudstackTestCase):
         #    all it's services should resume
 
         # Find router associated with user account
-        list_router_response = list_routers(
+        if (self.services['mode'] == "Basic"):
+            list_router_response = list_routers(
+                                    self.apiclient,
+                                    zoneid=self.zone.id,
+                                    listall=True
+                                    )
+        else:
+            list_router_response = list_routers(
                                     self.apiclient,
                                     account=self.account.name,
                                     domainid=self.account.domainid
@@ -702,7 +709,14 @@ class TestRouterRestart(cloudstackTestCase):
         self.apiclient.restartNetwork(cmd)
 
         # Get router details after restart
-        list_router_response = list_routers(
+        if (self.services['mode'] == "Basic"):
+            list_router_response = list_routers(
+                                    self.apiclient,
+                                    zoneid=self.zone.id,
+                                    listall=True
+                                    )
+        else:
+            list_router_response = list_routers(
                                     self.apiclient,
                                     account=self.account.name,
                                     domainid=self.account.domainid
@@ -729,7 +743,7 @@ class TestTemplates(cloudstackTestCase):
 
         cls.testClient = super(TestTemplates, cls).getClsTestClient()
         cls.api_client = cls.testClient.getApiClient()
-
+        cls.hypervisor = cls.testClient.getHypervisorInfo()
         cls.services = Services().services
         # Get Zone, Domain and templates
         cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
@@ -742,8 +756,12 @@ class TestTemplates(cloudstackTestCase):
                             cls.zone.id,
                             cls.services["ostype"]
                             )
-        cls.services["virtual_machine"]["zoneid"] = cls.zone.id
+        cls.templateSupported = True
         cls._cleanup = []
+        if cls.hypervisor.lower() in ['lxc']:
+            cls.templateSupported = False
+            return
+        cls.services["virtual_machine"]["zoneid"] = cls.zone.id
         try:
             cls.account = Account.create(
                             cls.api_client,
@@ -800,6 +818,8 @@ class TestTemplates(cloudstackTestCase):
         self.apiclient = self.testClient.getApiClient()
         self.dbclient = self.testClient.getDbConnection()
         self.cleanup = []
+        if not self.templateSupported:
+            self.skipTest("Template creation from root volume is not supported in LXC")
         return
 
     def tearDown(self):
@@ -855,6 +875,8 @@ class TestTemplates(cloudstackTestCase):
         # 4. Check the size of snapshot and template
 
         # Create a snapshot from the ROOTDISK
+        if self.hypervisor.lower() in ['hyperv']:
+            self.skipTest("Snapshots feature is not supported on Hyper-V")
         snapshot = Snapshot.create(
                                    self.apiclient,
                                    self.volume.id,
@@ -920,6 +942,8 @@ class TestTemplates(cloudstackTestCase):
         # 5. Template should be created succesfully
 
         # Create a snapshot from the ROOTDISK
+        if self.hypervisor.lower() in ['hyperv']:
+            self.skipTest("Snapshots feature is not supported on Hyper-V")
         snapshot = Snapshot.create(
                                    self.apiclient,
                                    self.volume.id,
@@ -1013,11 +1037,17 @@ class TestDataPersistency(cloudstackTestCase):
         cls.zone = get_zone(cls.api_client, cls.testClient.getZoneForTests())
         cls.domain = get_domain(cls.api_client)
         cls.services['mode'] = cls.zone.networktype
+        cls.templateSupported = True
+        cls.cleanup = []
         template = get_template(
                             cls.api_client,
                             cls.zone.id,
                             cls.services["ostype"]
                             )
+        cls.hypervisor = cls.testClient.getHypervisorInfo()
+        if cls.hypervisor.lower() in ['lxc']:
+            cls.templateSupported = False
+            return
         cls.services["virtual_machine"]["zoneid"] = cls.zone.id
 
         #Create an account, network, VM and IP addresses
@@ -1062,6 +1092,8 @@ class TestDataPersistency(cloudstackTestCase):
 
     def setUp(self):
         self.apiclient = self.testClient.getApiClient()
+        if not self.templateSupported:
+            self.skipTest("Template creation from root volume is not supported in LXC")
         return
 
     def tearDown(self):

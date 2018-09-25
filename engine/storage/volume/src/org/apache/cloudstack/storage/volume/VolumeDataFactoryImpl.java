@@ -23,8 +23,6 @@ import java.util.List;
 
 import javax.inject.Inject;
 
-import org.springframework.stereotype.Component;
-
 import org.apache.cloudstack.engine.subsystem.api.storage.DataObject;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataStore;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreManager;
@@ -37,7 +35,6 @@ import com.cloud.storage.DataStoreRole;
 import com.cloud.storage.VolumeVO;
 import com.cloud.storage.dao.VolumeDao;
 
-@Component
 public class VolumeDataFactoryImpl implements VolumeDataFactory {
     @Inject
     VolumeDao volumeDao;
@@ -77,7 +74,7 @@ public class VolumeDataFactoryImpl implements VolumeDataFactory {
 
     @Override
     public VolumeInfo getVolume(long volumeId) {
-        VolumeVO volumeVO = volumeDao.findById(volumeId);
+        VolumeVO volumeVO = volumeDao.findByIdIncludingRemoved(volumeId);
         if (volumeVO == null) {
             return null;
         }

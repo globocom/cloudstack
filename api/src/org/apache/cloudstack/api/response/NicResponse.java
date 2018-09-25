@@ -16,29 +16,28 @@
 // under the License.
 package org.apache.cloudstack.api.response;
 
-import java.util.List;
-
+import com.cloud.serializer.Param;
+import com.cloud.vm.Nic;
+import com.google.gson.annotations.SerializedName;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseResponse;
 import org.apache.cloudstack.api.EntityReference;
 
-import com.cloud.serializer.Param;
-import com.cloud.vm.Nic;
-import com.google.gson.annotations.SerializedName;
+import java.util.List;
 
 @SuppressWarnings("unused")
 @EntityReference(value = Nic.class)
 public class NicResponse extends BaseResponse {
 
-    @SerializedName("id")
+    @SerializedName(ApiConstants.ID)
     @Param(description = "the ID of the nic")
     private String id;
 
-    @SerializedName("networkid")
+    @SerializedName(ApiConstants.NETWORK_ID)
     @Param(description = "the ID of the corresponding network")
     private String networkId;
 
-    @SerializedName("networkname")
+    @SerializedName(ApiConstants.NETWORK_NAME)
     @Param(description = "the name of the corresponding network")
     private String networkName;
 
@@ -54,11 +53,11 @@ public class NicResponse extends BaseResponse {
     @Param(description = "the ip address of the nic")
     private String ipaddress;
 
-    @SerializedName("isolationuri")
+    @SerializedName(ApiConstants.ISOLATION_URI)
     @Param(description = "the isolation uri of the nic")
     private String isolationUri;
 
-    @SerializedName("broadcasturi")
+    @SerializedName(ApiConstants.BROADCAST_URI)
     @Param(description = "the broadcast uri of the nic")
     private String broadcastUri;
 
@@ -74,7 +73,7 @@ public class NicResponse extends BaseResponse {
     @Param(description = "true if nic is default, false otherwise")
     private Boolean isDefault;
 
-    @SerializedName("macaddress")
+    @SerializedName(ApiConstants.MAC_ADDRESS)
     @Param(description = "true if nic is default, false otherwise")
     private String macAddress;
 
@@ -90,9 +89,13 @@ public class NicResponse extends BaseResponse {
     @Param(description = "the IPv6 address of network")
     private String ip6Address;
 
-    @SerializedName("secondaryip")
+    @SerializedName(ApiConstants.SECONDARY_IP)
     @Param(description = "the Secondary ipv4 addr of nic")
     private List<NicSecondaryIpResponse> secondaryIps;
+
+    @SerializedName(ApiConstants.EXTRA_DHCP_OPTION)
+    @Param(description = "the extra dhcp options on the nic", since = "4.11.0")
+    private List<NicExtraDhcpOptionResponse> extraDhcpOptions;
 
     @SerializedName(ApiConstants.DEVICE_ID)
     @Param(description = "device id for the network when plugged into the virtual machine", since = "4.4")
@@ -101,6 +104,14 @@ public class NicResponse extends BaseResponse {
     @SerializedName(ApiConstants.VIRTUAL_MACHINE_ID)
     @Param(description = "Id of the vm to which the nic belongs")
     private String vmId;
+
+    @SerializedName(ApiConstants.NSX_LOGICAL_SWITCH)
+    @Param(description = "Id of the NSX Logical Switch (if NSX based), null otherwise", since="4.6.0")
+    private String nsxLogicalSwitch;
+
+    @SerializedName(ApiConstants.NSX_LOGICAL_SWITCH_PORT)
+    @Param(description = "Id of the NSX Logical Switch Port (if NSX based), null otherwise", since="4.6.0")
+    private String nsxLogicalSwitchPort;
 
     public void setVmId(String vmId) {
         this.vmId = vmId;
@@ -174,6 +185,10 @@ public class NicResponse extends BaseResponse {
         this.deviceId = deviceId;
     }
 
+    public void setExtraDhcpOptions(List<NicExtraDhcpOptionResponse> extraDhcpOptions) {
+        this.extraDhcpOptions = extraDhcpOptions;
+    }
+
     @Override
     public int hashCode() {
         final int prime = 31;
@@ -205,4 +220,87 @@ public class NicResponse extends BaseResponse {
         this.secondaryIps = ipList;
     }
 
+    public void setNsxLogicalSwitch(String nsxLogicalSwitch) {
+        this.nsxLogicalSwitch = nsxLogicalSwitch;
+    }
+
+    public void setNsxLogicalSwitchPort(String nsxLogicalSwitchPort) {
+        this.nsxLogicalSwitchPort = nsxLogicalSwitchPort;
+    }
+
+    public String getNetworkId() {
+        return networkId;
+    }
+
+    public String getNetworkName() {
+        return networkName;
+    }
+
+    public String getNetmask() {
+        return netmask;
+    }
+
+    public String getGateway() {
+        return gateway;
+    }
+
+    public String getIsolationUri() {
+        return isolationUri;
+    }
+
+    public String getBroadcastUri() {
+        return broadcastUri;
+    }
+
+    public String getTrafficType() {
+        return trafficType;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public Boolean getDefault() {
+        return isDefault;
+    }
+
+    public String getMacAddress() {
+        return macAddress;
+    }
+
+    public String getIpaddress() {
+        return ipaddress;
+    }
+
+    public String getIp6Gateway() {
+        return ip6Gateway;
+    }
+
+    public String getIp6Cidr() {
+        return ip6Cidr;
+    }
+
+    public String getIp6Address() {
+        return ip6Address;
+    }
+
+    public List<NicSecondaryIpResponse> getSecondaryIps() {
+        return secondaryIps;
+    }
+
+    public String getDeviceId() {
+        return deviceId;
+    }
+
+    public String getVmId() {
+        return vmId;
+    }
+
+    public String getNsxLogicalSwitch() {
+        return nsxLogicalSwitch;
+    }
+
+    public String getNsxLogicalSwitchPort() {
+        return nsxLogicalSwitchPort;
+    }
 }

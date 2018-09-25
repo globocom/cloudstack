@@ -47,6 +47,9 @@ class TestSnapshotList(cloudstackTestCase):
         cls.testclient = super(TestSnapshotList, cls).getClsTestClient()
         cls.apiclient = cls.testclient.getApiClient()
         cls.testdata = cls.testClient.getParsedTestDataConfig()
+        cls.hypervisor = cls.testclient.getHypervisorInfo()
+        if cls.hypervisor.lower() == 'lxc':
+            raise unittest.SkipTest("snapshots are not supported on %s" % cls.hypervisor.lower())
         cls.acldata = cls.testdata["acl"]
 
         cls.domain_1 = None
@@ -357,8 +360,8 @@ class TestSnapshotList(cloudstackTestCase):
                             cls.service_offering,
                             ]
         except Exception as e:
-                cls.domain_1.delete(cls.apiclient,cleanup="true")
                 cls.domain_2.delete(cls.apiclient,cleanup="true")
+                cls.domain_1.delete(cls.apiclient,cleanup="true")
                 cleanup_resources(cls.apiclient, cls.cleanup)
                 raise Exception("Failed to create the setup required to execute the test cases: %s" % e)
 
@@ -367,10 +370,11 @@ class TestSnapshotList(cloudstackTestCase):
         cls.apiclient = super(TestSnapshotList, cls).getClsTestClient().getApiClient()
         cls.apiclient.connection.apiKey = cls.default_apikey
         cls.apiclient.connection.securityKey = cls.default_secretkey
-        cls.domain_1.delete(cls.apiclient,cleanup="true")
-        cls.domain_2.delete(cls.apiclient,cleanup="true")
+        try:
+            cls.domain_2.delete(cls.apiclient,cleanup="true")
+            cls.domain_1.delete(cls.apiclient,cleanup="true")
+        except: pass
         cleanup_resources(cls.apiclient, cls.cleanup)
-        return
 
     def setUp(cls):
         cls.apiclient = cls.testClient.getApiClient()

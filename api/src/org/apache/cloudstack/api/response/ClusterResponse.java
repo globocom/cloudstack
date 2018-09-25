@@ -17,7 +17,9 @@
 package org.apache.cloudstack.api.response;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.google.gson.annotations.SerializedName;
 
@@ -81,6 +83,14 @@ public class ClusterResponse extends BaseResponse {
     @SerializedName("memoryovercommitratio")
     @Param(description = "The memory overcommit ratio of the cluster")
     private String memoryovercommitratio;
+
+    @SerializedName("ovm3vip")
+    @Param(description = "Ovm3 VIP to use for pooling and/or clustering")
+    private String ovm3vip;
+
+    @SerializedName(ApiConstants.RESOURCE_DETAILS)
+    @Param(description = "Meta data associated with the zone (key/value pairs)")
+    private Map<String, String> resourceDetails;
 
     public String getId() {
         return id;
@@ -184,5 +194,26 @@ public class ClusterResponse extends BaseResponse {
 
     public String getMemoryOvercommitRatio() {
         return memoryovercommitratio;
+    }
+
+    public void setOvm3Vip(String ovm3vip) {
+        this.ovm3vip = ovm3vip;
+    }
+
+    public String getOvm3Vip() {
+        return ovm3vip;
+    }
+
+    public void setResourceDetails(Map<String, String> details) {
+        if (details == null) {
+            return;
+        }
+        resourceDetails = new HashMap<>(details);
+        if (resourceDetails.containsKey("username")) {
+            resourceDetails.remove("username");
+        }
+        if (resourceDetails.containsKey("password")) {
+            resourceDetails.remove("password");
+        }
     }
 }

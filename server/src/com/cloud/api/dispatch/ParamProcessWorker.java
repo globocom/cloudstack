@@ -30,9 +30,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
+import java.text.SimpleDateFormat;
 
 import javax.inject.Inject;
 
+import com.google.common.base.Strings;
 import org.apache.log4j.Logger;
 
 import org.apache.cloudstack.acl.ControlledEntity;
@@ -48,6 +50,7 @@ import org.apache.cloudstack.api.EntityReference;
 import org.apache.cloudstack.api.InternalIdentity;
 import org.apache.cloudstack.api.Parameter;
 import org.apache.cloudstack.api.ServerApiException;
+import org.apache.cloudstack.api.ApiArgValidator;
 import org.apache.cloudstack.api.command.admin.resource.ArchiveAlertsCmd;
 import org.apache.cloudstack.api.command.admin.resource.DeleteAlertsCmd;
 import org.apache.cloudstack.api.command.admin.usage.GetUsageRecordsCmd;
@@ -66,6 +69,8 @@ import com.cloud.utils.exception.CloudRuntimeException;
 public class ParamProcessWorker implements DispatchWorker {
 
     private static final Logger s_logger = Logger.getLogger(ParamProcessWorker.class.getName());
+    public final DateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd");
+    public final DateFormat newInputFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
     @Inject
     protected AccountManager _accountMgr;
@@ -89,6 +94,55 @@ public class ParamProcessWorker implements DispatchWorker {
         processParameters(task.getCmd(), task.getParams());
     }
 
+    private void validateNonEmptyString(final Object param, final String argName) {
+        if (param == null || Strings.isNullOrEmpty(param.toString())) {
+            throw new ServerApiException(ApiErrorCode.PARAM_ERROR, String.format("Empty or null value provided for API arg: %s", argName));
+        }
+    }
+
+    private void validateNaturalNumber(final Object param, final String argName) {
+        Long value = null;
+        if (param != null && param instanceof Long) {
+            value = (Long) param;
+        } else if (param != null) {
+            value = Long.valueOf(param.toString());
+        }
+        if (value == null || value < 1L) {
+            throw new ServerApiException(ApiErrorCode.PARAM_ERROR, String.format("Invalid value provided for API arg: %s", argName));
+        }
+    }
+
+    private void validateField(final Object paramObj, final Parameter annotation) throws ServerApiException {
+        if (annotation == null) {
+            return;
+        }
+        final String argName = annotation.name();
+        for (final ApiArgValidator validator : annotation.validations()) {
+            if (validator == null) {
+                continue;
+            }
+            switch (validator) {
+                case NotNullOrEmpty:
+                    switch (annotation.type()) {
+                        case UUID:
+                        case STRING:
+                            validateNonEmptyString(paramObj, argName);
+                            break;
+                    }
+                    break;
+                case PositiveNumber:
+                    switch (annotation.type()) {
+                        case SHORT:
+                        case INTEGER:
+                        case LONG:
+                            validateNaturalNumber(paramObj, argName);
+                            break;
+                    }
+                    break;
+            }
+        }
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     public void processParameters(final BaseCmd cmd, final Map params) {
         final Map<Object, AccessType> entitiesToAccess = new HashMap<Object, AccessType>();
@@ -109,6 +163,7 @@ public class ParamProcessWorker implements DispatchWorker {
 
             // marshall the parameter into the correct type and set the field value
             try {
+                validateField(paramObj, parameterAnnotation);
                 setFieldValue(field, cmd, paramObj, parameterAnnotation);
             } catch (final IllegalArgumentException argEx) {
                 if (s_logger.isDebugEnabled()) {
@@ -259,12 +314,12 @@ public class ParamProcessWorker implements DispatchWorker {
                         cmdObj instanceof ArchiveAlertsCmd || cmdObj instanceof DeleteAlertsCmd || cmdObj instanceof GetUsageRecordsCmd) {
                     final boolean isObjInNewDateFormat = isObjInNewDateFormat(paramObj.toString());
                     if (isObjInNewDateFormat) {
-                        final DateFormat newFormat = BaseCmd.NEW_INPUT_FORMAT;
+                        final DateFormat newFormat = newInputFormat;
                         synchronized (newFormat) {
                             field.set(cmdObj, newFormat.parse(paramObj.toString()));
                         }
                     } else {
-                        final DateFormat format = BaseCmd.INPUT_FORMAT;
+                        final DateFormat format = inputFormat;
                         synchronized (format) {
                             Date date = format.parse(paramObj.toString());
                             if (field.getName().equals("startDate")) {
@@ -276,7 +331,7 @@ public class ParamProcessWorker implements DispatchWorker {
                         }
                     }
                 } else {
-                    final DateFormat format = BaseCmd.INPUT_FORMAT;
+                    final DateFormat format = inputFormat;
                     synchronized (format) {
                         format.setLenient(false);
                         field.set(cmdObj, format.parse(paramObj.toString()));
@@ -289,6 +344,14 @@ public class ParamProcessWorker implements DispatchWorker {
                 // value for optional parameters ...
                 if (paramObj != null && isNotBlank(paramObj.toString())) {
                     field.set(cmdObj, Float.valueOf(paramObj.toString()));
+                }
+                break;
+            case DOUBLE:
+                // Assuming that the parameters have been checked for required before now,
+                // we ignore blank or null values and defer to the command to set a default
+                // value for optional parameters ...
+                if (paramObj != null && isNotBlank(paramObj.toString())) {
+                    field.set(cmdObj, Double.valueOf(paramObj.toString()));
                 }
                 break;
             case INTEGER:
@@ -407,8 +470,9 @@ public class ParamProcessWorker implements DispatchWorker {
             if (internalId != null){
                 // Populate CallContext for each of the entity.
                 for (final Class<?> entity : entities) {
-                    CallContext.current().putContextParameter(entity.getName(), internalId);
+                    CallContext.current().putContextParameter(entity, internalId);
                 }
+                validateNaturalNumber(internalId, annotation.name());
                 return internalId;
             }
         }
@@ -431,7 +495,7 @@ public class ParamProcessWorker implements DispatchWorker {
             }
             // Return on first non-null Id for the uuid entity
             if (internalId != null){
-                CallContext.current().putContextParameter(entity.getName(), uuid);
+                CallContext.current().putContextParameter(entity, uuid);
                 break;
             }
         }
@@ -441,6 +505,7 @@ public class ParamProcessWorker implements DispatchWorker {
             throw new InvalidParameterValueException("Invalid parameter " + annotation.name() + " value=" + uuid +
                     " due to incorrect long value format, or entity does not exist or due to incorrect parameter annotation for the field in api cmd class.");
         }
+        validateNaturalNumber(internalId, annotation.name());
         return internalId;
     }
 }

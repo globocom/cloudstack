@@ -58,7 +58,7 @@ public class Site2SiteVpnConnectionResponse extends BaseResponse implements Cont
     private String guestCidrList;
 
     @SerializedName(ApiConstants.IPSEC_PSK)
-    @Param(description = "IPsec Preshared-Key of the customer gateway")
+    @Param(description = "IPsec Preshared-Key of the customer gateway", isSensitive = true)
     //from CustomerGateway
     private String ipsecPsk;
 
@@ -86,6 +86,11 @@ public class Site2SiteVpnConnectionResponse extends BaseResponse implements Cont
     @Param(description = "if DPD is enabled for customer gateway")
     //from CustomerGateway
     private Boolean dpd;
+
+    @SerializedName(ApiConstants.FORCE_ENCAP)
+    @Param(description = "if Force NAT Encapsulation is enabled for customer gateway")
+    //from CustomerGateway
+    private Boolean encap;
 
     @SerializedName(ApiConstants.STATE)
     @Param(description = "State of vpn connection")
@@ -173,6 +178,10 @@ public class Site2SiteVpnConnectionResponse extends BaseResponse implements Cont
 
     public void setDpd(Boolean dpd) {
         this.dpd = dpd;
+    }
+
+    public void setEncap(Boolean encap) {
+        this.encap = encap;
     }
 
     public void setState(String state) {

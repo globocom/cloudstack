@@ -19,6 +19,7 @@
 
 import marvin
 import os
+import re
 import time
 import logging
 import string
@@ -40,6 +41,43 @@ from marvin.codes import (
                           INVALID_INPUT,
                           EMPTY_LIST,
                           FAILED)
+
+def _configure_ssh_credentials(hypervisor):
+    ssh_command = "ssh -i ~/.ssh/id_rsa.cloud -ostricthostkeychecking=no "
+    
+    if (str(hypervisor).lower() == 'vmware'
+        or str(hypervisor).lower() == 'hyperv'):
+        ssh_command = "ssh -i /var/cloudstack/management/.ssh/id_rsa -ostricthostkeychecking=no "
+
+    return ssh_command
+
+
+def _configure_timeout(hypervisor):
+    timeout = 5
+
+    # Increase hop into router
+    if str(hypervisor).lower() == 'hyperv':
+        timeout = 12
+
+    return timeout
+
+
+def _execute_ssh_command(hostip, port, username, password, ssh_command):
+    #SSH to the machine
+    ssh = SshClient(hostip, port, username, password)
+    # Ensure the SSH login is successful
+    while True:
+        res = ssh.execute(ssh_command)
+        if "Connection refused".lower() in res[0].lower():
+            pass
+        elif res[0] != "Host key verification failed.":
+            break
+        elif timeout == 0:
+            break
+
+        time.sleep(5)
+        timeout = timeout - 1
+    return res
 
 def restart_mgmt_server(server):
     """Restarts the management server"""
@@ -191,40 +229,19 @@ def get_host_credentials(config, hostip):
     raise KeyError("Please provide the marvin configuration file with credentials to your hosts")
 
 
-def get_process_status(hostip, port, username, password, linklocalip, process, hypervisor=None):
-    """Double hop and returns a process status"""
+def get_process_status(hostip, port, username, password, linklocalip, command, hypervisor=None):
+    """Double hop and returns a command execution result"""
 
-    #SSH to the machine
-    ssh = SshClient(hostip, port, username, password)
-    if (str(hypervisor).lower() == 'vmware'
-		or str(hypervisor).lower() == 'hyperv'):
-        ssh_command = "ssh -i /var/cloudstack/management/.ssh/id_rsa -ostricthostkeychecking=no "
-    else:
-        ssh_command = "ssh -i ~/.ssh/id_rsa.cloud -ostricthostkeychecking=no "
+    ssh_command = _configure_ssh_credentials(hypervisor)
 
     ssh_command = ssh_command +\
                   "-oUserKnownHostsFile=/dev/null -p 3922 %s %s" % (
                       linklocalip,
-                      process)
+                      command)
+    timeout = _configure_timeout(hypervisor)
 
-    # Double hop into router
-    if str(hypervisor).lower() == 'hyperv':
-        timeout = 12
-    else:
-        timeout = 5
-    # Ensure the SSH login is successful
-    while True:
-        res = ssh.execute(ssh_command)
-        if "Connection refused".lower() in res[0].lower():
-            pass
-        elif res[0] != "Host key verification failed.":
-            break
-        elif timeout == 0:
-            break
-
-        time.sleep(5)
-        timeout = timeout - 1
-    return res
+    result = _execute_ssh_command(hostip, port, username, password, ssh_command)
+    return result
 
 
 def isAlmostEqual(first_digit, second_digit, range=0):
@@ -276,7 +293,7 @@ def is_snapshot_on_nfs(apiclient, dbconn, config, zoneid, snapshotid):
     # snapshot extension to be appended to the snapshot path obtained from db
     snapshot_extensions = {"vmware": ".ovf",
                             "kvm": "",
-                            "xenserver": ".vhd",
+                            "xenserver": "",
                             "simulator":""}
 
     qresultset = dbconn.execute(
@@ -473,9 +490,11 @@ def checkVolumeSize(ssh_handle=None,
                 return FAILED
             for line in fdisk_output["stdout"]:
                 if volume_name in line:
-                    parts = line.strip().split()
-                    if str(parts[-2]) == str(size_to_verify):
-                        return [SUCCESS,str(parts[-2])]
+                    # Get the bytes from the output
+                    # Disk /dev/xvdb: 1 GiB, 1073741824 bytes, 2097152 sectors
+                    m = re.match('.*?(\d+) bytes.*', line)
+                    if m and str(m.group(1)) == str(size_to_verify):
+                        return [SUCCESS,str(m.group(1))]
             return [FAILED,"Volume Not Found"]
     except Exception, e:
         print "\n Exception Occurred under getDiskUsage: " \
@@ -501,8 +520,27 @@ def verifyRouterState(apiclient, routerid, allowedstates):
     listvalidationresult = validateList(routers)
     if listvalidationresult[0] == FAIL:
         return [FAIL, listvalidationresult[2]]
-    if routers[0].redundantstate not in allowedstates:
-        return [FAIL, "Redundant state of the router should be in %s but is %s" %
-            (allowedstates, routers[0].redundantstate)]
+    if routers[0].state.lower() not in allowedstates:
+        return [FAIL, "state of the router should be in %s but is %s" %
+            (allowedstates, routers[0].state)]
     return [PASS, None]
-        
+
+
+def wait_until(retry_interval=2, no_of_times=2, callback=None, *callback_args):
+    """ Utility method to try out the callback method at most no_of_times with a interval of retry_interval,
+        Will return immediately if callback returns True. The callback method should be written to return a list of values first being a boolean """
+
+    if callback is None:
+        raise ("Bad value for callback method !")
+
+    wait_result = False 
+    for i in range(0,no_of_times):
+        time.sleep(retry_interval)
+        wait_result, return_val = callback(*callback_args)
+        if not(isinstance(wait_result, bool)):
+            raise ("Bad parameter returned from callback !")
+        if wait_result :
+            break
+
+    return wait_result, return_val
+

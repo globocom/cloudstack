@@ -39,7 +39,8 @@ from marvin.lib.common import (get_domain,
                                get_template,
                                createSnapshotFromVirtualMachineVolume,
                                isVmExpunged,
-                               isDomainResourceCountEqualToExpectedCount)
+                               isDomainResourceCountEqualToExpectedCount,
+                               find_storage_pool_type)
 from marvin.lib.utils import (cleanup_resources)
 from marvin.codes import (PASS,
                           FAIL,
@@ -193,7 +194,7 @@ class TestMultipleChildDomain(cloudstackTestCase):
             return [FAIL, e, None]
         return [PASS, None, users]
 
-    @attr(tags=["advanced", "selfservice"])
+    @attr(tags=["advanced", "selfservice"], required_hardware="false")
     def test_01_multiple_domains_primary_storage_limits(self):
         """Test primary storage limit of domain and its sub-domains
 
@@ -332,7 +333,7 @@ class TestMultipleChildDomain(cloudstackTestCase):
         self.assertTrue(isVmExpunged(self.apiclient, vm_2.id), "VM not expunged \
                 in allotted time")
 
-        expectedCount = 0
+        expectedCount -= templatesize
         result = isDomainResourceCountEqualToExpectedCount(
             self.apiclient, self.parent_domain.id,
             expectedCount, RESOURCE_PRIMARY_STORAGE)
@@ -418,14 +419,6 @@ class TestMultipleChildDomain(cloudstackTestCase):
                     expectedCount, RESOURCE_PRIMARY_STORAGE)
                 self.assertFalse(result[0], result[1])
                 self.assertTrue(result[2], "Resource count does not match")
-
-                expectedCount -= volumeSize
-                vm.detach_volume(apiclient, volume=volume)
-                result = isDomainResourceCountEqualToExpectedCount(
-                    self.apiclient, self.domain.id,
-                    expectedCount, RESOURCE_PRIMARY_STORAGE)
-                self.assertFalse(result[0], result[1])
-                self.assertTrue(result[2], "Resource count does not match")
             except Exception as e:
                 self.fail("Failure: %s" % e)
             return
@@ -447,6 +440,10 @@ class TestMultipleChildDomain(cloudstackTestCase):
 
         """
         # Setting up account and domain hierarchy
+
+        if self.hypervisor.lower() == 'lxc':
+            if not find_storage_pool_type(self.apiclient, storagetype='rbd'):
+                self.skipTest("RBD storage type is required for data volumes for LXC")
         result = self.setupAccounts()
         if result[0] == FAIL:
             self.fail(
@@ -535,19 +532,11 @@ class TestMultipleChildDomain(cloudstackTestCase):
                     expectedCount, RESOURCE_PRIMARY_STORAGE)
                 self.assertFalse(result[0], result[1])
                 self.assertTrue(result[2], "Resource count does not match")
-
-                expectedCount -= volume2size
-                vm.detach_volume(apiclient, volume=volume_2)
-                result = isDomainResourceCountEqualToExpectedCount(
-                    self.apiclient, self.domain.id,
-                    expectedCount, RESOURCE_PRIMARY_STORAGE)
-                self.assertFalse(result[0], result[1])
-                self.assertTrue(result[2], "Resource count does not match")
             except Exception as e:
                 self.fail("Failure: %s" % e)
         return
 
-    @attr(tags=["advanced"], required_hardware="false")
+    @attr(tags=["advanced"], required_hardware="true")
     def test_04_create_template_snapshot(self):
         """Test create snapshot and templates from volume
 
@@ -563,8 +552,8 @@ class TestMultipleChildDomain(cloudstackTestCase):
         # 5. Delete volume which was created from snapshot and verify primary storage
              resource count"""
 
-        if self.hypervisor.lower() in ['hyperv']:
-            self.skipTest("Snapshots feature is not supported on Hyper-V")
+        if self.hypervisor.lower() in ['hyperv', 'lxc']:
+            self.skipTest("Snapshots feature is not supported on %s" % self.hypervisor.lower())
 
         result = self.setupAccounts()
         if result[0] == FAIL:
@@ -638,12 +627,6 @@ class TestMultipleChildDomain(cloudstackTestCase):
 
                 expectedCount -= volumeSize
                 vm.detach_volume(apiclient, volume)
-                result = isDomainResourceCountEqualToExpectedCount(
-                    self.apiclient, self.domain.id,
-                    expectedCount, RESOURCE_PRIMARY_STORAGE)
-                self.assertFalse(result[0], result[1])
-                self.assertTrue(result[2], "Resource count does not match")
-
                 volume.delete(apiclient)
                 result = isDomainResourceCountEqualToExpectedCount(
                     self.apiclient, self.domain.id,

@@ -21,10 +21,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -38,19 +36,35 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import javax.ejb.Local;
 import javax.naming.ConfigurationException;
 
-import org.apache.log4j.Logger;
-
+import com.cloud.storage.template.Processor;
+import com.cloud.storage.template.S3TemplateDownloader;
+import com.cloud.storage.template.TemplateDownloader;
+import com.cloud.storage.template.TemplateLocation;
+import com.cloud.storage.template.MetalinkTemplateDownloader;
+import com.cloud.storage.template.HttpTemplateDownloader;
+import com.cloud.storage.template.LocalTemplateDownloader;
+import com.cloud.storage.template.ScpTemplateDownloader;
+import com.cloud.storage.template.TemplateProp;
+import com.cloud.storage.template.OVAProcessor;
+import com.cloud.storage.template.IsoProcessor;
+import com.cloud.storage.template.QCOW2Processor;
+import com.cloud.storage.template.VmdkProcessor;
+import com.cloud.storage.template.RawImageProcessor;
+import com.cloud.storage.template.TARProcessor;
+import com.cloud.storage.template.VhdProcessor;
+import com.cloud.storage.template.TemplateConstants;
 import org.apache.cloudstack.storage.command.DownloadCommand;
 import org.apache.cloudstack.storage.command.DownloadCommand.ResourceType;
 import org.apache.cloudstack.storage.command.DownloadProgressCommand;
 import org.apache.cloudstack.storage.command.DownloadProgressCommand.RequestType;
+import org.apache.cloudstack.storage.resource.NfsSecondaryStorageResource;
 import org.apache.cloudstack.storage.resource.SecondaryStorageResource;
+import org.apache.log4j.Logger;
 
 import com.cloud.agent.api.storage.DownloadAnswer;
-import com.cloud.agent.api.storage.Proxy;
+import com.cloud.utils.net.Proxy;
 import com.cloud.agent.api.to.DataStoreTO;
 import com.cloud.agent.api.to.NfsTO;
 import com.cloud.agent.api.to.S3TO;
@@ -59,36 +73,25 @@ import com.cloud.storage.Storage.ImageFormat;
 import com.cloud.storage.StorageLayer;
 import com.cloud.storage.VMTemplateHostVO;
 import com.cloud.storage.VMTemplateStorageResourceAssoc;
-import com.cloud.storage.template.HttpTemplateDownloader;
-import com.cloud.storage.template.IsoProcessor;
-import com.cloud.storage.template.LocalTemplateDownloader;
-import com.cloud.storage.template.OVAProcessor;
-import com.cloud.storage.template.Processor;
 import com.cloud.storage.template.Processor.FormatInfo;
-import com.cloud.storage.template.QCOW2Processor;
-import com.cloud.storage.template.RawImageProcessor;
-import com.cloud.storage.template.TARProcessor;
-import com.cloud.storage.template.S3TemplateDownloader;
-import com.cloud.storage.template.ScpTemplateDownloader;
-import com.cloud.storage.template.TemplateConstants;
-import com.cloud.storage.template.TemplateDownloader;
 import com.cloud.storage.template.TemplateDownloader.DownloadCompleteCallback;
 import com.cloud.storage.template.TemplateDownloader.Status;
-import com.cloud.storage.template.TemplateLocation;
-import com.cloud.storage.template.TemplateProp;
-import com.cloud.storage.template.VhdProcessor;
-import com.cloud.storage.template.VmdkProcessor;
 import com.cloud.utils.NumbersUtil;
+import com.cloud.utils.StringUtils;
 import com.cloud.utils.component.ManagerBase;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.script.OutputInterpreter;
 import com.cloud.utils.script.Script;
+import com.cloud.utils.storage.QCOW2Utils;
+import org.apache.cloudstack.utils.security.ChecksumValue;
+import org.apache.cloudstack.utils.security.DigestHelper;
 
-@Local(value = DownloadManager.class)
 public class DownloadManagerImpl extends ManagerBase implements DownloadManager {
     private String _name;
     StorageLayer _storage;
-    Map<String, Processor> _processors;
+    public Map<String, Processor> _processors;
+    private long _processTimeout;
+    private Integer _nfsVersion;
 
     public class Completion implements DownloadCompleteCallback {
         private final String jobId;
@@ -101,6 +104,11 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
         public void downloadComplete(Status status) {
             setDownloadStatus(jobId, status);
         }
+    }
+
+    @Override
+    public Map<String, Processor> getProcessors() {
+        return _processors;
     }
 
     private static class DownloadJob {
@@ -124,10 +132,10 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
             this.tmpltName = tmpltName;
             this.format = format;
             this.hvm = hvm;
-            description = descr;
-            checksum = cksum;
+            this.description = descr;
+            this.checksum = cksum;
             this.installPathPrefix = installPathPrefix;
-            templatesize = 0;
+            this.templatesize = 0;
             this.id = id;
             this.resourceType = resourceType;
         }
@@ -271,11 +279,27 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
             threadPool.execute(td);
             break;
         case DOWNLOAD_FINISHED:
-            if (!(td instanceof S3TemplateDownloader)) {
-                // we currently only create template.properties for NFS by
-                // running some post download script
+            if(td instanceof S3TemplateDownloader) {
+                // For S3 and Swift, which are considered "remote",
+                // as in the file cannot be accessed locally,
+                // we run the postRemoteDownload() method.
                 td.setDownloadError("Download success, starting install ");
-                String result = postDownload(jobId);
+                String result = postRemoteDownload(jobId);
+                if (result != null) {
+                    s_logger.error("Failed post download install: " + result);
+                    td.setStatus(Status.UNRECOVERABLE_ERROR);
+                    td.setDownloadError("Failed post download install: " + result);
+                    ((S3TemplateDownloader) td).cleanupAfterError();
+                } else {
+                    td.setStatus(Status.POST_DOWNLOAD_FINISHED);
+                    td.setDownloadError("Install completed successfully at " + new SimpleDateFormat().format(new Date()));
+                }
+            }
+            else {
+                // For other TemplateDownloaders where files are locally available,
+                // we run the postLocalDownload() method.
+                td.setDownloadError("Download success, starting install ");
+                String result = postLocalDownload(jobId);
                 if (result != null) {
                     s_logger.error("Failed post download script: " + result);
                     td.setStatus(Status.UNRECOVERABLE_ERROR);
@@ -284,17 +308,6 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
                     td.setStatus(Status.POST_DOWNLOAD_FINISHED);
                     td.setDownloadError("Install completed successfully at " + new SimpleDateFormat().format(new Date()));
                 }
-            } else {
-                // for s3 and swift, we skip post download step and just set
-                // status to trigger callback.
-                td.setStatus(Status.POST_DOWNLOAD_FINISHED);
-                // set template size for S3
-                S3TemplateDownloader std = (S3TemplateDownloader)td;
-                long size = std.totalBytes;
-                DownloadJob dnld = jobs.get(jobId);
-                dnld.setTemplatesize(size);
-                dnld.setTemplatePhysicalSize(size);
-                dnld.setTmpltPath(std.getDownloadLocalPath()); // update template path to include file name.
             }
             dj.cleanup();
             break;
@@ -303,43 +316,53 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
         }
     }
 
-    private String computeCheckSum(File f) {
-        byte[] buffer = new byte[8192];
-        int read = 0;
-        MessageDigest digest;
-        String checksum = null;
-        InputStream is = null;
-        try {
-            digest = MessageDigest.getInstance("MD5");
-            is = new FileInputStream(f);
-            while ((read = is.read(buffer)) > 0) {
-                digest.update(buffer, 0, read);
-            }
-            byte[] md5sum = digest.digest();
-            BigInteger bigInt = new BigInteger(1, md5sum);
-            checksum = String.format("%032x", bigInt);
-            return checksum;
+    private ChecksumValue computeCheckSum(String algorithm, File f) throws NoSuchAlgorithmException {
+        try (InputStream is = new FileInputStream(f);) {
+            return DigestHelper.digest(algorithm, is);
         } catch (IOException e) {
             return null;
-        } catch (NoSuchAlgorithmException e) {
-            return null;
-        } finally {
-            try {
-                if (is != null)
-                    is.close();
-            } catch (IOException e) {
-                return null;
-            }
         }
     }
 
     /**
-     * Post download activity (install and cleanup). Executed in context of
+     * Post remote download activity (install and cleanup). Executed in context of the downloader thread.
+     */
+    private String postRemoteDownload(String jobId) {
+        String result = null;
+        DownloadJob dnld = jobs.get(jobId);
+        S3TemplateDownloader td = (S3TemplateDownloader)dnld.getTemplateDownloader();
+
+        if (td.getFileExtension().equalsIgnoreCase("QCOW2")) {
+            // The QCOW2 is the only format with a header,
+            // and as such can be easily read.
+
+            try (InputStream inputStream = td.getS3ObjectInputStream();) {
+                dnld.setTemplatesize(QCOW2Utils.getVirtualSize(inputStream));
+            }
+            catch (IOException e) {
+                result = "Couldn't read QCOW2 virtual size. Error: " + e.getMessage();
+            }
+
+        }
+        else {
+            // For the other formats, both the virtual
+            // and actual file size are set the same.
+            dnld.setTemplatesize(td.getTotalBytes());
+        }
+
+        dnld.setTemplatePhysicalSize(td.getTotalBytes());
+        dnld.setTmpltPath(td.getDownloadLocalPath());
+
+        return result;
+    }
+
+    /**
+     * Post local download activity (install and cleanup). Executed in context of
      * downloader thread
      *
      * @throws IOException
      */
-    private String postDownload(String jobId) {
+    private String postLocalDownload(String jobId) {
         DownloadJob dnld = jobs.get(jobId);
         TemplateDownloader td = dnld.getTemplateDownloader();
         String resourcePath = dnld.getInstallPathPrefix(); // path with mount
@@ -350,11 +373,22 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
         ResourceType resourceType = dnld.getResourceType();
 
         File originalTemplate = new File(td.getDownloadLocalPath());
-        String checkSum = computeCheckSum(originalTemplate);
-        if (checkSum == null) {
+        ChecksumValue oldValue = new ChecksumValue(dnld.getChecksum());
+        ChecksumValue newValue = null;
+        try {
+            newValue = computeCheckSum(oldValue.getAlgorithm(), originalTemplate);
+        } catch (NoSuchAlgorithmException e) {
+            return "checksum algorithm not recognised: " + oldValue.getAlgorithm();
+        }
+        if(StringUtils.isNotBlank(dnld.getChecksum()) && ! oldValue.equals(newValue)) {
+            return "checksum \"" + newValue +"\" didn't match the given value, \"" + oldValue + "\"";
+        }
+        String checksum = newValue.getChecksum();
+        if (checksum == null) {
             s_logger.warn("Something wrong happened when try to calculate the checksum of downloaded template!");
         }
-        dnld.setCheckSum(checkSum);
+
+        dnld.setCheckSum(checksum);
 
         int imgSizeGigs = (int)Math.ceil(_storage.getSize(td.getDownloadLocalPath()) * 1.0d / (1024 * 1024 * 1024));
         imgSizeGigs++; // add one just in case
@@ -377,7 +411,7 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
         if (extension.equals("iso")) {
             templateName = jobs.get(jobId).getTmpltName().trim().replace(" ", "_");
         } else {
-            templateName = java.util.UUID.nameUUIDFromBytes((jobs.get(jobId).getTmpltName() + System.currentTimeMillis()).getBytes()).toString();
+            templateName = java.util.UUID.nameUUIDFromBytes((jobs.get(jobId).getTmpltName() + System.currentTimeMillis()).getBytes(StringUtils.getPreferredCharset())).toString();
         }
 
         // run script to mv the temporary template file to the final template
@@ -387,11 +421,7 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
         scr.add("-n", templateFilename);
 
         scr.add("-t", resourcePath);
-        scr.add("-f", td.getDownloadLocalPath()); // this is the temporary
-        // template file downloaded
-        if (dnld.getChecksum() != null && dnld.getChecksum().length() > 1) {
-            scr.add("-c", dnld.getChecksum());
-        }
+        scr.add("-f", td.getDownloadLocalPath()); // this is the temporary template file downloaded
         scr.add("-u"); // cleanup
         String result;
         result = scr.execute();
@@ -429,13 +459,16 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
 
             FormatInfo info = null;
             try {
-                info = processor.process(resourcePath, null, templateName);
+                info = processor.process(resourcePath, null, templateName, this._processTimeout);
             } catch (InternalErrorException e) {
                 s_logger.error("Template process exception ", e);
                 return e.toString();
             }
             if (info != null) {
-                loc.addFormat(info);
+                if(!loc.addFormat(info)) {
+                    loc.purge();
+                    return "Unable to install due to invalid file format";
+                }
                 dnld.setTemplatesize(info.virtualSize);
                 dnld.setTemplatePhysicalSize(info.size);
                 break;
@@ -510,7 +543,9 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
                     ResourceType.TEMPLATE == resourceType ? _storage.getFile(tmpDir + File.separator + TemplateLocation.Filename) : _storage.getFile(tmpDir + File.separator +
                             "volume.properties");
                     if (file.exists()) {
-                        file.delete();
+                        if(! file.delete()) {
+                            s_logger.warn("Deletion of file '" + file.getAbsolutePath() + "' failed.");
+                        }
                     }
 
                     if (!file.createNewFile()) {
@@ -526,7 +561,9 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
                     }
                     TemplateDownloader td;
                     if ((uri != null) && (uri.getScheme() != null)) {
-                        if (uri.getScheme().equalsIgnoreCase("http") || uri.getScheme().equalsIgnoreCase("https")) {
+                        if (uri.getPath().endsWith(".metalink")) {
+                            td = new MetalinkTemplateDownloader(_storage, url, tmpDir, new Completion(jobId), maxTemplateSizeInBytes);
+                        } else if (uri.getScheme().equalsIgnoreCase("http") || uri.getScheme().equalsIgnoreCase("https")) {
                             td = new HttpTemplateDownloader(_storage, url, tmpDir, new Completion(jobId), maxTemplateSizeInBytes, user, password, proxy, resourceType);
                         } else if (uri.getScheme().equalsIgnoreCase("file")) {
                             td = new LocalTemplateDownloader(_storage, url, tmpDir, maxTemplateSizeInBytes, new Completion(jobId));
@@ -640,6 +677,8 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
 
     @Override
     public DownloadAnswer handleDownloadCommand(SecondaryStorageResource resource, DownloadCommand cmd) {
+        int timeout = NumbersUtil.parseInt(cmd.getContextParam("vmware.package.ova.timeout"), 3600000);
+        this._processTimeout = timeout;
         ResourceType resourceType = cmd.getResourceType();
         if (cmd instanceof DownloadProgressCommand) {
             return handleDownloadProgressCmd(resource, (DownloadProgressCommand)cmd);
@@ -654,11 +693,15 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
             return new DownloadAnswer("Invalid Name", VMTemplateStorageResourceAssoc.Status.DOWNLOAD_ERROR);
         }
 
+        if(! DigestHelper.isAlgorithmSupported(cmd.getChecksum())) {
+            return new DownloadAnswer("invalid algorithm: " + cmd.getChecksum(), VMTemplateStorageResourceAssoc.Status.NOT_DOWNLOADED);
+        }
+
         DataStoreTO dstore = cmd.getDataStore();
         String installPathPrefix = cmd.getInstallPath();
         // for NFS, we need to get mounted path
         if (dstore instanceof NfsTO) {
-            installPathPrefix = resource.getRootDir(((NfsTO)dstore).getUrl()) + File.separator + installPathPrefix;
+            installPathPrefix = resource.getRootDir(((NfsTO)dstore).getUrl(), _nfsVersion) + File.separator + installPathPrefix;
         }
         String user = null;
         String password = null;
@@ -812,17 +855,6 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
             result.put(tInfo.getTemplateName(), tInfo);
             s_logger.debug("Added template name: " + tInfo.getTemplateName() + ", path: " + tmplt);
         }
-        /*
-        for (String tmplt : isoTmplts) {
-            String tmp[];
-            tmp = tmplt.split("/");
-            String tmpltName = tmp[tmp.length - 2];
-            tmplt = tmplt.substring(tmplt.lastIndexOf("iso/"));
-            TemplateInfo tInfo = new TemplateInfo(tmpltName, tmplt, false);
-            s_logger.debug("Added iso template name: " + tmpltName + ", path: " + tmplt);
-            result.put(tmpltName, tInfo);
-        }
-         */
         return result;
     }
 
@@ -932,6 +964,7 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
         String inSystemVM = (String)params.get("secondary.storage.vm");
         if (inSystemVM != null && "true".equalsIgnoreCase(inSystemVM)) {
             s_logger.info("DownloadManager: starting additional services since we are inside system vm");
+            _nfsVersion = NfsSecondaryStorageResource.retrieveNfsVersionFromParams(params);
             startAdditionalServices();
             blockOutgoingOnPrivate();
         }
@@ -1042,10 +1075,9 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
     }
 
     private void startAdditionalServices() {
-
-        Script command = new Script("/bin/bash", s_logger);
-        command.add("-c");
-        command.add("if [ -d /etc/apache2 ] ; then service apache2 stop; else service httpd stop; fi ");
+        Script command = new Script("/bin/systemctl", s_logger);
+        command.add("stop");
+        command.add("apache2");
         String result = command.execute();
         if (result != null) {
             s_logger.warn("Error in stopping httpd service err=" + result);
@@ -1060,21 +1092,25 @@ public class DownloadManagerImpl extends ManagerBase implements DownloadManager 
 
         result = command.execute();
         if (result != null) {
-            s_logger.warn("Error in opening up httpd port err=" + result);
+            s_logger.warn("Error in opening up apache2 port err=" + result);
             return;
         }
 
-        command = new Script("/bin/bash", s_logger);
-        command.add("-c");
-        command.add("if [ -d /etc/apache2 ] ; then service apache2 start; else service httpd start; fi ");
+        command = new Script("/bin/systemctl", s_logger);
+        command.add("start");
+        command.add("apache2");
         result = command.execute();
         if (result != null) {
-            s_logger.warn("Error in starting httpd service err=" + result);
+            s_logger.warn("Error in starting apache2 service err=" + result);
             return;
         }
-        command = new Script("mkdir", s_logger);
-        command.add("-p");
-        command.add("/var/www/html/copy/template");
+
+        command = new Script("/bin/su", s_logger);
+        command.add("-s");
+        command.add("/bin/bash");
+        command.add("-c");
+        command.add("mkdir -p /var/www/html/copy/template");
+        command.add("www-data");
         result = command.execute();
         if (result != null) {
             s_logger.warn("Error in creating directory =" + result);

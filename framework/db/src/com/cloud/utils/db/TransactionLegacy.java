@@ -77,7 +77,6 @@ public class TransactionLegacy implements Closeable {
 
     public static final short CLOUD_DB = 0;
     public static final short USAGE_DB = 1;
-    public static final short AWSAPI_DB = 2;
     public static final short SIMULATOR_DB = 3;
 
     public static final short CONNECTED_DB = -1;
@@ -169,12 +168,22 @@ public class TransactionLegacy implements Closeable {
                 isNew = true;
             }
         }
-
+        txn.checkConnection();
         txn.takeOver(name, false);
         if (isNew) {
             s_mbean.addTransaction(txn);
         }
         return txn;
+    }
+
+    public void checkConnection() {
+        try {
+            if (_conn != null && !_conn.isValid(3)) {
+                _conn = null;
+            }
+        } catch (SQLException e) {
+            _conn = null;
+        }
     }
 
     protected StackElement peekInStack(Object obj) {
@@ -219,19 +228,6 @@ public class TransactionLegacy implements Closeable {
     public static Connection getStandaloneUsageConnection() {
         try {
             Connection conn = s_usageDS.getConnection();
-            if (s_connLogger.isTraceEnabled()) {
-                s_connLogger.trace("Retrieving a standalone connection for usage: dbconn" + System.identityHashCode(conn));
-            }
-            return conn;
-        } catch (SQLException e) {
-            s_logger.warn("Unexpected exception: ", e);
-            return null;
-        }
-    }
-
-    public static Connection getStandaloneAwsapiConnection() {
-        try {
-            Connection conn = s_awsapiDS.getConnection();
             if (s_connLogger.isTraceEnabled()) {
                 s_connLogger.trace("Retrieving a standalone connection for usage: dbconn" + System.identityHashCode(conn));
             }
@@ -571,15 +567,6 @@ public class TransactionLegacy implements Closeable {
                     throw new CloudRuntimeException("Database is not initialized, process is dying?");
                 }
                 break;
-            case AWSAPI_DB:
-                if (s_awsapiDS != null) {
-                    _conn = s_awsapiDS.getConnection();
-                } else {
-                    s_logger.warn("A static-initialized variable becomes null, process is dying?");
-                    throw new CloudRuntimeException("Database is not initialized, process is dying?");
-                }
-                break;
-
             case SIMULATOR_DB:
                 if (s_simulatorDS != null) {
                     _conn = s_simulatorDS.getConnection();
@@ -1014,7 +1001,6 @@ public class TransactionLegacy implements Closeable {
 
     private static DataSource s_ds;
     private static DataSource s_usageDS;
-    private static DataSource s_awsapiDS;
     private static DataSource s_simulatorDS;
     private static boolean s_dbHAEnabled;
 
@@ -1048,6 +1034,7 @@ public class TransactionLegacy implements Closeable {
             final String cloudUsername = dbProps.getProperty("db.cloud.username");
             final String cloudPassword = dbProps.getProperty("db.cloud.password");
             final String cloudHost = dbProps.getProperty("db.cloud.host");
+            final String cloudDriver = dbProps.getProperty("db.cloud.driver");
             final int cloudPort = Integer.parseInt(dbProps.getProperty("db.cloud.port"));
             final String cloudDbName = dbProps.getProperty("db.cloud.name");
             final boolean cloudAutoReconnect = Boolean.parseBoolean(dbProps.getProperty("db.cloud.autoReconnect"));
@@ -1096,10 +1083,12 @@ public class TransactionLegacy implements Closeable {
                     new GenericObjectPool(null, cloudMaxActive, GenericObjectPool.DEFAULT_WHEN_EXHAUSTED_ACTION, cloudMaxWait, cloudMaxIdle, cloudTestOnBorrow, false,
                             cloudTimeBtwEvictionRunsMillis, 1, cloudMinEvcitableIdleTimeMillis, cloudTestWhileIdle);
 
-            final ConnectionFactory cloudConnectionFactory =
-                    new DriverManagerConnectionFactory("jdbc:mysql://" + cloudHost + (s_dbHAEnabled ? "," + cloudSlaves : "") + ":" + cloudPort + "/" + cloudDbName +
-                            "?autoReconnect=" + cloudAutoReconnect + (url != null ? "&" + url : "") + (useSSL ? "&useSSL=true" : "") +
-                            (s_dbHAEnabled ? "&" + cloudDbHAParams : "") + (s_dbHAEnabled ? "&loadBalanceStrategy=" + loadBalanceStrategy : ""), cloudUsername, cloudPassword);
+            final String cloudConnectionUri = cloudDriver + "://" + cloudHost + (s_dbHAEnabled ? "," + cloudSlaves : "") + ":" + cloudPort + "/" + cloudDbName +
+                    "?autoReconnect=" + cloudAutoReconnect + (url != null ? "&" + url : "") + (useSSL ? "&useSSL=true" : "") +
+                    (s_dbHAEnabled ? "&" + cloudDbHAParams : "") + (s_dbHAEnabled ? "&loadBalanceStrategy=" + loadBalanceStrategy : "");
+            DriverLoader.loadDriver(cloudDriver);
+
+            final ConnectionFactory cloudConnectionFactory = new DriverManagerConnectionFactory(cloudConnectionUri, cloudUsername, cloudPassword);
 
             final KeyedObjectPoolFactory poolableObjFactory = (cloudPoolPreparedStatements ? new StackKeyedObjectPoolFactory() : null);
 
@@ -1116,6 +1105,7 @@ public class TransactionLegacy implements Closeable {
             final String usageUsername = dbProps.getProperty("db.usage.username");
             final String usagePassword = dbProps.getProperty("db.usage.password");
             final String usageHost = dbProps.getProperty("db.usage.host");
+            final String usageDriver = dbProps.getProperty("db.usage.driver");
             final int usagePort = Integer.parseInt(dbProps.getProperty("db.usage.port"));
             final String usageDbName = dbProps.getProperty("db.usage.name");
             final boolean usageAutoReconnect = Boolean.parseBoolean(dbProps.getProperty("db.usage.autoReconnect"));
@@ -1124,31 +1114,18 @@ public class TransactionLegacy implements Closeable {
             final GenericObjectPool usageConnectionPool =
                     new GenericObjectPool(null, usageMaxActive, GenericObjectPool.DEFAULT_WHEN_EXHAUSTED_ACTION, usageMaxWait, usageMaxIdle);
 
-            final ConnectionFactory usageConnectionFactory =
-                    new DriverManagerConnectionFactory("jdbc:mysql://" + usageHost + (s_dbHAEnabled ? "," + dbProps.getProperty("db.cloud.slaves") : "") + ":" + usagePort +
-                            "/" + usageDbName + "?autoReconnect=" + usageAutoReconnect + (usageUrl != null ? "&" + usageUrl : "") +
-                            (s_dbHAEnabled ? "&" + getDBHAParams("usage", dbProps) : "") + (s_dbHAEnabled ? "&loadBalanceStrategy=" + loadBalanceStrategy : ""), usageUsername,
-                            usagePassword);
+            final String usageConnectionUri = usageDriver + "://" + usageHost + (s_dbHAEnabled ? "," + dbProps.getProperty("db.cloud.slaves") : "") + ":" + usagePort +
+                    "/" + usageDbName + "?autoReconnect=" + usageAutoReconnect + (usageUrl != null ? "&" + usageUrl : "") +
+                    (s_dbHAEnabled ? "&" + getDBHAParams("usage", dbProps) : "") + (s_dbHAEnabled ? "&loadBalanceStrategy=" + loadBalanceStrategy : "");
+            DriverLoader.loadDriver(usageDriver);
+
+            final ConnectionFactory usageConnectionFactory = new DriverManagerConnectionFactory(usageConnectionUri, usageUsername, usagePassword);
 
             final PoolableConnectionFactory usagePoolableConnectionFactory =
                     new PoolableConnectionFactory(usageConnectionFactory, usageConnectionPool, new StackKeyedObjectPoolFactory(), null, false, false);
 
             // Data Source for usage server
             s_usageDS = new PoolingDataSource(usagePoolableConnectionFactory.getPool());
-
-            // Configure awsapi db
-            final String awsapiDbName = dbProps.getProperty("db.awsapi.name");
-            final GenericObjectPool awsapiConnectionPool =
-                    new GenericObjectPool(null, usageMaxActive, GenericObjectPool.DEFAULT_WHEN_EXHAUSTED_ACTION, usageMaxWait, usageMaxIdle);
-            final ConnectionFactory awsapiConnectionFactory =
-                    new DriverManagerConnectionFactory("jdbc:mysql://" + cloudHost + (s_dbHAEnabled ? "," + cloudSlaves : "") + ":" + cloudPort + "/" + awsapiDbName +
-                            "?autoReconnect=" + cloudAutoReconnect + (s_dbHAEnabled ? "&" + cloudDbHAParams : "") +
-                            (s_dbHAEnabled ? "&loadBalanceStrategy=" + loadBalanceStrategy : ""), cloudUsername, cloudPassword);
-            final PoolableConnectionFactory awsapiPoolableConnectionFactory =
-                    new PoolableConnectionFactory(awsapiConnectionFactory, awsapiConnectionPool, new StackKeyedObjectPoolFactory(), null, false, false);
-
-            // Data Source for awsapi
-            s_awsapiDS = new PoolingDataSource(awsapiPoolableConnectionFactory.getPool());
 
             try {
                 // Configure the simulator db
@@ -1158,6 +1135,7 @@ public class TransactionLegacy implements Closeable {
                 final String simulatorUsername = dbProps.getProperty("db.simulator.username");
                 final String simulatorPassword = dbProps.getProperty("db.simulator.password");
                 final String simulatorHost = dbProps.getProperty("db.simulator.host");
+                final String simulatorDriver = dbProps.getProperty("db.simulator.driver");
                 final int simulatorPort = Integer.parseInt(dbProps.getProperty("db.simulator.port"));
                 final String simulatorDbName = dbProps.getProperty("db.simulator.name");
                 final boolean simulatorAutoReconnect = Boolean.parseBoolean(dbProps.getProperty("db.simulator.autoReconnect"));
@@ -1165,9 +1143,11 @@ public class TransactionLegacy implements Closeable {
                 final GenericObjectPool simulatorConnectionPool =
                         new GenericObjectPool(null, simulatorMaxActive, GenericObjectPool.DEFAULT_WHEN_EXHAUSTED_ACTION, simulatorMaxWait, simulatorMaxIdle);
 
-                final ConnectionFactory simulatorConnectionFactory =
-                        new DriverManagerConnectionFactory("jdbc:mysql://" + simulatorHost + ":" + simulatorPort + "/" + simulatorDbName + "?autoReconnect=" +
-                                simulatorAutoReconnect, simulatorUsername, simulatorPassword);
+                final String simulatorConnectionUri = simulatorDriver + "://" + simulatorHost + ":" + simulatorPort + "/" + simulatorDbName + "?autoReconnect=" +
+                        simulatorAutoReconnect;
+                DriverLoader.loadDriver(simulatorDriver);
+
+                final ConnectionFactory simulatorConnectionFactory = new DriverManagerConnectionFactory(simulatorConnectionUri, simulatorUsername, simulatorPassword);
 
                 final PoolableConnectionFactory simulatorPoolableConnectionFactory =
                         new PoolableConnectionFactory(simulatorConnectionFactory, simulatorConnectionPool, new StackKeyedObjectPoolFactory(), null, false, false);

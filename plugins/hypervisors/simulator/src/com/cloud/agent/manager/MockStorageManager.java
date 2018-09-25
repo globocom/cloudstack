@@ -19,11 +19,11 @@ package com.cloud.agent.manager;
 import org.apache.cloudstack.storage.command.DeleteCommand;
 import org.apache.cloudstack.storage.command.DownloadCommand;
 import org.apache.cloudstack.storage.command.DownloadProgressCommand;
+import org.apache.cloudstack.storage.command.UploadStatusAnswer;
+import org.apache.cloudstack.storage.command.UploadStatusCommand;
 
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.AttachIsoCommand;
-import com.cloud.agent.api.AttachVolumeAnswer;
-import com.cloud.agent.api.AttachVolumeCommand;
 import com.cloud.agent.api.BackupSnapshotCommand;
 import com.cloud.agent.api.ComputeChecksumCommand;
 import com.cloud.agent.api.CreatePrivateTemplateFromSnapshotCommand;
@@ -33,6 +33,9 @@ import com.cloud.agent.api.CreateVolumeFromSnapshotCommand;
 import com.cloud.agent.api.DeleteStoragePoolCommand;
 import com.cloud.agent.api.GetStorageStatsAnswer;
 import com.cloud.agent.api.GetStorageStatsCommand;
+import com.cloud.agent.api.GetVolumeStatsAnswer;
+import com.cloud.agent.api.GetVolumeStatsCommand;
+import com.cloud.agent.api.HandleConfigDriveIsoCommand;
 import com.cloud.agent.api.ManageSnapshotCommand;
 import com.cloud.agent.api.ModifyStoragePoolCommand;
 import com.cloud.agent.api.SecStorageSetupCommand;
@@ -57,8 +60,6 @@ public interface MockStorageManager extends Manager {
 
     public CreateAnswer createVolume(CreateCommand cmd);
 
-    public AttachVolumeAnswer AttachVolume(AttachVolumeCommand cmd);
-
     public Answer AttachIso(AttachIsoCommand cmd);
 
     public Answer DeleteStoragePool(DeleteStoragePoolCommand cmd);
@@ -78,6 +79,8 @@ public interface MockStorageManager extends Manager {
     public Answer Download(DownloadCommand cmd);
 
     public Answer DownloadProcess(DownloadProgressCommand cmd);
+
+    GetVolumeStatsAnswer getVolumeStats(GetVolumeStatsCommand cmd);
 
     public GetStorageStatsAnswer GetStorageStats(GetStorageStatsCommand cmd);
 
@@ -106,4 +109,8 @@ public interface MockStorageManager extends Manager {
     StoragePoolInfo getLocalStorage(String hostGuid, Long storageSize);
 
     CopyVolumeAnswer CopyVolume(CopyVolumeCommand cmd);
+
+    public UploadStatusAnswer getUploadStatus(UploadStatusCommand cmd);
+
+    Answer handleConfigDriveIso(HandleConfigDriveIsoCommand cmd);
 }

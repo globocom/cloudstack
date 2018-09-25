@@ -27,7 +27,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
@@ -103,7 +102,6 @@ import com.cloud.vm.dao.DomainRouterDao;
 import com.cloud.vm.dao.NicDao;
 
 @Component
-@Local(value = {ElasticLoadBalancerManager.class})
 public class ElasticLoadBalancerManagerImpl extends ManagerBase implements ElasticLoadBalancerManager, VirtualMachineGuru {
     private static final Logger s_logger = Logger.getLogger(ElasticLoadBalancerManagerImpl.class);
 
@@ -292,7 +290,6 @@ public class ElasticLoadBalancerManagerImpl extends ManagerBase implements Elast
         _elasticLbVmRamSize = NumbersUtil.parseInt(configs.get(Config.ElasticLoadBalancerVmMemory.key()), DEFAULT_ELB_VM_RAMSIZE);
         _elasticLbvmCpuMHz = NumbersUtil.parseInt(configs.get(Config.ElasticLoadBalancerVmCpuMhz.key()), DEFAULT_ELB_VM_CPU_MHZ);
         _elasticLbvmNumCpu = NumbersUtil.parseInt(configs.get(Config.ElasticLoadBalancerVmNumVcpu.key()), 1);
-
         List<ServiceOfferingVO> offerings = _serviceOfferingDao.createSystemServiceOfferings("System Offering For Elastic LB VM",
                 ServiceOffering.elbVmDefaultOffUniqueName, _elasticLbvmNumCpu, _elasticLbVmRamSize, _elasticLbvmCpuMHz, 0, 0, true, null,
                 Storage.ProvisioningType.THIN, true, null, true, VirtualMachine.Type.ElasticLoadBalancerVm, true);
@@ -435,12 +432,12 @@ public class ElasticLoadBalancerManagerImpl extends ManagerBase implements Elast
 
         for (NicProfile nic : profile.getNics()) {
             int deviceId = nic.getDeviceId();
-            buf.append(" eth").append(deviceId).append("ip=").append(nic.getIp4Address());
-            buf.append(" eth").append(deviceId).append("mask=").append(nic.getNetmask());
+            buf.append(" eth").append(deviceId).append("ip=").append(nic.getIPv4Address());
+            buf.append(" eth").append(deviceId).append("mask=").append(nic.getIPv4Netmask());
             if (nic.isDefaultNic()) {
-                buf.append(" gateway=").append(nic.getGateway());
-                defaultDns1 = nic.getDns1();
-                defaultDns2 = nic.getDns2();
+                buf.append(" gateway=").append(nic.getIPv4Gateway());
+                defaultDns1 = nic.getIPv4Dns1();
+                defaultDns2 = nic.getIPv4Dns2();
             }
             if (nic.getTrafficType() == TrafficType.Management) {
                 buf.append(" localgw=").append(dest.getPod().getGateway());
@@ -450,7 +447,7 @@ public class ElasticLoadBalancerManagerImpl extends ManagerBase implements Elast
                     if (s_logger.isInfoEnabled()) {
                         s_logger.info("Check if we need to add management server explicit route to ELB vm. pod cidr: " + dest.getPod().getCidrAddress() + "/"
                                 + dest.getPod().getCidrSize() + ", pod gateway: " + dest.getPod().getGateway() + ", management host: "
-                                + ApiServiceConfiguration.ManagementHostIPAdr.value());
+                                + ApiServiceConfiguration.ManagementServerAddresses.value());
                     }
 
                     if (s_logger.isDebugEnabled()) {
@@ -498,11 +495,11 @@ public class ElasticLoadBalancerManagerImpl extends ManagerBase implements Elast
         List<NicProfile> nics = profile.getNics();
         for (NicProfile nic : nics) {
             if (nic.getTrafficType() == TrafficType.Public) {
-                elbVm.setPublicIpAddress(nic.getIp4Address());
-                elbVm.setPublicNetmask(nic.getNetmask());
+                elbVm.setPublicIpAddress(nic.getIPv4Address());
+                elbVm.setPublicNetmask(nic.getIPv4Netmask());
                 elbVm.setPublicMacAddress(nic.getMacAddress());
             } else if (nic.getTrafficType() == TrafficType.Control) {
-                elbVm.setPrivateIpAddress(nic.getIp4Address());
+                elbVm.setPrivateIpAddress(nic.getIPv4Address());
                 elbVm.setPrivateMacAddress(nic.getMacAddress());
             }
         }
@@ -535,14 +532,14 @@ public class ElasticLoadBalancerManagerImpl extends ManagerBase implements Elast
             // TODO this is a ugly to test hypervisor type here
             // for basic network mode, we will use the guest NIC for control NIC
             for (NicProfile nic : profile.getNics()) {
-                if (nic.getTrafficType() == TrafficType.Guest && nic.getIp4Address() != null) {
+                if (nic.getTrafficType() == TrafficType.Guest && nic.getIPv4Address() != null) {
                     controlNic = nic;
                     guestNetworkId = nic.getNetworkId();
                 }
             }
         } else {
             for (NicProfile nic : profile.getNics()) {
-                if (nic.getTrafficType() == TrafficType.Control && nic.getIp4Address() != null) {
+                if (nic.getTrafficType() == TrafficType.Control && nic.getIPv4Address() != null) {
                     controlNic = nic;
                 } else if (nic.getTrafficType() == TrafficType.Guest) {
                     guestNetworkId = nic.getNetworkId();
@@ -555,7 +552,7 @@ public class ElasticLoadBalancerManagerImpl extends ManagerBase implements Elast
             return false;
         }
 
-        cmds.addCommand("checkSsh", new CheckSshCommand(profile.getInstanceName(), controlNic.getIp4Address(), 3922));
+        cmds.addCommand("checkSsh", new CheckSshCommand(profile.getInstanceName(), controlNic.getIPv4Address(), 3922));
 
         // Re-apply load balancing rules
         List<LoadBalancerVO> lbs = _elbVmMapDao.listLbsForElbVm(elbVm.getId());

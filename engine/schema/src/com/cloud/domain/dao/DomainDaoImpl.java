@@ -23,7 +23,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import javax.ejb.Local;
 
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -38,7 +37,6 @@ import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.TransactionLegacy;
 
 @Component
-@Local(value = {DomainDao.class})
 public class DomainDaoImpl extends GenericDaoBase<DomainVO, Long> implements DomainDao {
     private static final Logger s_logger = Logger.getLogger(DomainDaoImpl.class);
 
@@ -150,6 +148,11 @@ public class DomainDaoImpl extends GenericDaoBase<DomainVO, Long> implements Dom
         if (id != null && id.longValue() == Domain.ROOT_DOMAIN) {
             s_logger.error("Can not remove domain " + id + " as it is ROOT domain");
             return false;
+        } else {
+            if(id == null) {
+                s_logger.error("Can not remove domain without id.");
+                return false;
+            }
         }
 
         DomainVO domain = findById(id);

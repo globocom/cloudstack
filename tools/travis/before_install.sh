@@ -21,27 +21,12 @@
 # or internet downloads.
 #
 
-export TEST_JOB_NUMBER=`echo $TRAVIS_JOB_NUMBER | cut -d. -f1`
-export TEST_SEQUENCE_NUMBER=`echo $TRAVIS_JOB_NUMBER | cut -d. -f2`
-
-echo "REGRESSION_CYCLE=$REGRESSION_CYCLE"
-echo "TEST_JOB_NUMBER=$TEST_JOB_NUMBER"
-echo "TEST_SEQUENCE_NUMBER=$TEST_SEQUENCE_NUMBER"
-
-#run regression test only on $REGRESSION_CYCLE
-MOD=$(( $TEST_JOB_NUMBER % $REGRESSION_CYCLE ))
-
-echo "MOD=$MOD"
-
-if [ $MOD -ne 0 ]; then
- if [ $TEST_SEQUENCE_NUMBER -ge $REGRESSION_INDEX ]; then
-   #skip test
-   echo "Skipping tests ... SUCCESS !"
-   exit 0
- fi
-fi
-
 echo -e "#### System Information ####"
+echo -e "\nO.S. information:"
+echo $(uname -a)
+
+echo -e "\nWho am I:"
+whoami
 
 echo -e "\nJava Version: "
 javac -version
@@ -49,25 +34,56 @@ javac -version
 echo -e "\nMaven Version: "
 mvn -v
 
+echo -e "\nPython Version: "
+python --version
+
+echo -e "\nPip Version: "
+pip --version
+
+echo -e "\nDisk Status: "
+df
+
+echo -e "\nMemory Status: "
+free
+
+echo -e "\nTotal CPUs: "
+nproc
+
+echo -e "\nCheck Git status"
+git status
+
+echo -e "\nCleaning up stale files in /tmp: "
+sudo find /tmp -type f -mtime +2 | grep -v "`sudo lsof | grep /tmp |awk '{print $9}'|sed -e '1 d' |sort |uniq | tr \\n \|`" | xargs sudo rm -vf
+
 echo -e "\nUpdating the system: "
-sudo apt-get -q -y update > /dev/null
+sudo apt-get -y clean
+sudo apt-get -y update > /dev/null
 
 echo -e "\nInstalling MySQL: "
 
-sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password your_password'
-sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password your_password'
+export DEBIAN_FRONTEND=noninteractive
+sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password password'
+sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password password'
 sudo apt-get -q -y install mysql-server > /dev/null
 
-sudo /etc/init.d/mysql start
-
-echo -e "\nInstalling Tomcat: "
-wget -q -O tomcat.tar.gz http://archive.apache.org/dist/tomcat/tomcat-6/v6.0.33/bin/apache-tomcat-6.0.33.tar.gz
-sudo mkdir -p /opt/tomcat
-sudo tar xfv tomcat.tar.gz -C /opt/tomcat --strip 1 > /dev/null
+mysql -uroot -ppassword -e "SET PASSWORD = PASSWORD(''); FLUSH PRIVILEGES;"
+sudo service mysql restart
 
 echo -e "\nInstalling Development tools: "
+RETRY_COUNT=3
 
-sudo apt-get -q -y install uuid-runtime genisoimage python-setuptools python-pip netcat > /dev/null
+sudo apt-get -q -y install uuid-runtime genisoimage netcat > /dev/null
+if [[ $? -ne 0 ]]; then
+  echo -e "\napt-get packages failed to install"
+fi
+
+# Use latest ipmitool 1.8.16
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1397BC53640DB551
+sudo sh -c 'echo "deb http://archive.ubuntu.com/ubuntu xenial main universe" >> /etc/apt/sources.list'
+sudo apt-get update -q -y > /dev/null
+sudo apt-get -q -y -V install freeipmi-common libfreeipmi16 libgcrypt20 libgpg-error-dev libgpg-error0 libopenipmi0 ipmitool libpython-dev libssl-dev libffi-dev python-openssl build-essential --no-install-recommends > /dev/null
+
+ipmitool -V
 
 echo "<settings>
   <mirrors>
@@ -82,5 +98,18 @@ echo "<settings>
 
 echo -e "\nInstalling some python packages: "
 
-sudo pip install lxml > /dev/null
-sudo pip install texttable > /dev/null
+pip install --user --upgrade pip
+
+for ((i=0;i<$RETRY_COUNT;i++))
+do
+  pip install --user --upgrade lxml paramiko nose texttable ipmisim pyopenssl mock flask netaddr pylint pycodestyle six astroid > /tmp/piplog
+  if [[ $? -eq 0 ]]; then
+    echo -e "\npython packages installed successfully"
+    break;
+  fi
+  echo -e "\npython packages failed to install"
+  cat /tmp/piplog
+done
+
+echo -e "\nVersion of pip packages:\n"
+echo $(pip freeze)
