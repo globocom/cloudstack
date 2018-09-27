@@ -18,6 +18,7 @@ package com.cloud.globodictionary.apiclient;
 
 import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.cloud.globodictionary.GloboDictionaryService;
+import com.cloud.globodictionary.apiclient.model.GloboDictionaryEntityVO;
 import com.cloud.utils.exception.CloudRuntimeException;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -28,7 +29,10 @@ import org.mockito.MockitoAnnotations;
 import org.mockito.Spy;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -109,6 +113,18 @@ public class GloboDictionaryAPIClientImplTest {
         mockCreateRequest(getMethodMock);
         mockExecuteMethod(200);
 
+        GloboDictionaryEntityVO vo1 = new GloboDictionaryEntityVO();
+        vo1.setId(BUSINESS_SERVICE_ID);
+        vo1.setName(BUSINESS_SERVICE_NAME);
+        vo1.setStatus("Ativo");
+
+        ArrayList<GloboDictionaryEntity> vos = new ArrayList<>();
+        vos.add(vo1);
+
+        GloboDictionaryApiUnmarshaller unmarshallerMock = mock(GloboDictionaryApiUnmarshaller.class);
+        apiClient.setGloboDictionaryApiUnmarshaller(unmarshallerMock);
+        when(unmarshallerMock.unmarshal(getBusinessServiceJSON())).thenReturn(vos);
+
         List<GloboDictionaryEntity> entities = apiClient.list(GloboDictionaryService.GloboDictionaryEntityType.BUSINESS_SERVICE);
 
         GloboDictionaryEntity entity = entities.get(0);
@@ -116,6 +132,41 @@ public class GloboDictionaryAPIClientImplTest {
         assertEquals(BUSINESS_SERVICE_NAME, entity.getName());
         assertEquals(BUSINESS_SERVICE_ID, entity.getId());
         verify(httpClient).executeMethod(getMethodMock);
+        verify(unmarshallerMock).unmarshal(getBusinessServiceJSON());
+    }
+
+    @Test
+    public void testListByExample() throws IOException {
+        GetMethod getMethodMock = mock(GetMethod.class);
+        when(getMethodMock.getResponseBodyAsString()).thenReturn(getBusinessServiceJSON());
+        mockCreateRequest(getMethodMock);
+        mockExecuteMethod(200);
+
+        GloboDictionaryEntityVO vo1 = new GloboDictionaryEntityVO();
+        vo1.setId("11aa");
+        vo1.setName("Teste");
+        vo1.setStatus("Ativo");
+
+        GloboDictionaryEntityVO vo2 = new GloboDictionaryEntityVO();
+        vo2.setId("22bb");
+        vo2.setName("Teste2");
+        vo2.setStatus("Ativo");
+
+        ArrayList<GloboDictionaryEntity> vos = new ArrayList<>();
+        vos.add(vo1);
+        vos.add(vo2);
+
+        GloboDictionaryApiUnmarshaller unmarshallerMock = mock(GloboDictionaryApiUnmarshaller.class);
+        apiClient.setGloboDictionaryApiUnmarshaller(unmarshallerMock);
+        when(unmarshallerMock.unmarshal(getBusinessServiceJSON())).thenReturn(vos);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("component_id", "1199aaff");
+        List<GloboDictionaryEntity> globoDictionaryEntities = apiClient.listByExample(GloboDictionaryService.GloboDictionaryEntityType.SUB_COMPONENT, params);
+        assertEquals(2, globoDictionaryEntities.size());
+        assertEquals("22bb", globoDictionaryEntities.get(1).getId());
+
+        verify(unmarshallerMock).unmarshal(getBusinessServiceJSON());
     }
 
     @Test
@@ -125,10 +176,15 @@ public class GloboDictionaryAPIClientImplTest {
         mockCreateRequest(getMethodMock);
         mockExecuteMethod(200);
 
+        GloboDictionaryApiUnmarshaller unmarshallerMock = mock(GloboDictionaryApiUnmarshaller.class);
+        when(unmarshallerMock.unmarshal("[]")).thenReturn(new ArrayList<>());
+        apiClient.setGloboDictionaryApiUnmarshaller(unmarshallerMock);
+
         List<GloboDictionaryEntity> entities = apiClient.list(GloboDictionaryService.GloboDictionaryEntityType.BUSINESS_SERVICE);
 
         assertEquals(0, entities.size());
         verify(httpClient).executeMethod(getMethodMock);
+        verify(unmarshallerMock).unmarshal("[]");
     }
 
     @Test(expected = CloudRuntimeException.class)

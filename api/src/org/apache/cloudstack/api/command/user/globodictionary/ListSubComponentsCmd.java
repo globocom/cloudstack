@@ -16,9 +16,22 @@
 */
 package org.apache.cloudstack.api.command.user.globodictionary;
 
+import com.cloud.exception.InsufficientCapacityException;
+import com.cloud.exception.NetworkRuleConflictException;
+import com.cloud.exception.ResourceAllocationException;
+import com.cloud.exception.ResourceUnavailableException;
+import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.cloud.globodictionary.GloboDictionaryService;
+import com.cloud.utils.StringUtils;
 import org.apache.cloudstack.api.APICommand;
+import org.apache.cloudstack.api.ApiConstants;
+import org.apache.cloudstack.api.Parameter;
 import org.apache.cloudstack.api.response.GloboDictionaryResponse;
+import org.apache.cloudstack.api.response.ListResponse;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 @APICommand(name = "listSubComponents", description = "Lists sub-components", responseObject = GloboDictionaryResponse.class,
         requestHasSensitiveInfo = false, responseHasSensitiveInfo = false)
@@ -26,6 +39,12 @@ public class ListSubComponentsCmd extends BaseDictionaryCmd {
 
     private static final String s_name = "listsubcomponentsresponse";
     private static final String response_name = "subcomponent";
+
+    @Parameter(name = ApiConstants.COMPONENT_REQUIRED, type = CommandType.BOOLEAN, description = "only brings the Sub Components if the Component Id is passed")
+    protected boolean componentRequired;
+
+    @Parameter(name = ApiConstants.COMPONENT_ID, type = CommandType.STRING, description = "the ID of the Component which the Sub Components are children ")
+    protected String componentId;
 
     @Override
     GloboDictionaryService.GloboDictionaryEntityType getEntity() {
@@ -37,8 +56,39 @@ public class ListSubComponentsCmd extends BaseDictionaryCmd {
         return s_name;
     }
 
+    public boolean isComponentRequired() { return componentRequired; }
+
+    public boolean getComponentRequired() { return componentRequired; }
+
+    public String getComponentId() { return componentId; }
+
     @Override
     String getResponseName() {
         return response_name;
     }
+
+    @Override
+    public void execute() throws ResourceUnavailableException, NetworkRuleConflictException, InsufficientCapacityException, ResourceAllocationException {
+        if(componentRequired) {
+            ListResponse<GloboDictionaryResponse> response = new ListResponse<>();
+            List<GloboDictionaryResponse> globoDictionaryResponses = new ArrayList<>();
+
+            if(StringUtils.isNotBlank(componentId)) {
+                HashMap<String, String> example = new HashMap<>();
+                example.put("componente_id", componentId);
+
+                List<GloboDictionaryEntity> components = globoDictionaryService.listByExample(this.getEntity(), example);
+                for (GloboDictionaryEntity component : components) {
+                    globoDictionaryResponses.add(createResponse(component));
+                }
+            }
+
+            response.setResponses(globoDictionaryResponses);
+            response.setResponseName(getCommandName());
+            this.setResponseObject(response);
+        } else {
+            super.execute();
+        }
+    }
+
 }

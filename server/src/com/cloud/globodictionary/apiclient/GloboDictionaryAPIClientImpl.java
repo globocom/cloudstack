@@ -23,19 +23,19 @@ import com.cloud.utils.exception.CloudRuntimeException;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.apache.cloudstack.framework.config.ConfigKey;
+import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
+import javax.inject.Inject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Collections;
-
+import java.util.Map;
 
 @Component
 public class GloboDictionaryAPIClientImpl implements GloboDictionaryAPIClient, Configurable {
@@ -47,6 +47,9 @@ public class GloboDictionaryAPIClientImpl implements GloboDictionaryAPIClient, C
 
     private final HttpClient httpClient;
     private static final String API_ID_QUERY_PARAMETER = "id_service_now";
+
+    @Inject
+    private GloboDictionaryApiUnmarshaller globoDictionaryApiUnmarshaller;
 
     public GloboDictionaryAPIClientImpl() {
         this.httpClient = new HttpClient(new MultiThreadedHttpConnectionManager());
@@ -66,11 +69,23 @@ public class GloboDictionaryAPIClientImpl implements GloboDictionaryAPIClient, C
         return this.listDictionaryEntity(type);
     }
 
+    @Override
+    public List<GloboDictionaryEntity> listByExample(GloboDictionaryService.GloboDictionaryEntityType type, Map<String, String> example) {
+        String queryString = "";
+
+        String querySymbol = "";
+        for (Map.Entry<String, String> entry : example.entrySet()) {
+                queryString += String.format("%s%s=%s", querySymbol, entry.getKey(), entry.getValue());
+                querySymbol = "&";
+        }
+
+        String response = this.makeHttpRequest(type, queryString);
+        return globoDictionaryApiUnmarshaller.unmarshal(response);
+    }
+
     private List<GloboDictionaryEntity> listDictionaryEntity(GloboDictionaryService.GloboDictionaryEntityType entityType) {
         String response = this.makeHttpRequest(entityType);
-        List<GloboDictionaryEntity> globoDictionaryEntities = new Gson().fromJson(response, new TypeToken<ArrayList<GloboDictionaryEntityVO>>() {}.getType());
-        Collections.sort(globoDictionaryEntities);
-        return globoDictionaryEntities;
+        return globoDictionaryApiUnmarshaller.unmarshal(response);
     }
 
     private GloboDictionaryEntity getDictionaryEntity(GloboDictionaryService.GloboDictionaryEntityType entityType, String id) {
@@ -118,4 +133,9 @@ public class GloboDictionaryAPIClientImpl implements GloboDictionaryAPIClient, C
     public ConfigKey<?>[] getConfigKeys() {
         return new ConfigKey<?>[] {GloboDictionaryEndpoint};
     }
+
+    public void setGloboDictionaryApiUnmarshaller(GloboDictionaryApiUnmarshaller globoDictionaryApiUnmarshaller) {
+        this.globoDictionaryApiUnmarshaller = globoDictionaryApiUnmarshaller;
+    }
+
 }

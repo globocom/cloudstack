@@ -31,6 +31,7 @@ import org.springframework.stereotype.Component;
 import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class GloboDictionaryManager implements GloboDictionaryService, PluggableService {
@@ -58,6 +59,11 @@ public class GloboDictionaryManager implements GloboDictionaryService, Pluggable
             return businessService;
         }
         return null;
+    }
+
+    @Override
+    public List<GloboDictionaryEntity> listByExample(GloboDictionaryEntityType type, Map<String, String> example) {
+        return dictionaryAPIClient.listByExample(type, example);
     }
 
     private List<GloboDictionaryEntity> filterActives(List<GloboDictionaryEntity> entities){

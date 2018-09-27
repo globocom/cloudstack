@@ -17,6 +17,7 @@
 package com.cloud.globodictionary;
 
 import java.util.List;
+import java.util.Map;
 
 public interface GloboDictionaryService {
 
@@ -45,4 +46,7 @@ public interface GloboDictionaryService {
     List<GloboDictionaryEntity> list(GloboDictionaryEntityType type);
 
     GloboDictionaryEntity get(GloboDictionaryEntityType type, String id);
+
+    List<GloboDictionaryEntity> listByExample(GloboDictionaryEntityType type, Map<String, String> example);
+
 }

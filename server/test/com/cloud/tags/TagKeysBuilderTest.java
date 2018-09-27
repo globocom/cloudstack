@@ -72,7 +72,7 @@ public class TagKeysBuilderTest extends TestCase {
 
         String keys = TagKeysBuilder.buildTagKeys(tags);
 
-        assertEquals("MY_TAG,MY_TAG_1,MY_TAG_2", keys);
+        assertEquals("MY_TAG_,MY_TAG_1_,_MY_TAG_2_", keys);
     }
 
     public void testBuildTagKeys_empty_list() {
