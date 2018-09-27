@@ -487,6 +487,7 @@ public class ApiConstants {
     public static final String RESOURCE_STATE = "resourcestate";
     public static final String PROJECT_INVITE_REQUIRED = "projectinviterequired";
     public static final String REQUIRED = "required";
+    public static final String COMPONENT_REQUIRED = "componentrequired";
     public static final String RESTART_REQUIRED = "restartrequired";
     public static final String ALLOW_USER_CREATE_PROJECTS = "allowusercreateprojects";
     public static final String CONSERVE_MODE = "conservemode";

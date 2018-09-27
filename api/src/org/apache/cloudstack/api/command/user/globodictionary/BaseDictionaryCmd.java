@@ -87,7 +87,7 @@ public abstract class BaseDictionaryCmd extends BaseCmd {
         return CallContext.current().getCallingAccountId();
     }
 
-    private GloboDictionaryResponse createResponse(GloboDictionaryEntity component) {
+    protected GloboDictionaryResponse createResponse(GloboDictionaryEntity component) {
         GloboDictionaryResponse globoDictionaryResponse = new GloboDictionaryResponse(component.getId(), component.getName());
         globoDictionaryResponse.setObjectName(this.getResponseName());
         return globoDictionaryResponse;

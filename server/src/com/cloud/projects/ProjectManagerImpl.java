@@ -38,7 +38,9 @@ import javax.mail.URLName;
 import javax.mail.internet.InternetAddress;
 import javax.naming.ConfigurationException;
 
+import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.cloud.globodictionary.GloboDictionaryService;
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
@@ -197,35 +199,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
             owner = _accountMgr.finalizeOwner(caller, accountName, domainId, null);
         }
 
-        if(businessServiceId != null){
-            if(!businessServiceId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.BUSINESS_SERVICE, businessServiceId) == null){
-                throw new InvalidParameterValueException("Business Service with ID "+ businessServiceId +" does not exist");
-            }
-        }
-
-        if(clientId != null){
-            if(!clientId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.CLIENT, clientId) == null){
-                throw new InvalidParameterValueException("Client with ID "+ clientId +" does not exist");
-            }
-        }
-
-        if(componentId != null){
-            if(!componentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.COMPONENT, componentId) == null){
-                throw new InvalidParameterValueException("Component with ID "+ componentId +" does not exist");
-            }
-        }
-
-        if(subComponentId != null){
-            if(!subComponentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.SUB_COMPONENT, subComponentId) == null){
-                throw new InvalidParameterValueException("Sub-component with ID "+ subComponentId +" does not exist");
-            }
-        }
-
-        if(productId != null){
-            if(!productId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.PRODUCT, productId) == null){
-                throw new InvalidParameterValueException("Product with ID "+ productId +" does not exist");
-            }
-        }
+        validateFields(businessServiceId, clientId, componentId, subComponentId, productId);
 
         //don't allow 2 projects with the same name inside the same domain
         if (_projectDao.findByNameAndDomain(name, owner.getDomainId()) != null) {
@@ -262,6 +236,47 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
         return project;
     }
         });
+    }
+
+    private void validateFields(String businessServiceId, String clientId, String componentId, String subComponentId, String productId) {
+        if(StringUtils.isEmpty(businessServiceId)) {
+            throw new InvalidParameterValueException("Business Service must be passed");
+        }
+
+        if(StringUtils.isEmpty(clientId)) {
+            throw new InvalidParameterValueException("Client must be passed");
+        }
+
+        if(StringUtils.isEmpty(componentId)) {
+            throw new InvalidParameterValueException("Component must be passed");
+        }
+
+        if(StringUtils.isEmpty(subComponentId)) {
+            throw new InvalidParameterValueException("Sub Component must be passed");
+        }
+
+        if(_globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.BUSINESS_SERVICE, businessServiceId) == null){
+            throw new InvalidParameterValueException("Business Service with ID "+ businessServiceId +" does not exist");
+        }
+
+        if(_globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.CLIENT, clientId) == null){
+            throw new InvalidParameterValueException("Client with ID "+ clientId +" does not exist");
+        }
+
+        if(_globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.COMPONENT, componentId) == null){
+            throw new InvalidParameterValueException("Component with ID "+ componentId +" does not exist");
+        }
+
+        GloboDictionaryEntity subComponent = _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.SUB_COMPONENT, subComponentId);
+        if(subComponent == null){
+            throw new InvalidParameterValueException("Sub-component with ID "+ subComponentId +" does not exist");
+        }
+
+        if(productId != null){
+            if(!productId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.PRODUCT, productId) == null){
+                throw new InvalidParameterValueException("Product with ID "+ productId +" does not exist");
+            }
+        }
     }
 
     @Override
@@ -508,40 +523,7 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
                     project.setDetailedUsage(detailedUsage);
                 }
 
-                if(businessServiceId != null){
-                    if(!businessServiceId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.BUSINESS_SERVICE, businessServiceId) == null){
-                        throw new InvalidParameterValueException("Business Service with ID "+ businessServiceId +" does not exist");
-                    }
-                    project.setBusinessServiceId(businessServiceId);
-                }
-
-                if(clientId != null) {
-                    if(!clientId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.CLIENT, clientId) == null){
-                        throw new InvalidParameterValueException("Client with ID "+ clientId +" does not exist");
-                    }
-                    project.setClientId(clientId);
-                }
-
-                if(componentId != null) {
-                    if(!componentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.COMPONENT, componentId) == null){
-                        throw new InvalidParameterValueException("Component with ID "+ componentId +" does not exist");
-                    }
-                    project.setComponentId(componentId);
-                }
-
-                if(subComponentId != null) {
-                    if(!subComponentId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.SUB_COMPONENT, subComponentId) == null){
-                        throw new InvalidParameterValueException("Sub-component with ID "+ subComponentId +" does not exist");
-                    }
-                    project.setSubComponentId(subComponentId);
-                }
-
-                if(productId != null) {
-                    if(!productId.trim().equals("") && _globoDictionaryManager.get(GloboDictionaryService.GloboDictionaryEntityType.PRODUCT, productId) == null){
-                        throw new InvalidParameterValueException("Product with ID "+ productId +" does not exist");
-                    }
-                    project.setProductId(productId);
-                }
+                validateFields(businessServiceId, clientId, componentId, subComponentId, productId);
 
                 _projectDao.update(projectId, project);
 
