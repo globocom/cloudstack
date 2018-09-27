@@ -161,6 +161,11 @@
       <artifactId>snmp4j</artifactId>
       <version>1.10.1</version>
     </dependency>
+    <dependency>
+      <groupId>com.globo.graylog2</groupId>
+      <artifactId>gelfj</artifactId>
+      <version>1.1.16.1</version>
+    </dependency>
   </dependencies>
   <build>
     <testResources>
