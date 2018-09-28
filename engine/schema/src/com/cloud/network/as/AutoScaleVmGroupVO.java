@@ -91,7 +91,7 @@ public class AutoScaleVmGroupVO implements AutoScaleVmGroup, InternalIdentity {
     @Column(name = "display", updatable = true, nullable = false)
     protected boolean display = true;
 
-    @Column(name = "lock_expiration_date", nullable = false)
+    @Column(name = "lock_expiration_date", nullable = true, updatable = true)
     @Temporal(value = TemporalType.TIMESTAMP)
     protected LocalDateTime lockExpirationDate;
 
