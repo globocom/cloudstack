@@ -168,11 +168,55 @@ var pollAsyncJobResult = function(args) {
     });
 }
 
+function loadSubComponentsByComponent(targetElementId, defaultValue, parentId) {
+    listSubComponents(fullFillOptions(targetElementId, defaultValue), parentId)
+}
+
+var fullFillOptions = function(id, defaultValue) {
+    return function (objects) {
+        $('#'+id)
+            .find('option')
+            .remove();
+
+        $('#'+id).append($('<option>', {
+            value: "",
+            text: ""
+        }));
+        $.each(objects, function (i, object) {
+            $('#'+id).append($('<option>', {
+                value: object.id,
+                text: object.name,
+                selected: defaultValue == object.id ? true : false
+            }));
+        });
+    }
+}
+
+var listSubComponents = function(callback, parentId){
+    $.ajax({
+        url: createURL('listSubComponents', null, {componentId: parentId, componentRequired: true}),
+        success: function(json) {
+            callback(json['listsubcomponentsresponse']['subcomponent'] ? json['listsubcomponentsresponse']['subcomponent'] : []);
+        },
+        error: function() {
+            callback([])
+        }
+    });
+}
+
+
 //API calls
 
-    function createURL(apiName, options) {
+    function createURL(apiName, options, params) {
         if (!options) options = {};
         var urlString = clientApiUrl + "?" + "command=" + apiName + "&response=json";
+
+        if(params) {
+            for(var k in params) {
+                urlString += "&" + k + "=" + params[k];
+            }
+        }
+
         if (g_sessionKey) {
             urlString += "&sessionkey=" + g_sessionKey;
         }

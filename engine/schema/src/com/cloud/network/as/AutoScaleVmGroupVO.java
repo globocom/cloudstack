@@ -240,7 +240,7 @@ public class AutoScaleVmGroupVO implements AutoScaleVmGroup, InternalIdentity {
     }
 
     public void lock() {
-        this.lockExpirationDate = LocalDateTime.now().plusSeconds(30);
+        this.lockExpirationDate = LocalDateTime.now().plusSeconds(600);
     }
 
     public void unlock() {

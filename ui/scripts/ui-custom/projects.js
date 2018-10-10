@@ -353,7 +353,8 @@
                 .append($('<label>').attr('for', 'project-component').html(_l('label.project.component')))
                 .append($('<select>').attr({
                   name: 'project-component',
-                  id: 'project-component'
+                  id: 'project-component',
+                  onchange: 'loadSubComponentsByComponent(\'project-subcomponent\', null, this.value)'
                 }));
 
             var $projectSubComponent = $('<div>').addClass('field subcomponent')
@@ -373,7 +374,7 @@
             createDictionaryOption('businessservice', listBusinessServices)
             createDictionaryOption('client', listClients)
             createDictionaryOption('component', listComponents)
-            createDictionaryOption('subcomponent', listSubComponents)
+            createEmptyDictionaryOption('subcomponent')
             createDictionaryOption('product', listProducts)
 
             var $submit = $('<input>').attr({
@@ -749,6 +750,25 @@
                 .append($cancel);
         }
     };
+
+    var createEmptyDictionaryOption = function(name){
+        $('#project-' + name).append($('<option>', {
+            value: "",
+            text : ""
+        }));
+    }
+
+    var listDictionaryEntity = function(uri, responseRoot, object, callback){
+        $.ajax({
+            url: createURL(uri),
+            success: function(json) {
+                callback(json[responseRoot][object] ? json[responseRoot][object] : []);
+            },
+            error: function() {
+                callback([])
+            }
+        });
+    }
 
     var createDictionaryOption = function(name, listFunction){
         listFunction(function(objects){

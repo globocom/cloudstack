@@ -880,14 +880,17 @@
                                                    label: 'label.project.component',
                                                    defaultValue: project.componentid,
                                                    select: function(args) {
-                                                       createDictionaryEntityOption('listComponents', 'listcomponentsresponse', 'component', args)
+                                                       createDictionaryEntityOption('listComponents', 'listcomponentsresponse', 'component', args);
+                                                       args.$select.change(function() {
+                                                           loadSubComponentsByComponent('label_project_subcomponent', project.subcomponentid, this.value)
+                                                       });
                                                    }
                                                },
                                                subcomponentid: {
                                                    label: 'label.project.subcomponent',
                                                    defaultValue: project.subcomponentid,
                                                    select: function(args) {
-                                                       createDictionaryEntityOption('listSubComponents', 'listsubcomponentsresponse', 'subcomponent', args)
+                                                       createDictionaryEntityOption('listSubComponents', 'listsubcomponentsresponse', 'subcomponent', args, {componentId: project.componentid, componentRequired: true})
                                                    }
                                                },
                                                productid: {
@@ -1508,9 +1511,9 @@
         }
     };
 
-    function createDictionaryEntityOption(uri, collectionName, objectName, args){
+    function createDictionaryEntityOption(uri, collectionName, objectName, args, params){
         $.ajax({
-            url: createURL(uri),
+            url: createURL(uri, null, params),
             async: false,
             success: function(json) {
                 options = Array()
