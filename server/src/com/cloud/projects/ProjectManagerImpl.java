@@ -523,7 +523,16 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
                     project.setDetailedUsage(detailedUsage);
                 }
 
+                if (productId != null) {
+                    project.setProductId(productId);
+                }
+
                 validateFields(businessServiceId, clientId, componentId, subComponentId, productId);
+
+                project.setBusinessServiceId(businessServiceId);
+                project.setClientId(clientId);
+                project.setComponentId(componentId);
+                project.setSubComponentId(subComponentId);
 
                 _projectDao.update(projectId, project);
 
