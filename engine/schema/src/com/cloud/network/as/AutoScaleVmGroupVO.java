@@ -16,7 +16,7 @@
 // under the License.
 package com.cloud.network.as;
 
-import java.time.LocalDateTime;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.UUID;
 
@@ -93,7 +93,7 @@ public class AutoScaleVmGroupVO implements AutoScaleVmGroup, InternalIdentity {
 
     @Column(name = "lock_expiration_date", nullable = true, updatable = true)
     @Temporal(value = TemporalType.TIMESTAMP)
-    protected LocalDateTime lockExpirationDate;
+    protected Date lockExpirationDate;
 
     @Column(name = "vm_prefix_name")
     private String vmPrefixName;
@@ -236,11 +236,13 @@ public class AutoScaleVmGroupVO implements AutoScaleVmGroup, InternalIdentity {
 
     @Override
     public boolean isLocked() {
-        return lockExpirationDate != null && lockExpirationDate.isAfter(LocalDateTime.now());
+        return lockExpirationDate != null && lockExpirationDate.after(new Date());
     }
 
     public void lock() {
-        this.lockExpirationDate = LocalDateTime.now().plusSeconds(600);
+        Calendar calendar = Calendar.getInstance();
+        calendar.add(Calendar.MINUTE, 10);
+        this.lockExpirationDate = calendar.getTime();
     }
 
     public void unlock() {
