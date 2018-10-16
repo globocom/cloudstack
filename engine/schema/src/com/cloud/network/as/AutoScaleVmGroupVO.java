@@ -242,11 +242,11 @@ public class AutoScaleVmGroupVO implements AutoScaleVmGroup, InternalIdentity {
     public void lock() {
         Calendar calendar = Calendar.getInstance();
         calendar.add(Calendar.MINUTE, 10);
-        this.lockExpirationDate = calendar.getTime();
+        setLockExpirationDate(calendar.getTime());
     }
 
     public void unlock() {
-        this.lockExpirationDate = null;
+        this.setLockExpirationDate(null);
     }
 
     @Override
@@ -261,5 +261,14 @@ public class AutoScaleVmGroupVO implements AutoScaleVmGroup, InternalIdentity {
     @Override
     public String getVmPrefixName() {
         return this.vmPrefixName;
+    }
+
+    @Override
+    public Date getLockExpirationDate() {
+        return lockExpirationDate;
+    }
+
+    public void setLockExpirationDate(Date lockExpirationDate) {
+        this.lockExpirationDate = lockExpirationDate;
     }
 }

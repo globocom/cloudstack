@@ -50,6 +50,8 @@ public interface AutoScaleVmGroup extends ControlledEntity, InternalIdentity, Di
 
     Date getLastInterval();
 
+    Date getLockExpirationDate();
+
     String getState();
 
     String getUuid();
