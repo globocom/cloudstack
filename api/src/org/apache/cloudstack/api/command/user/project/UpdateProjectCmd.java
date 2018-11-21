@@ -64,7 +64,7 @@ public class UpdateProjectCmd extends BaseAsyncCmd {
     @Parameter(name = ApiConstants.SUB_COMPONENT_ID, type = CommandType.STRING, required = true, description = "sub-component id")
     private String subComponentId;
 
-    @Parameter(name = ApiConstants.PRODUCT_ID, type = CommandType.STRING, required = true, description = "product id")
+    @Parameter(name = ApiConstants.PRODUCT_ID, type = CommandType.STRING, required = false, description = "product id")
     private String productId;
 
     @Parameter(name = ApiConstants.DETAILED_USAGE, type = CommandType.BOOLEAN, required = false, description = "true if project has detailed usage by third party app")
