@@ -1850,6 +1850,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
             throw ex;
         } catch(Exception ex){
             String message = "It was not possible do start VM for Auto Scale Id: " + asGroup.getUuid() + " Reason: unexpected error during execution";
+            message += "\n Original error: " + ex.getMessage();
             createScaleUpFailedEvent(asGroup.getUuid(), message);
             s_logger.error(message, ex);
             throw ex;
