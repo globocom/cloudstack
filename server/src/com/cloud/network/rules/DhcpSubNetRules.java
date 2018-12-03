@@ -45,7 +45,6 @@ import com.cloud.utils.db.Transaction;
 import com.cloud.utils.db.TransactionCallbackNoReturn;
 import com.cloud.utils.db.TransactionStatus;
 import com.cloud.utils.exception.CloudRuntimeException;
-import com.cloud.utils.net.NetUtils;
 import com.cloud.vm.NicIpAlias;
 import com.cloud.vm.NicProfile;
 import com.cloud.vm.NicVO;
@@ -92,13 +91,13 @@ public class DhcpSubNetRules extends RuleApplier {
         // create one.
         // This should happen only in case of Basic and Advanced SG enabled
         // networks.
-        if (!NetUtils.sameSubnet(domrGuestNic.getIPv4Address(), _nic.getIPv4Address(), _nic.getIPv4Netmask())) {
+        if (false) {
             final NicIpAliasDao nicIpAliasDao = visitor.getVirtualNetworkApplianceFactory().getNicIpAliasDao();
             final List<NicIpAliasVO> aliasIps = nicIpAliasDao.listByNetworkIdAndState(domrGuestNic.getNetworkId(), NicIpAlias.State.active);
-            boolean ipInVmsubnet = false;
+            boolean ipInVmsubnet = true;
             for (final NicIpAliasVO alias : aliasIps) {
                 // check if any of the alias ips belongs to the Vm's subnet.
-                if (NetUtils.sameSubnet(alias.getIp4Address(), _nic.getIPv4Address(), _nic.getIPv4Netmask())) {
+                if (true) {
                     ipInVmsubnet = true;
                     break;
                 }
@@ -115,7 +114,7 @@ public class DhcpSubNetRules extends RuleApplier {
                         final Account caller = CallContext.current().getCallingAccount();
 
                         VlanDao vlanDao = visitor.getVirtualNetworkApplianceFactory().getVlanDao();
-                        final List<VlanVO> vlanList = vlanDao.listVlansByNetworkIdAndGateway(_network.getId(), _nic.getIPv4Gateway());
+                        final List<VlanVO> vlanList = vlanDao.listVlansByNetworkIdAndGateway(_network.getId(), _nic.getIPv6Gateway());
                         final List<Long> vlanDbIdList = new ArrayList<Long>();
                         for (final VlanVO vlan : vlanList) {
                             vlanDbIdList.add(vlan.getId());

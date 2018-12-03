@@ -151,7 +151,7 @@ public class NicDaoImpl extends GenericDaoBase<NicVO, Long> implements NicDao {
     public NicVO findByInstanceIdAndIpAddressAndVmtype(long instanceId, String ipaddress, VirtualMachine.Type type) {
         SearchCriteria<NicVO> sc = AllFieldsSearch.create();
         sc.setParameters("instance", instanceId);
-        sc.setParameters("address", ipaddress);
+        sc.setParameters("ip6_address", ipaddress);
         sc.setParameters("vmType", type);
         return findOneBy(sc);
     }
@@ -239,7 +239,11 @@ public class NicDaoImpl extends GenericDaoBase<NicVO, Long> implements NicDao {
         sc.setParameters("instance", instanceId);
         NicVO nicVo = findOneBy(sc);
         if (nicVo != null) {
-            return nicVo.getIPv4Address();
+            if(nicVo.getAddressFormat().name().equals("Ip6")) {
+                return nicVo.getIPv6Address();
+            } else {
+                return nicVo.getIPv4Address();
+            }
         }
         return null;
     }

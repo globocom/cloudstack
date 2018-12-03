@@ -346,7 +346,7 @@ public class VlanDaoImpl extends GenericDaoBase<VlanVO, Long> implements VlanDao
     public List<VlanVO> listVlansByNetworkIdAndGateway(long networkid, String gateway) {
         SearchCriteria<VlanVO> sc = VlanGatewaysearch.create();
         sc.setParameters("networkid", networkid);
-        sc.setParameters("gateway", gateway);
+        sc.setParameters("ip6Gateway", gateway);
         return listBy(sc);
     }
 
