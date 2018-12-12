@@ -35,12 +35,10 @@ log_it() {
 }
 
 hypervisor() {
-  local try=$([ -x /usr/sbin/virt-what ] && virt-what | tail -1)
-  [ "$try" != "" ] && echo $try && return 0
+#  local try=$([ -x /usr/sbin/virt-what ] && virt-what | tail -1)
+#  [ "$try" != "" ] && echo $try && return 0
 
-  grep -q QEMU /proc/cpuinfo  && echo "kvm" && return 0
-  grep -q QEMU /var/log/messages && echo "kvm" && return 0
-
+  mount -t proc proc /proc
   [ -d /proc/xen ] && mount -t xenfs none /proc/xen
   if [ -d /proc/xen ]; then
     $(dmesg | grep -q "Xen HVM")
@@ -50,6 +48,9 @@ hypervisor() {
       echo "xen-pv" && return 0
     fi
   fi
+
+  grep -q QEMU /proc/cpuinfo  && echo "kvm" && return 0
+  grep -q QEMU /var/log/messages && echo "kvm" && return 0
 
   vmware-checkvm &> /dev/null && echo "vmware" && return 0
 
