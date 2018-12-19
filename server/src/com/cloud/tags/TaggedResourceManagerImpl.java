@@ -30,6 +30,7 @@ import javax.naming.ConfigurationException;
 import com.cloud.storage.SnapshotPolicyVO;
 import com.cloud.user.dao.AccountDao;
 import com.cloud.utils.exception.CloudRuntimeException;
+import com.google.common.base.CharMatcher;
 import org.apache.cloudstack.api.Identity;
 import org.apache.cloudstack.api.InternalIdentity;
 import org.apache.cloudstack.context.CallContext;
@@ -312,6 +313,14 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
                             throw new InvalidParameterValueException("The resource type " + resourceType + " doesn't support resource tags");
                         }
 
+                        String value = tags.get(key);
+                        boolean isKeyAscii = CharMatcher.ascii().matchesAllOf(key);
+                        boolean isValueAscii = CharMatcher.ascii().matchesAllOf(value);
+
+                        if(!isKeyAscii || !isValueAscii) {
+                            throw new InvalidParameterValueException(String.format("The tag \"%s\" with value \"%s\" contains non ascii characters", key, value));
+                        }
+
                         long id = getResourceId(resourceId, resourceType);
                         String resourceUuid = getUuid(resourceId, resourceType);
 
@@ -321,8 +330,6 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
 
                         checkResourceAccessible(accountId, domainId, "Account '" + caller +
                                 "' doesn't have permissions to create tags" + " for resource '" + id + "(" + key + ")'.");
-
-                        String value = tags.get(key);
 
                         if (value == null || value.isEmpty()) {
                             throw new InvalidParameterValueException("Value for the key " + key + " is either null or empty");
