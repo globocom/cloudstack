@@ -1023,7 +1023,7 @@
                         // Due to zonal grouping, low pagesize can result lower
                         // aggregated items, resulting in no scroll shown
                         // So, use maximum pagesize
-                        data.pagesize = 200;
+                        data.pagesize = 700;
 
                         var ignoreProject = false;
                         if (args.filterBy != null) { //filter dropdown
@@ -2368,7 +2368,7 @@
                         // Due to zonal grouping, low pagesize can result lower
                         // aggregated items, resulting in no scroll shown
                         // So, use maximum pagesize
-                        data.pagesize = 200;
+                        data.pagesize = 700;
 
                         var ignoreProject = false;
                         if (args.filterBy != null) { //filter dropdown
