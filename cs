@@ -21,6 +21,8 @@ gen_version(){
     cs_version=$(mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep '^[0-9]\.')
     #cs_version="4.11.1.0"
     tag_version=$(date +%Y%m%d%H%M)
+    echo "tag.number=${tag_version}" > "${BASEDIR}/client/conf/build.properties"
+
     echo "${cs_version}-${tag_version}"
 }
 

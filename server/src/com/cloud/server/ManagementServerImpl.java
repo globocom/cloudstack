@@ -16,6 +16,8 @@
 // under the License.
 package com.cloud.server;
 
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,6 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.TimeZone;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -37,6 +40,7 @@ import javax.crypto.spec.SecretKeySpec;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
+import com.cloud.utils.PropertiesUtil;
 import org.apache.cloudstack.acl.ControlledEntity;
 import org.apache.cloudstack.affinity.AffinityGroupProcessor;
 import org.apache.cloudstack.affinity.dao.AffinityGroupVMMapDao;
@@ -3514,10 +3518,25 @@ public class ManagementServerImpl extends ManagerBase implements ManagementServe
 
     @Override
     public String getVersion() {
+        String tagVersion = "";
+        try {
+            File configFile = PropertiesUtil.findConfigFile("build.properties");
+            Properties ps = new Properties();
+            PropertiesUtil.loadFromFile(ps, configFile);
+            tagVersion = ps.getProperty("tag.number");
+            s_logger.info("Retrivied the tag number from build.properties file. Tag number: " + tagVersion);
+        } catch (IOException e) {
+            s_logger.error("It was not possible to get the tag version from the build.properties file");
+            e.printStackTrace();
+        } catch (NullPointerException e) {
+            s_logger.error("It was not possible to find the build.properties file");
+            e.printStackTrace();
+        }
+
         final Class<?> c = ManagementServer.class;
         final String fullVersion = c.getPackage().getImplementationVersion();
         if (fullVersion != null && fullVersion.length() > 0) {
-            return fullVersion;
+            return fullVersion +" "+ tagVersion;
         }
 
         return "unknown";
