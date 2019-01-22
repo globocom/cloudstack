@@ -23,7 +23,7 @@ gen_version(){
     tag_version=$(date +%Y%m%d%H%M)
     echo "tag.number=${tag_version}" > "${BASEDIR}/client/conf/build.properties"
     git add "${BASEDIR}/client/conf/build.properties"
-    git ci -m 'generating build number: ${tag_version}'
+    git ci -m "generating build number: ${tag_version}"
     git push origin ${1}
 
     echo "${cs_version}-${tag_version}"
