@@ -3520,10 +3520,9 @@ public class ManagementServerImpl extends ManagerBase implements ManagementServe
     public String getVersion() {
         String tagVersion = "";
         try {
-            File configFile = PropertiesUtil.findConfigFile("build.properties");
             Properties ps = new Properties();
-            PropertiesUtil.loadFromFile(ps, configFile);
-            tagVersion = ps.getProperty("tag.number");
+            PropertiesUtil.loadFromJar(ps, "build.properties");
+            tagVersion = " " + ps.getProperty("tag.number");
             s_logger.info("Retrivied the tag number from build.properties file. Tag number: " + tagVersion);
         } catch (IOException e) {
             s_logger.error("It was not possible to get the tag version from the build.properties file");
@@ -3536,7 +3535,7 @@ public class ManagementServerImpl extends ManagerBase implements ManagementServe
         final Class<?> c = ManagementServer.class;
         final String fullVersion = c.getPackage().getImplementationVersion();
         if (fullVersion != null && fullVersion.length() > 0) {
-            return fullVersion +" "+ tagVersion;
+            return fullVersion + tagVersion;
         }
 
         return "unknown";
