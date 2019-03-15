@@ -987,7 +987,8 @@
                                     label: 'label.select.a.template',
                                     select: function(args) {
                                         var data = {
-                                            templatefilter: 'featured'
+                                            templatefilter: 'featured',
+                                            zoneid : args.context.instances[0].zoneid
                                         };
                                         $.ajax({
                                             url: createURL('listTemplates'),
