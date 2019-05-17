@@ -39,6 +39,11 @@ import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+
 import com.cloud.network.as.AutoScaleVmGroupVmMapVO;
 import com.cloud.network.as.dao.AutoScaleVmGroupVmMapDao;
 import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreDao;
@@ -98,6 +103,8 @@ import org.apache.cloudstack.storage.command.DeleteCommand;
 import org.apache.cloudstack.storage.command.DettachCommand;
 import org.apache.cloudstack.storage.datastore.db.PrimaryDataStoreDao;
 import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
+import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreDao;
+import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreVO;
 import org.apache.commons.collections.MapUtils;
 
 import com.cloud.agent.AgentManager;
@@ -696,10 +703,6 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
 
         if (result) {
             userVm.setPassword(password);
-            // update the password in vm_details table too
-            // Check if an SSH key pair was selected for the instance and if so
-            // use it to encrypt & save the vm password
-            encryptAndStorePassword(userVm, password);
         } else {
             throw new CloudRuntimeException("Failed to reset password for the virtual machine ");
         }
@@ -744,7 +747,6 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
             } else {
                 final UserVmVO userVm = _vmDao.findById(vmId);
                 _vmDao.loadDetails(userVm);
-                userVm.setPassword(password);
                 // update the password in vm_details table too
                 // Check if an SSH key pair was selected for the instance and if so
                 // use it to encrypt & save the vm password
@@ -858,8 +860,9 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
                 userVm.setPassword(password);
                 //update the encrypted password in vm_details table too
                 encryptAndStorePassword(userVm, password);
+            } else {
+                _vmDao.saveDetails(userVm);
             }
-            _vmDao.saveDetails(userVm);
 
             if (vmInstance.getState() == State.Stopped) {
                 s_logger.debug("Vm " + vmInstance + " is stopped, not rebooting it as a part of SSH Key reset");
@@ -4512,6 +4515,7 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
                     password = DBEncryptionUtil.decrypt(vm.getDetail("password"));
                 } else {
                     password = _mgr.generateRandomPassword();
+                    vm.setPassword(password);
                 }
             }
 
@@ -4550,11 +4554,10 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
             // this value is not being sent to the backend; need only for api
             // display purposes
             if (template.getEnablePassword()) {
-                vm.setPassword((String)vmParamPair.second().get(VirtualMachineProfile.Param.VmPassword));
-                vm.setUpdateParameters(false);
                 if (vm.getDetail("password") != null) {
-                    _vmDetailsDao.remove(_vmDetailsDao.findDetail(vm.getId(), "password").getId());
+                    _vmDetailsDao.removeDetail(vm.getId(), "password");
                 }
+                vm.setUpdateParameters(false);
                 _vmDao.update(vm.getId(), vm);
             }
         }
@@ -5109,7 +5112,7 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
         // check if migrating to same host
         long srcHostId = vm.getHostId();
         if (destinationHost.getId() == srcHostId) {
-            throw new InvalidParameterValueException("Cannot migrate VM, VM is already presnt on this host, please specify valid destination host to migrate the VM");
+            throw new InvalidParameterValueException("Cannot migrate VM, VM is already present on this host, please specify valid destination host to migrate the VM");
         }
 
         // check if host is UP
@@ -6231,7 +6234,7 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
                             vm.setUpdateParameters(false);
                             _vmDao.loadDetails(vm);
                             if (vm.getDetail("password") != null) {
-                                _vmDetailsDao.remove(_vmDetailsDao.findDetail(vm.getId(), "password").getId());
+                                _vmDetailsDao.removeDetail(vm.getId(), "password");
                             }
                             _vmDao.update(vm.getId(), vm);
                         }
@@ -6528,6 +6531,3 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
         public abstract boolean execute(Network network, NicProfile nic, VirtualMachineProfile vmProfile, UserDataServiceProvider element) throws ResourceUnavailableException;
     }
 }
-
-
-

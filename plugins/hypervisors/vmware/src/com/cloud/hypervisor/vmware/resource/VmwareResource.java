@@ -25,8 +25,6 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.channels.SocketChannel;
 import java.rmi.RemoteException;
-
-import com.cloud.configuration.Resource.ResourceType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -42,13 +40,15 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
+
 import javax.naming.ConfigurationException;
 
-import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.math.NumberUtils;
 import org.apache.log4j.Logger;
 import org.apache.log4j.NDC;
 import org.joda.time.Duration;
+
 import com.google.gson.Gson;
 import com.vmware.vim25.AboutInfo;
 import com.vmware.vim25.BoolPolicy;
@@ -62,6 +62,7 @@ import com.vmware.vim25.DistributedVirtualPort;
 import com.vmware.vim25.DistributedVirtualSwitchPortConnection;
 import com.vmware.vim25.DistributedVirtualSwitchPortCriteria;
 import com.vmware.vim25.DynamicProperty;
+import com.vmware.vim25.GuestInfo;
 import com.vmware.vim25.HostCapability;
 import com.vmware.vim25.HostHostBusAdapter;
 import com.vmware.vim25.HostInternetScsiHba;
@@ -99,6 +100,7 @@ import com.vmware.vim25.VirtualMachinePowerState;
 import com.vmware.vim25.VirtualMachineRelocateSpec;
 import com.vmware.vim25.VirtualMachineRelocateSpecDiskLocator;
 import com.vmware.vim25.VirtualMachineRuntimeInfo;
+import com.vmware.vim25.VirtualMachineToolsStatus;
 import com.vmware.vim25.VirtualMachineVideoCard;
 import com.vmware.vim25.VirtualUSBController;
 import com.vmware.vim25.VmwareDistributedVirtualSwitchVlanIdSpec;
@@ -106,11 +108,13 @@ import com.vmware.vim25.VmwareDistributedVirtualSwitchVlanIdSpec;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.storage.command.CopyCommand;
 import org.apache.cloudstack.storage.command.StorageSubSystemCommand;
+import org.apache.cloudstack.storage.configdrive.ConfigDrive;
 import org.apache.cloudstack.storage.resource.NfsSecondaryStorageResource;
 import org.apache.cloudstack.storage.to.PrimaryDataStoreTO;
 import org.apache.cloudstack.storage.to.TemplateObjectTO;
 import org.apache.cloudstack.storage.to.VolumeObjectTO;
 import org.apache.cloudstack.utils.volume.VirtualMachineDiskInfo;
+
 import com.cloud.agent.IAgentControl;
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.AttachIsoAnswer;
@@ -142,6 +146,7 @@ import com.cloud.agent.api.GetStorageStatsAnswer;
 import com.cloud.agent.api.GetStorageStatsCommand;
 import com.cloud.agent.api.GetVmDiskStatsAnswer;
 import com.cloud.agent.api.GetVmDiskStatsCommand;
+import com.cloud.agent.api.GetVmIpAddressCommand;
 import com.cloud.agent.api.GetVmNetworkStatsAnswer;
 import com.cloud.agent.api.GetVmNetworkStatsCommand;
 import com.cloud.agent.api.GetVmStatsAnswer;
@@ -234,6 +239,7 @@ import com.cloud.agent.api.to.VolumeTO;
 import com.cloud.agent.resource.virtualnetwork.VRScripts;
 import com.cloud.agent.resource.virtualnetwork.VirtualRouterDeployer;
 import com.cloud.agent.resource.virtualnetwork.VirtualRoutingResource;
+import com.cloud.configuration.Resource.ResourceType;
 import com.cloud.dc.DataCenter.NetworkType;
 import com.cloud.dc.Vlan;
 import com.cloud.exception.CloudException;
@@ -252,8 +258,8 @@ import com.cloud.hypervisor.vmware.mo.DatastoreFile;
 import com.cloud.hypervisor.vmware.mo.DatastoreMO;
 import com.cloud.hypervisor.vmware.mo.DiskControllerType;
 import com.cloud.hypervisor.vmware.mo.FeatureKeyConstants;
-import com.cloud.hypervisor.vmware.mo.HostMO;
 import com.cloud.hypervisor.vmware.mo.HostDatastoreSystemMO;
+import com.cloud.hypervisor.vmware.mo.HostMO;
 import com.cloud.hypervisor.vmware.mo.HostStorageSystemMO;
 import com.cloud.hypervisor.vmware.mo.HypervisorHostHelper;
 import com.cloud.hypervisor.vmware.mo.NetworkDetails;
@@ -302,9 +308,6 @@ import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachine.PowerState;
 import com.cloud.vm.VirtualMachineName;
 import com.cloud.vm.VmDetailConstants;
-import com.vmware.vim25.GuestInfo;
-import com.vmware.vim25.VirtualMachineToolsStatus;
-import com.cloud.agent.api.GetVmIpAddressCommand;
 
 public class VmwareResource implements StoragePoolResource, ServerResource, VmwareHostService, VirtualRouterDeployer {
     private static final Logger s_logger = Logger.getLogger(VmwareResource.class);
@@ -1665,6 +1668,7 @@ public class VmwareResource implements StoragePoolResource, ServerResource, Vmwa
         String existingVmName = null;
         VirtualMachineFileInfo existingVmFileInfo = null;
         VirtualMachineFileLayoutEx existingVmFileLayout = null;
+        List<DatastoreMO> existingDatastores = new ArrayList<DatastoreMO>();
 
         Pair<String, String> names = composeVmNames(vmSpec);
         String vmInternalCSName = names.first();
@@ -1787,6 +1791,7 @@ public class VmwareResource implements StoragePoolResource, ServerResource, Vmwa
                         existingVmName = existingVmInDc.getName();
                         existingVmFileInfo = existingVmInDc.getFileInfo();
                         existingVmFileLayout = existingVmInDc.getFileLayout();
+                        existingDatastores = existingVmInDc.getAllDatastores();
                         existingVmInDc.unregisterVm();
                     }
                     Pair<ManagedObjectReference, DatastoreMO> rootDiskDataStoreDetails = null;
@@ -2253,7 +2258,18 @@ public class VmwareResource implements StoragePoolResource, ServerResource, Vmwa
 
             // Since VM was successfully powered-on, if there was an existing VM in a different cluster that was unregistered, delete all the files associated with it.
             if (existingVmName != null && existingVmFileLayout != null) {
-                deleteUnregisteredVmFiles(existingVmFileLayout, dcMo, true);
+                List<String> vmDatastoreNames = new ArrayList<String>();
+                for (DatastoreMO vmDatastore : vmMo.getAllDatastores()) {
+                    vmDatastoreNames.add(vmDatastore.getName());
+                }
+                // Don't delete files that are in a datastore that is being used by the new VM as well (zone-wide datastore).
+                List<String> skipDatastores = new ArrayList<String>();
+                for (DatastoreMO existingDatastore : existingDatastores) {
+                    if (vmDatastoreNames.contains(existingDatastore.getName())) {
+                        skipDatastores.add(existingDatastore.getName());
+                    }
+                }
+                deleteUnregisteredVmFiles(existingVmFileLayout, dcMo, true, skipDatastores);
             }
 
             return startAnswer;
@@ -2941,7 +2957,14 @@ public class VmwareResource implements StoragePoolResource, ServerResource, Vmwa
         }
     }
 
-    private void deleteUnregisteredVmFiles(VirtualMachineFileLayoutEx vmFileLayout, DatacenterMO dcMo, boolean deleteDisks) throws Exception {
+    private void checkAndDeleteDatastoreFile(String filePath, List<String> skipDatastores, DatastoreMO dsMo, DatacenterMO dcMo) throws Exception {
+        if (dsMo != null && dcMo != null && (skipDatastores == null || !skipDatastores.contains(dsMo.getName()))) {
+            s_logger.debug("Deleting file: " + filePath);
+            dsMo.deleteFile(filePath, dcMo.getMor(), true);
+        }
+    }
+
+    private void deleteUnregisteredVmFiles(VirtualMachineFileLayoutEx vmFileLayout, DatacenterMO dcMo, boolean deleteDisks, List<String> skipDatastores) throws Exception {
         s_logger.debug("Deleting files associated with an existing VM that was unregistered");
         DatastoreFile vmFolder = null;
         try {
@@ -2954,8 +2977,7 @@ public class VmwareResource implements StoragePoolResource, ServerResource, Vmwa
                 else if (file.getType().equals("config"))
                     vmFolder = new DatastoreFile(fileInDatastore.getDatastoreName(), fileInDatastore.getDir());
                 DatastoreMO dsMo = new DatastoreMO(dcMo.getContext(), dcMo.findDatastore(fileInDatastore.getDatastoreName()));
-                s_logger.debug("Deleting file: " + file.getName());
-                dsMo.deleteFile(file.getName(), dcMo.getMor(), true, VmwareManager.s_vmwareSearchExcludeFolder.value());
+                checkAndDeleteDatastoreFile(file.getName(), skipDatastores, dsMo, dcMo);
             }
             // Delete files that are present in the VM folder - this will take care of the VM disks as well.
             DatastoreMO vmFolderDsMo = new DatastoreMO(dcMo.getContext(), dcMo.findDatastore(vmFolder.getDatastoreName()));
@@ -2963,14 +2985,12 @@ public class VmwareResource implements StoragePoolResource, ServerResource, Vmwa
             if (deleteDisks) {
                 for (String file : files) {
                     String vmDiskFileFullPath = String.format("%s/%s", vmFolder.getPath(), file);
-                    s_logger.debug("Deleting file: " + vmDiskFileFullPath);
-                    vmFolderDsMo.deleteFile(vmDiskFileFullPath, dcMo.getMor(), true, VmwareManager.s_vmwareSearchExcludeFolder.value());
+                    checkAndDeleteDatastoreFile(vmDiskFileFullPath, skipDatastores, vmFolderDsMo, dcMo);
                 }
             }
             // Delete VM folder
             if (deleteDisks || files.length == 0) {
-                s_logger.debug("Deleting folder: " + vmFolder.getPath());
-                vmFolderDsMo.deleteFolder(vmFolder.getPath(), dcMo.getMor());
+                checkAndDeleteDatastoreFile(vmFolder.getPath(), skipDatastores, vmFolderDsMo, dcMo);
             }
         } catch (Exception e) {
             String message = "Failed to delete files associated with an existing VM that was unregistered due to " + VmwareHelper.getExceptionMessage(e);
@@ -3352,7 +3372,7 @@ public class VmwareResource implements StoragePoolResource, ServerResource, Vmwa
         String isoFileName = isoUrl.substring(isoFileNameStartPos);
 
         int templateRootPos = isoUrl.indexOf("template/tmpl");
-        templateRootPos = (templateRootPos < 0 ? isoUrl.indexOf("ConfigDrive") : templateRootPos);
+        templateRootPos = (templateRootPos < 0 ? isoUrl.indexOf(ConfigDrive.CONFIGDRIVEDIR) : templateRootPos);
         if (templateRootPos < 0 ) {
             throw new Exception("Invalid ISO path info");
         }
@@ -4905,7 +4925,7 @@ public class VmwareResource implements StoragePoolResource, ServerResource, Vmwa
                     VirtualMachineFileLayoutEx vmFileLayout = vmMo.getFileLayout();
                     context.getService().unregisterVM(vmMo.getMor());
                     if (cmd.getCleanupVmFiles()) {
-                        deleteUnregisteredVmFiles(vmFileLayout, dataCenterMo, false);
+                        deleteUnregisteredVmFiles(vmFileLayout, dataCenterMo, false, null);
                     }
                     return new Answer(cmd, true, "unregister succeeded");
                 } catch (Exception e) {

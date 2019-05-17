@@ -35,17 +35,23 @@ log_it() {
 }
 
 hypervisor() {
-#  local try=$([ -x /usr/sbin/virt-what ] && virt-what | tail -1)
-#  [ "$try" != "" ] && echo $try && return 0
-
-  mount -t proc proc /proc
-  [ -d /proc/xen ] && mount -t xenfs none /proc/xen
   if [ -d /proc/xen ]; then
+    mount -t xenfs none /proc/xen
     $(dmesg | grep -q "Xen HVM")
     if [ $? -eq 0 ]; then  # 1=PV,0=HVM
       echo "xen-hvm" && return 0
     else
       echo "xen-pv" && return 0
+    fi
+  fi
+
+  [ -x /usr/sbin/virt-what ] && local facts=( $(virt-what) )
+  if [ "$facts" != "" ]; then
+    # Xen HVM is recognized as Hyperv when Viridian extensions are enabled
+    if [ "${facts[-1]}" == "xen-domU" ] && [ "${facts[0]}" == "hyperv" ]; then
+      echo "xen-hvm" && return 0
+    else
+      echo ${facts[-1]} && return 0
     fi
   fi
 
@@ -145,18 +151,7 @@ get_boot_params() {
 }
 
 get_systemvm_type() {
-  for str in $(cat $CMDLINE)
-    do
-      KEY=$(echo $str | cut -d= -f1)
-      VALUE=$(echo $str | cut -d= -f2)
-      case $KEY in
-        type)
-          export TYPE=$VALUE
-          ;;
-        *)
-          ;;
-      esac
-  done
+  export TYPE=$(grep -Po 'type=\K[a-zA-Z]*' $CMDLINE)
 }
 
 patch() {

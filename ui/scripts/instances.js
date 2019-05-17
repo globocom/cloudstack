@@ -2741,16 +2741,29 @@
                                                     }
                                                 });
                                             }
+                                        },
+                                        ipaddress: {
+                                            label: 'label.ip.address',
+                                            validation: {
+                                                required: false,
+                                                ipv4: true
+                                            }
                                         }
                                     }
                                 },
                                 action: function(args) {
+                                    var dataObj = {
+                                        virtualmachineid: args.context.instances[0].id,
+                                        networkid: args.data.networkid,
+                                    };
+
+                                    if (args.data.ipaddress) {
+                                        dataObj.ipaddress = args.data.ipaddress;
+                                    }
+
                                     $.ajax({
                                         url: createURL('addNicToVirtualMachine'),
-                                        data: {
-                                            virtualmachineid: args.context.instances[0].id,
-                                            networkid: args.data.networkid
-                                        },
+                                        data: dataObj,
                                         success: function(json) {
                                             args.response.success({
                                                 _custom: {
@@ -3471,6 +3484,7 @@
             }
 
             allowedActions.push("viewConsole");
+            allowedActions.push("resetSSHKeyForVirtualMachine");
         } else if (jsonObj.state == 'Stopped') {
             allowedActions.push("edit");
             if (isAdmin())
@@ -3506,6 +3520,9 @@
             allowedActions.push("resetSSHKeyForVirtualMachine");
         } else if (jsonObj.state == 'Starting') {
             //  allowedActions.push("stop");
+            if (isAdmin()) {
+                allowedActions.push("viewConsole");
+            }
         } else if (jsonObj.state == 'Error') {
             allowedActions.push("destroy");
         } else if (jsonObj.state == 'Expunging') {

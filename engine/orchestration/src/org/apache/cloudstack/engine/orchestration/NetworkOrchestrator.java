@@ -1336,7 +1336,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
 
         //check if the there are no service provider other than virtualrouter.
         for(Provider provider : providers) {
-            if (provider!=Provider.VirtualRouter)
+            if (provider != Provider.VirtualRouter)
                 throw new UnsupportedOperationException("Cannot update the network resources in sequence when providers other than virtualrouter are used");
         }
         //check if routers are in correct state before proceeding with the update
@@ -2878,7 +2878,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         s_logger.debug("Implementing the network " + network + " elements and resources as a part of network restart without cleanup");
         try {
             implementNetworkElementsAndResources(dest, context, network, offering);
-            setRestartRequired(network, true);
+            setRestartRequired(network, false);
             return true;
         } catch (final Exception ex) {
             s_logger.warn("Failed to implement network " + network + " elements and resources as a part of network restart due to ", ex);
@@ -2945,6 +2945,14 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
      * @throws InsufficientCapacityException
      */
     private boolean rollingRestartRouters(final NetworkVO network, final NetworkOffering offering, final DeployDestination dest, final ReservationContext context) throws ResourceUnavailableException, ConcurrentOperationException, InsufficientCapacityException {
+        if (!NetworkOrchestrationService.RollingRestartEnabled.value()) {
+            if (shutdownNetworkElementsAndResources(context, true, network)) {
+                implementNetworkElementsAndResources(dest, context, network, offering);
+                return true;
+            }
+            s_logger.debug("Failed to shutdown the network elements and resources as a part of network restart: " + network.getState());
+            return false;
+        }
         s_logger.debug("Performing rolling restart of routers of network " + network);
         destroyExpendableRouters(_routerDao.findByNetwork(network.getId()), context);
 
@@ -2969,6 +2977,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
 
         // Destroy old routers
         for (final DomainRouterVO oldRouter : oldRouters) {
+            _routerService.stopRouter(oldRouter.getId(), true);
             _routerService.destroyRouter(oldRouter.getId(), context.getAccount(), context.getCaller().getId());
         }
 
@@ -3849,6 +3858,6 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
     public ConfigKey<?>[] getConfigKeys() {
         return new ConfigKey<?>[] {NetworkGcWait, NetworkGcInterval, NetworkLockTimeout,
                 GuestDomainSuffix, NetworkThrottlingRate, MinVRVersion,
-                PromiscuousMode, MacAddressChanges, ForgedTransmits};
+                PromiscuousMode, MacAddressChanges, ForgedTransmits, RollingRestartEnabled};
     }
 }
