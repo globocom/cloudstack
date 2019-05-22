@@ -16,9 +16,21 @@
 // under the License.
 package com.cloud.vm;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-
+import com.cloud.exception.InsufficientAddressCapacityException;
+import com.cloud.exception.InsufficientCapacityException;
+import com.cloud.exception.InvalidParameterValueException;
+import com.cloud.exception.ResourceUnavailableException;
+import com.cloud.network.NetworkModel;
+import com.cloud.server.ResourceTag;
+import com.cloud.storage.GuestOSVO;
+import com.cloud.storage.dao.GuestOSDao;
+import com.cloud.tags.ResourceTagVO;
+import com.cloud.tags.TaggedResourceManagerImpl;
+import com.cloud.user.Account;
+import com.cloud.user.AccountManager;
+import com.cloud.uservm.UserVm;
+import com.cloud.vm.dao.UserVmDao;
+import com.cloud.vm.dao.UserVmDetailsDao;
 import org.apache.cloudstack.api.BaseCmd.HTTPMethod;
 import org.apache.cloudstack.api.command.user.vm.UpdateVMCmd;
 import org.apache.cloudstack.context.CallContext;
@@ -26,27 +38,26 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.BDDMockito;
+
+
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.Spy;
+import org.mockito.BDDMockito;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
-import com.cloud.exception.InsufficientAddressCapacityException;
-import com.cloud.exception.InsufficientCapacityException;
-import com.cloud.exception.InvalidParameterValueException;
-import com.cloud.exception.ResourceUnavailableException;
-import com.cloud.network.NetworkModel;
-import com.cloud.storage.GuestOSVO;
-import com.cloud.storage.dao.GuestOSDao;
-import com.cloud.user.Account;
-import com.cloud.user.AccountManager;
-import com.cloud.uservm.UserVm;
-import com.cloud.vm.dao.UserVmDao;
-import com.cloud.vm.dao.UserVmDetailsDao;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
+
+import static org.mockito.Mockito.when;
+
 
 @RunWith(PowerMockRunner.class)
 public class UserVmManagerImplTest {
@@ -76,39 +87,41 @@ public class UserVmManagerImplTest {
     @Mock
     private NetworkModel networkModel;
 
+    @Mock
+    private TaggedResourceManagerImpl taggedResourceManagerMock;
+
     private long vmId = 1l;
 
     @Before
     public void beforeTest() {
-        Mockito.when(updateVmCommand.getId()).thenReturn(vmId);
-
-        Mockito.when(userVmDao.findById(Mockito.eq(vmId))).thenReturn(userVmVoMock);
+        when(updateVmCommand.getId()).thenReturn(vmId);
+        when(userVmDao.findById(Mockito.eq(vmId))).thenReturn(userVmVoMock);
     }
 
     @Test
     public void validateGuestOsIdForUpdateVirtualMachineCommandTestOsTypeNull() {
-        Mockito.when(updateVmCommand.getOsTypeId()).thenReturn(null);
+        when(updateVmCommand.getOsTypeId()).thenReturn(null);
         userVmManagerImpl.validateGuestOsIdForUpdateVirtualMachineCommand(updateVmCommand);
     }
 
     @Test(expected = InvalidParameterValueException.class)
     public void validateGuestOsIdForUpdateVirtualMachineCommandTestOsTypeNotFound() {
-        Mockito.when(updateVmCommand.getOsTypeId()).thenReturn(1l);
+        when(updateVmCommand.getOsTypeId()).thenReturn(1l);
 
         userVmManagerImpl.validateGuestOsIdForUpdateVirtualMachineCommand(updateVmCommand);
     }
 
     @Test
     public void validateGuestOsIdForUpdateVirtualMachineCommandTestOsTypeFound() {
-        Mockito.when(updateVmCommand.getOsTypeId()).thenReturn(1l);
-        Mockito.when(guestOSDao.findById(Mockito.eq(1l))).thenReturn(Mockito.mock(GuestOSVO.class));
+        when(updateVmCommand.getOsTypeId()).thenReturn(1l);
+        when(guestOSDao.findById(Mockito.eq(1l))).thenReturn(Mockito.mock(GuestOSVO.class));
 
         userVmManagerImpl.validateGuestOsIdForUpdateVirtualMachineCommand(updateVmCommand);
     }
 
     @Test(expected = InvalidParameterValueException.class)
     public void validateInputsAndPermissionForUpdateVirtualMachineCommandTestVmNotFound() {
-        Mockito.when(userVmDao.findById(Mockito.eq(vmId))).thenReturn(null);
+        when(userVmDao.findById(Mockito.eq(vmId))).thenReturn(null);
 
         userVmManagerImpl.validateInputsAndPermissionForUpdateVirtualMachineCommand(updateVmCommand);
     }
@@ -123,7 +136,7 @@ public class UserVmManagerImplTest {
 
         PowerMockito.mockStatic(CallContext.class);
         BDDMockito.given(CallContext.current()).willReturn(callContextMock);
-        Mockito.when(callContextMock.getCallingAccount()).thenReturn(accountMock);
+        when(callContextMock.getCallingAccount()).thenReturn(accountMock);
 
         Mockito.doNothing().when(accountManager).checkAccess(accountMock, null, true, userVmVoMock);
         userVmManagerImpl.validateInputsAndPermissionForUpdateVirtualMachineCommand(updateVmCommand);
@@ -136,7 +149,7 @@ public class UserVmManagerImplTest {
     public void updateVirtualMachineTestDisplayChanged() throws ResourceUnavailableException, InsufficientCapacityException {
         configureDoNothingForMethodsThatWeDoNotWantToTest();
 
-        Mockito.when(userVmVoMock.isDisplay()).thenReturn(true);
+        when(userVmVoMock.isDisplay()).thenReturn(true);
         Mockito.doNothing().when(userVmManagerImpl).updateDisplayVmFlag(false, vmId, userVmVoMock);
 
         userVmManagerImpl.updateVirtualMachine(updateVmCommand);
@@ -150,7 +163,7 @@ public class UserVmManagerImplTest {
     public void updateVirtualMachineTestCleanUpTrue() throws ResourceUnavailableException, InsufficientCapacityException {
         configureDoNothingForMethodsThatWeDoNotWantToTest();
 
-        Mockito.when(updateVmCommand.isCleanupDetails()).thenReturn(true);
+        when(updateVmCommand.isCleanupDetails()).thenReturn(true);
 
         Mockito.doNothing().when(userVmManagerImpl).updateDisplayVmFlag(false, vmId, userVmVoMock);
         Mockito.doNothing().when(userVmDetailVO).removeDetails(vmId);
@@ -185,11 +198,11 @@ public class UserVmManagerImplTest {
         configureDoNothingForMethodsThatWeDoNotWantToTest();
 
         HashMap<String, String> details = new HashMap<>();
-        if(!isDetailsEmpty) {
+        if (!isDetailsEmpty) {
             details.put("", "");
         }
-        Mockito.when(updateVmCommand.getDetails()).thenReturn(details);
-        Mockito.when(updateVmCommand.isCleanupDetails()).thenReturn(cleanUpDetails);
+        when(updateVmCommand.getDetails()).thenReturn(details);
+        when(updateVmCommand.isCleanupDetails()).thenReturn(cleanUpDetails);
 
         configureDoNothingForDetailsMethod();
 
@@ -197,7 +210,7 @@ public class UserVmManagerImplTest {
         verifyMethodsThatAreAlwaysExecuted();
 
         Mockito.verify(userVmVoMock, Mockito.times(cleanUpDetails || isDetailsEmpty ? 0 : 1)).setDetails(details);
-        Mockito.verify(userVmDetailVO, Mockito.times(cleanUpDetails ? 1: 0)).removeDetails(vmId);
+        Mockito.verify(userVmDetailVO, Mockito.times(cleanUpDetails ? 1 : 0)).removeDetails(vmId);
         Mockito.verify(userVmDao, Mockito.times(cleanUpDetails || isDetailsEmpty ? 0 : 1)).saveDetails(userVmVoMock);
         Mockito.verify(userVmManagerImpl, Mockito.times(0)).updateDisplayVmFlag(false, vmId, userVmVoMock);
     }
@@ -268,8 +281,50 @@ public class UserVmManagerImplTest {
         configureValidateOrReplaceMacAddressTest(1, "@1:23:45:67:89:ab", "01:23:45:67:89:ab");
     }
 
+    @Test
+    public void validateRemoveTagsWhenExists() {
+
+        List<ResourceTag> resourceTags = Arrays.asList(new ResourceTagVO("test", "test", 1l, 2l,
+                2l, ResourceTag.ResourceObjectType.UserVm, "", "test"));
+
+        Map<String, String> tags = new HashMap<>();
+        List<String> resourceIds = Arrays.asList("123");
+
+        userVmManagerImpl.setVmDao(userVmDao);
+        userVmManagerImpl.setTaggedResourceService(taggedResourceManagerMock);
+
+        when(taggedResourceManagerMock.getUuid("123", ResourceTag.ResourceObjectType.UserVm)).thenReturn("123");
+        when(taggedResourceManagerMock.deleteTags(resourceIds, ResourceTag.ResourceObjectType.UserVm, tags)).thenReturn(true);
+        Mockito.<List<? extends ResourceTag>>when(taggedResourceManagerMock.listByResourceTypeAndId(ResourceTag.ResourceObjectType.UserVm, 0)).thenReturn(resourceTags);
+
+
+        when(userVmVoMock.getUuid()).thenReturn("123");
+        when(userVmDao.findById(Mockito.eq(vmId))).thenReturn(userVmVoMock);
+
+        Boolean result = userVmManagerImpl.removeTagsFromVm(1l);
+        Assert.assertTrue(result);
+    }
+
+
+    @Test
+    public void validateWhenRemoveTagsNoExists() {
+
+        List<ResourceTag> resourceTags = Arrays.asList();
+
+        userVmManagerImpl.setVmDao(userVmDao);
+        userVmManagerImpl.setTaggedResourceService(taggedResourceManagerMock);
+
+        Mockito.<List<? extends ResourceTag>>when(taggedResourceManagerMock.listByResourceTypeAndId(ResourceTag.ResourceObjectType.UserVm, 123)).thenReturn(resourceTags);
+        when(userVmVoMock.getUuid()).thenReturn("123");
+        when(userVmDao.findById(Mockito.eq(vmId))).thenReturn(userVmVoMock);
+
+        Boolean result = userVmManagerImpl.removeTagsFromVm(1l);
+        Assert.assertFalse(result);
+    }
+
+
     private void configureValidateOrReplaceMacAddressTest(int times, String macAddress, String expectedMacAddress) throws InsufficientAddressCapacityException {
-        Mockito.when(networkModel.getNextAvailableMacAddressInNetwork(Mockito.anyLong())).thenReturn(expectedMacAddress);
+        when(networkModel.getNextAvailableMacAddressInNetwork(Mockito.anyLong())).thenReturn(expectedMacAddress);
 
         String returnedMacAddress = userVmManagerImpl.validateOrReplaceMacAddress(macAddress, 1l);
 
