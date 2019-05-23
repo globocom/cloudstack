@@ -42,7 +42,7 @@ import javax.naming.ConfigurationException;
 import com.cloud.network.as.AutoScaleVmGroupVmMapVO;
 import com.cloud.network.as.dao.AutoScaleVmGroupVmMapDao;
 import com.cloud.server.ResourceTag;
-import com.cloud.tags.TaggedResourceManagerImpl;
+import com.cloud.server.TaggedResourceService;
 import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreDao;
 import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreVO;
 import org.apache.commons.codec.binary.Base64;
@@ -483,7 +483,8 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
     @Inject
     protected AutoScaleVmGroupVmMapDao _asGroupVmMapDao;
 
-    private TaggedResourceManagerImpl _taggedResourceManager = new TaggedResourceManagerImpl();
+    @Inject
+    private TaggedResourceService _taggedResourceService;
 
     protected ScheduledExecutorService _executor = null;
     protected ScheduledExecutorService _vmIpFetchExecutor = null;
@@ -2824,7 +2825,7 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
 //        }
 //
         List<String> resourceIds = Arrays.asList(vm.getUuid());
-        Boolean result = _taggedResourceManager.deleteTags(resourceIds, ResourceTag.ResourceObjectType.UserVm, tags);
+        Boolean result = _taggedResourceService.deleteTags(resourceIds, ResourceTag.ResourceObjectType.UserVm, tags);
 
         return result;
     }
