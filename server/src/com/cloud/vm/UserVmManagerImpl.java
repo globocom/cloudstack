@@ -483,7 +483,6 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
     @Inject
     protected AutoScaleVmGroupVmMapDao _asGroupVmMapDao;
 
-
     private TaggedResourceManagerImpl _taggedResourceManager = new TaggedResourceManagerImpl();
 
     protected ScheduledExecutorService _executor = null;
