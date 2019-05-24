@@ -24,7 +24,7 @@ import com.cloud.network.NetworkModel;
 import com.cloud.server.ResourceTag;
 import com.cloud.storage.GuestOSVO;
 import com.cloud.storage.dao.GuestOSDao;
-import com.cloud.tags.ResourceTagVO;
+//import com.cloud.tags.ResourceTagVO;
 import com.cloud.tags.TaggedResourceManagerImpl;
 import com.cloud.user.Account;
 import com.cloud.user.AccountManager;
@@ -53,7 +53,7 @@ import org.powermock.modules.junit4.PowerMockRunner;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+//import java.util.Map;
 import java.util.ArrayList;
 
 import static org.mockito.Mockito.when;
