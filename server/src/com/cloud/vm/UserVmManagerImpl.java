@@ -2816,18 +2816,25 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
         return destroyedVm;
     }
 
-    private Boolean removeTagsFromVm(long vmId) {
-//        List<? extends ResourceTag> resourceTags = _taggedResourceManager.listByResourceTypeAndId(ResourceTag.ResourceObjectType.UserVm, Long.parseLong(resourceId));
+    protected Boolean removeTagsFromVm(long vmId) {
         UserVmVO vm = _vmDao.findById(vmId);
-        Map<String, String> tags = new HashMap<>();
-//        for (ResourceTag tag : resourceTags) {
-//            tags.put(tag.getKey(), tag.getValue());
-//        }
-//
-        List<String> resourceIds = Arrays.asList(vm.getUuid());
-        Boolean result = _taggedResourceService.deleteTags(resourceIds, ResourceTag.ResourceObjectType.UserVm, tags);
+        List<? extends ResourceTag> resourceTags = _taggedResourceService.listByResourceTypeAndId(ResourceTag.ResourceObjectType.UserVm, Long.parseLong(vm.getUuid()));
+        if (resourceTags.size() > 0) {
+            List<String> resourceIds = Arrays.asList(vm.getUuid());
+            Map<String, String> tags = new HashMap<>();
+            return _taggedResourceService.deleteTags(resourceIds, ResourceTag.ResourceObjectType.UserVm, tags);
+        } else {
+            return false;
+        }
 
-        return result;
+    }
+
+    public void setTaggedResourceService(TaggedResourceService taggedResourceServiceMock) {
+        _taggedResourceService = taggedResourceServiceMock;
+    }
+
+    public void setVmDao(UserVmDao userVmMock) {
+        _vmDao = userVmMock;
     }
 
     private void removeVmFromAutoScaleGroup(long vmId) {
@@ -4609,7 +4616,7 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
         }
 
         if (!resultRemovedTags) {
-            s_logger.error("Error to delete tags, for the vm with id " + vmId);
+            s_logger.error("Error to delete tags or tags not exists, for the vm with id " + vmId);
         }
 
         if (status) {
