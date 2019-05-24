@@ -2818,7 +2818,8 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
 
     protected Boolean removeTagsFromVm(long vmId) {
         UserVmVO vm = _vmDao.findById(vmId);
-        List<? extends ResourceTag> resourceTags = _taggedResourceService.listByResourceTypeAndId(ResourceTag.ResourceObjectType.UserVm, Long.parseLong(vm.getUuid()));
+        Long resourceId = _taggedResourceService.getResourceId(vm.getUuid(), ResourceTag.ResourceObjectType.UserVm);
+        List<? extends ResourceTag> resourceTags = _taggedResourceService.listByResourceTypeAndId(ResourceTag.ResourceObjectType.UserVm, resourceId);
         if (resourceTags.size() > 0) {
             List<String> resourceIds = Arrays.asList(vm.getUuid());
             Map<String, String> tags = new HashMap<>();
