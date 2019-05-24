@@ -26,7 +26,6 @@ import com.cloud.storage.GuestOSVO;
 import com.cloud.storage.dao.GuestOSDao;
 import com.cloud.tags.ResourceTagVO;
 import com.cloud.tags.TaggedResourceManagerImpl;
-import com.cloud.tags.dao.ResourceTagDao;
 import com.cloud.user.Account;
 import com.cloud.user.AccountManager;
 import com.cloud.uservm.UserVm;
@@ -39,12 +38,23 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.*;
+
+
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.Spy;
+import org.mockito.BDDMockito;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
-import java.util.*;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
 
 import static org.mockito.Mockito.when;
 
