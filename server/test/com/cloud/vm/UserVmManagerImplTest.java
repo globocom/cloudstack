@@ -16,6 +16,9 @@
 // under the License.
 package com.cloud.vm;
 
+import java.util.Map;
+import java.util.Arrays;
+import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -48,6 +51,10 @@ import com.cloud.uservm.UserVm;
 import com.cloud.vm.dao.UserVmDao;
 import com.cloud.vm.dao.UserVmDetailsDao;
 
+import com.cloud.server.ResourceTag;
+import com.cloud.tags.ResourceTagVO;
+import com.cloud.tags.TaggedResourceManagerImpl;
+
 @RunWith(PowerMockRunner.class)
 public class UserVmManagerImplTest {
 
@@ -75,6 +82,9 @@ public class UserVmManagerImplTest {
 
     @Mock
     private NetworkModel networkModel;
+
+    @Mock
+    private TaggedResourceManagerImpl taggedResourceManagerMock;
 
     private long vmId = 1l;
 
@@ -267,6 +277,48 @@ public class UserVmManagerImplTest {
     public void validateOrReplaceMacAddressTestMacAddressNotValidOption4() throws InsufficientAddressCapacityException {
         configureValidateOrReplaceMacAddressTest(1, "@1:23:45:67:89:ab", "01:23:45:67:89:ab");
     }
+
+    @Test
+    public void validateRemoveTagsWhenExists() {
+
+        List<ResourceTag> resourceTags = Arrays.asList(new ResourceTagVO("test", "test", 1l, 2l,
+                2l, ResourceTag.ResourceObjectType.UserVm, "", "test"));
+
+        Map<String, String> tags = new HashMap<>();
+        List<String> resourceIds = Arrays.asList("123");
+
+        userVmManagerImpl.setVmDao(userVmDao);
+        userVmManagerImpl.setTaggedResourceService(taggedResourceManagerMock);
+
+        Mockito.when(taggedResourceManagerMock.getUuid("123", ResourceTag.ResourceObjectType.UserVm)).thenReturn("123");
+        Mockito.when(taggedResourceManagerMock.deleteTags(resourceIds, ResourceTag.ResourceObjectType.UserVm, tags)).thenReturn(true);
+        Mockito.<List<? extends ResourceTag>>when(taggedResourceManagerMock.listByResourceTypeAndId(ResourceTag.ResourceObjectType.UserVm, 0)).thenReturn(resourceTags);
+
+
+        Mockito.when(userVmVoMock.getUuid()).thenReturn("123");
+        Mockito.when(userVmDao.findById(Mockito.eq(vmId))).thenReturn(userVmVoMock);
+
+        Boolean result = userVmManagerImpl.removeTagsFromVm(1l);
+        Assert.assertTrue(result);
+    }
+
+
+    @Test
+    public void validateWhenRemoveTagsNoExists() {
+
+        List<ResourceTag> resourceTags = Arrays.asList();
+
+        userVmManagerImpl.setVmDao(userVmDao);
+        userVmManagerImpl.setTaggedResourceService(taggedResourceManagerMock);
+
+        Mockito.<List<? extends ResourceTag>>when(taggedResourceManagerMock.listByResourceTypeAndId(ResourceTag.ResourceObjectType.UserVm, 123)).thenReturn(resourceTags);
+        Mockito.when(userVmVoMock.getUuid()).thenReturn("123");
+        Mockito.when(userVmDao.findById(Mockito.eq(vmId))).thenReturn(userVmVoMock);
+
+        Boolean result = userVmManagerImpl.removeTagsFromVm(1l);
+        Assert.assertFalse(result);
+    }
+
 
     private void configureValidateOrReplaceMacAddressTest(int times, String macAddress, String expectedMacAddress) throws InsufficientAddressCapacityException {
         Mockito.when(networkModel.getNextAvailableMacAddressInNetwork(Mockito.anyLong())).thenReturn(expectedMacAddress);

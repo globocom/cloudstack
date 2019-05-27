@@ -41,6 +41,8 @@ import javax.naming.ConfigurationException;
 
 import com.cloud.network.as.AutoScaleVmGroupVmMapVO;
 import com.cloud.network.as.dao.AutoScaleVmGroupVmMapDao;
+import com.cloud.server.ResourceTag;
+import com.cloud.server.TaggedResourceService;
 import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreDao;
 import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreVO;
 import org.apache.commons.codec.binary.Base64;
@@ -480,6 +482,9 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
 
     @Inject
     protected AutoScaleVmGroupVmMapDao _asGroupVmMapDao;
+
+    @Inject
+    private TaggedResourceService _taggedResourceService;
 
     protected ScheduledExecutorService _executor = null;
     protected ScheduledExecutorService _vmIpFetchExecutor = null;
@@ -2812,6 +2817,28 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
         return destroyedVm;
     }
 
+    protected Boolean removeTagsFromVm(long vmId) {
+        UserVmVO vm = _vmDao.findById(vmId);
+        Long resourceId = _taggedResourceService.getResourceId(vm.getUuid(), ResourceTag.ResourceObjectType.UserVm);
+        List<? extends ResourceTag> resourceTags = _taggedResourceService.listByResourceTypeAndId(ResourceTag.ResourceObjectType.UserVm, resourceId);
+        if (resourceTags.size() > 0) {
+            List<String> resourceIds = Arrays.asList(vm.getUuid());
+            Map<String, String> tags = new HashMap<>();
+            return _taggedResourceService.deleteTags(resourceIds, ResourceTag.ResourceObjectType.UserVm, tags);
+        } else {
+            return false;
+        }
+
+    }
+
+    public void setTaggedResourceService(TaggedResourceService taggedResourceServiceMock) {
+        _taggedResourceService = taggedResourceServiceMock;
+    }
+
+    public void setVmDao(UserVmDao userVmMock) {
+        _vmDao = userVmMock;
+    }
+
     private void removeVmFromAutoScaleGroup(long vmId) {
         AutoScaleVmGroupVmMapVO autoScaleVmMap = _asGroupVmMapDao.findByVmId(vmId);
         if(autoScaleVmMap != null){
@@ -4581,15 +4608,21 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
         }
 
         boolean status;
+        boolean resultRemovedTags;
         State vmState = vm.getState();
 
         try {
             VirtualMachineEntity vmEntity = _orchSrvc.getVirtualMachine(vm.getUuid());
             status = vmEntity.destroy(Long.toString(userId), expunge);
+            resultRemovedTags = removeTagsFromVm(vmId);
         } catch (CloudException e) {
             CloudRuntimeException ex = new CloudRuntimeException("Unable to destroy with specified vmId", e);
             ex.addProxyObject(vm.getUuid(), "vmId");
             throw ex;
+        }
+
+        if (!resultRemovedTags) {
+            s_logger.error("Error to delete tags or tags not exists, for the vm with id " + vmId);
         }
 
         if (status) {
