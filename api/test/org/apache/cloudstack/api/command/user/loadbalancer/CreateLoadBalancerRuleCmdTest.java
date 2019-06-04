@@ -74,7 +74,7 @@ public class CreateLoadBalancerRuleCmdTest extends TestCase{
         cmd._entityMgr = em;
 
         LoadBalancingRulesService lbRService = Mockito.mock(LoadBalancingRulesService.class);
-        Mockito.when(lbRService.deleteLoadBalancerRule(23l, false)).thenReturn(true);
+        Mockito.when(lbRService.deleteLoadBalancerRule(23l, false, false)).thenReturn(true);
         cmd._lbService = lbRService;
 
         try {
@@ -86,7 +86,7 @@ public class CreateLoadBalancerRuleCmdTest extends TestCase{
             assertNull(lbResponseCmd);
 
             Mockito.verify(em, Mockito.times(1)).findById(LoadBalancer.class, 23l);
-            Mockito.verify(lbRService, Mockito.times(1)).deleteLoadBalancerRule(23l, false);
+            Mockito.verify(lbRService, Mockito.times(1)).deleteLoadBalancerRule(23l, false, false);
         } catch (Exception e ) {
             e.printStackTrace();
             fail("shoud be ServerApiException");

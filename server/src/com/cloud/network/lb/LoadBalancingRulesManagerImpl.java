@@ -1563,7 +1563,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
 
     @Override
     @ActionEvent(eventType = EventTypes.EVENT_LOAD_BALANCER_DELETE, eventDescription = "deleting load balancer", async = true)
-    public boolean deleteLoadBalancerRule(long loadBalancerId, boolean apply) {
+    public boolean deleteLoadBalancerRule(long loadBalancerId, boolean apply, boolean keepIp) {
         CallContext ctx = CallContext.current();
         Account caller = ctx.getCallingAccount();
 
@@ -1574,7 +1574,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         }
         _accountMgr.checkAccess(caller, null, true, rule);
 
-        boolean result = deleteLoadBalancerRule(loadBalancerId, apply, caller, ctx.getCallingUserId(), true);
+        boolean result = deleteLoadBalancerRule(loadBalancerId, apply, caller, ctx.getCallingUserId(), true, keepIp);
         if (!result) {
             throw new CloudRuntimeException("Unable to remove load balancer rule " + loadBalancerId);
         }
@@ -1583,6 +1583,11 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
 
     @DB
     public boolean deleteLoadBalancerRule(final long loadBalancerId, boolean apply, Account caller, long callerUserId, boolean rollBack) {
+        return deleteLoadBalancerRule(loadBalancerId, apply, caller, callerUserId, rollBack, false);
+    }
+
+    @DB
+    public boolean deleteLoadBalancerRule(final long loadBalancerId, boolean apply, Account caller, long callerUserId, boolean rollBack, boolean keepIp) {
         final LoadBalancerVO lb = _lbDao.findById(loadBalancerId);
         FirewallRule.State backupState = lb.getState();
 
@@ -1652,7 +1657,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
                     _autoScaleMgr.deleteAutoScaleVmGroupWithDependencies(autoScaleVmGroup.getId());
                 }
 
-                if (!applyLoadBalancerConfig(loadBalancerId)) {
+                if (!applyLoadBalancerConfig(loadBalancerId, keepIp)) {
                     s_logger.warn("Unable to apply the load balancer config");
                     return false;
                 }
@@ -1991,6 +1996,11 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
 
     @Override
     public boolean applyLoadBalancerConfig(long lbRuleId) throws ResourceUnavailableException {
+       return applyLoadBalancerConfig(lbRuleId, false);
+    }
+
+    @Override
+    public boolean applyLoadBalancerConfig(long lbRuleId, boolean keepIp) throws ResourceUnavailableException {
         LoadBalancerVO lb = _lbDao.findById(lbRuleId);
         List<LoadBalancerVO> lbs;
         if (isRollBackAllowedForProvider(lb)) {
@@ -2017,7 +2027,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
             }
 
         }
-        return applyLoadBalancerRules(lbs, true);
+        return applyLoadBalancerRules(lbs, true, keepIp);
     }
 
     @Override
@@ -2119,11 +2129,19 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         return loadBalancing;
     }
 
+
     @DB
     protected boolean applyLoadBalancerRules(List<LoadBalancerVO> lbs, boolean updateRulesInDB) throws ResourceUnavailableException {
+        return applyLoadBalancerRules(lbs, updateRulesInDB, false);
+    }
+
+    @DB
+    protected boolean applyLoadBalancerRules(List<LoadBalancerVO> lbs, boolean updateRulesInDB, boolean keepIp) throws ResourceUnavailableException {
         List<LoadBalancingRule> rules = new ArrayList<LoadBalancingRule>();
         for (LoadBalancerVO lb : lbs) {
-            rules.add(getLoadBalancerRuleToApply(lb));
+            LoadBalancingRule lbRule = getLoadBalancerRuleToApply(lb);
+            lbRule.setKeepIp(keepIp);
+            rules.add(lbRule);
         }
 
         if (!applyLbRules(rules, false)) {

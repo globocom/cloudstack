@@ -2029,7 +2029,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
 
         final RemoveVipFromGloboNetworkCommand cmd = new RemoveVipFromGloboNetworkCommand();
         cmd.setVipId(globoNetworkIpDetail.getGloboNetworkVipId());
-        cmd.setKeepIp(false);
+        cmd.setKeepIp(rule.isKeepIp());
         _globoResourceConfigurationDao.removeConfigurations(rule.getUuid(), GloboResourceType.LOAD_BALANCER);
         this.callCommand(cmd, network.getDataCenterId());
 

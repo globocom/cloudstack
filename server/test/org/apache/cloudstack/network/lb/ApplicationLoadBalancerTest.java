@@ -126,8 +126,8 @@ public class ApplicationLoadBalancerTest extends TestCase {
         Mockito.when(_lbDao.findById(2L)).thenReturn(null);
 
         //mockito for .deleteApplicationLoadBalancer tests
-        Mockito.when(_lbService.deleteLoadBalancerRule(existingLbId, true)).thenReturn(true);
-        Mockito.when(_lbService.deleteLoadBalancerRule(nonExistingLbId, true)).thenReturn(false);
+        Mockito.when(_lbService.deleteLoadBalancerRule(existingLbId, true, false)).thenReturn(true);
+        Mockito.when(_lbService.deleteLoadBalancerRule(nonExistingLbId, true, false)).thenReturn(false);
 
         //mockito for .createApplicationLoadBalancer tests
         NetworkVO guestNetwork = new NetworkVO(TrafficType.Guest, null, null, 1, null, 1, 1L, false);

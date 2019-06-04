@@ -59,7 +59,7 @@ public interface LoadBalancingRulesService {
 
     LoadBalancer updateLoadBalancerRule(UpdateLoadBalancerRuleCmd cmd);
 
-    boolean deleteLoadBalancerRule(long lbRuleId, boolean apply);
+    boolean deleteLoadBalancerRule(long lbRuleId, boolean apply, boolean keepIp);
 
     /**
      * Create a stickiness policy to a load balancer from the given stickiness method name and parameters in
@@ -104,6 +104,8 @@ public interface LoadBalancingRulesService {
     boolean removeFromLoadBalancer(long lbRuleId, List<Long> vmIds,   Map<Long, List<String>> vmIdIpMap);
 
     boolean applyLoadBalancerConfig(long lbRuleId) throws ResourceUnavailableException;
+
+    boolean applyLoadBalancerConfig(long lbRuleId, boolean keepIp) throws ResourceUnavailableException;
 
     boolean assignCertToLoadBalancer(long lbRuleId, Long certId);
 

@@ -146,7 +146,7 @@ public class CreateGloboLoadBalancerCmd extends CreateLoadBalancerRuleCmd /*impl
 
         } catch (Exception e) {
             s_logger.warn("[load_balancer " + name + "] removing loadbalancer after error", e);
-            _lbService.deleteLoadBalancerRule(getEntityId(), false);
+            _lbService.deleteLoadBalancerRule(getEntityId(), false, false);
             handleErrorAfterIpCreated(name, ipCreated, ipAddressId);
             throw e;
         }
