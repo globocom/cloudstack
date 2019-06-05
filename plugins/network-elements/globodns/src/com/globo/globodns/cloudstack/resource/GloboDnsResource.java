@@ -24,6 +24,10 @@ import java.util.Map;
 
 import javax.naming.ConfigurationException;
 
+import com.globo.globodns.client.model.Authentication;
+import com.globo.globodns.client.model.Domain;
+import com.globo.globodns.client.model.Export;
+import com.globo.globodns.client.model.Record;
 import org.apache.log4j.Logger;
 
 import com.cloud.agent.IAgentControl;
@@ -42,10 +46,6 @@ import com.cloud.utils.StringUtils;
 import com.cloud.utils.component.ManagerBase;
 import com.globo.globodns.client.GloboDns;
 import com.globo.globodns.client.GloboDnsException;
-import com.globo.globodns.client.model.Authentication;
-import com.globo.globodns.client.model.Domain;
-import com.globo.globodns.client.model.Export;
-import com.globo.globodns.client.model.Record;
 import com.globo.globodns.cloudstack.commands.CreateLbRecordAndReverseCommand;
 import com.globo.globodns.cloudstack.commands.CreateOrUpdateDomainCommand;
 import com.globo.globodns.cloudstack.commands.CreateOrUpdateRecordAndReverseCommand;
@@ -475,6 +475,20 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
             _globoDns.getRecordAPI().removeRecord(record.getId());
         }
 
+        int x = 0;
+        while(x < 3) {
+
+            Boolean resultIfRecordExists = removeRecordIfItExists((record.getId()));
+            if (resultIfRecordExists) {
+                s_logger.warn("Trying to remove Record " + recordName + " in domain " + bindZoneName);
+                _globoDns.getRecordAPI().removeRecord(record.getId());
+            } else {
+                s_logger.warn("Record " + recordName + " in domain " + bindZoneName + " has already been removed.");
+                break;
+            }
+            x++;
+        }
+
         return true;
     }
 
@@ -621,5 +635,21 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
             String reverseRecordName = octets[3];
             return reverseRecordName;
         }
+    }
+
+    private Boolean removeRecordIfItExists(Long recordId) {
+        Record record;
+        try{
+            record = _globoDns.getRecordAPI().getById(recordId);
+        } catch (Exception e) {
+            s_logger.error("Record not found");
+            return false;
+        }
+
+        if (record == null) {
+            return false;
+        }
+
+        return true;
     }
 }
