@@ -114,7 +114,9 @@ public class DeleteGloboLoadBalancerCmd extends BaseAsyncCmd {
         result = result && _lbService.deleteLoadBalancerRule(id, true, keepIp);
 
         if (result) {
-            removeIpAddress(lb);
+            if(!keepIp) {
+                removeIpAddress(lb);
+            }
             SuccessResponse response = new SuccessResponse(getCommandName());
             this.setResponseObject(response);
         } else {
