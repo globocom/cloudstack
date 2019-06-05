@@ -370,7 +370,7 @@ public class ApplicationLoadBalancerManagerImpl extends ManagerBase implements A
 
     @Override
     public boolean deleteApplicationLoadBalancer(long id) {
-        return _lbService.deleteLoadBalancerRule(id, true);
+        return _lbService.deleteLoadBalancerRule(id, true, false);
     }
 
     @Override

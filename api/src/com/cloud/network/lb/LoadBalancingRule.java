@@ -50,6 +50,8 @@ public class LoadBalancingRule {
     private List<Long> additionalNetworks;
     private List<String> additionalPortMap;
 
+    private boolean keepIp;
+
     public LoadBalancingRule(LoadBalancer lb, List<LbDestination> destinations, List<LbStickinessPolicy> stickinessPolicies,
             List<LbHealthCheckPolicy> healthCheckPolicies, Ip sourceIp) {
         this.lb = lb;
@@ -581,5 +583,13 @@ public class LoadBalancingRule {
 
     public Scheme getScheme() {
         return lb.getScheme();
+    }
+
+    public void setKeepIp(boolean keepIp) {
+        this.keepIp = keepIp;
+    }
+
+    public boolean isKeepIp() {
+        return keepIp;
     }
 }

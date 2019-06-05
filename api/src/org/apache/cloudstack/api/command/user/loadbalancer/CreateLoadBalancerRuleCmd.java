@@ -341,7 +341,7 @@ public class CreateLoadBalancerRuleCmd extends BaseAsyncCreateCmd /*implements L
                     _firewallService.revokeRelatedFirewallRule(getEntityId(), true);
                 }
                 // no need to apply the rule on the backend as it exists in the db only
-                _lbService.deleteLoadBalancerRule(getEntityId(), false);
+                _lbService.deleteLoadBalancerRule(getEntityId(), false, false);
             }
         }
     }
