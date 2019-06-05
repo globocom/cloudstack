@@ -477,6 +477,7 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
 
         int x = 0;
         while(x < 3) {
+
             Boolean resultIfRecordExists = removeRecordIfItExists((record.getId()));
             if (resultIfRecordExists) {
                 s_logger.warn("Trying to remove Record " + recordName + " in domain " + bindZoneName);
@@ -637,7 +638,14 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
     }
 
     private Boolean removeRecordIfItExists(Long recordId) {
-        Record record = _globoDns.getRecordAPI().getById(recordId);
+        Record record;
+        try{
+            record = _globoDns.getRecordAPI().getById(recordId);
+        } catch (Exception e) {
+            s_logger.error("Record not found");
+            return false;
+        }
+
         if (record == null) {
             return false;
         }
