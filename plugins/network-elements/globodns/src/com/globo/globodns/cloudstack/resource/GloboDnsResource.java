@@ -54,6 +54,7 @@ import com.globo.globodns.cloudstack.commands.RemoveRecordCommand;
 import com.globo.globodns.cloudstack.commands.SignInCommand;
 import com.globo.globodns.cloudstack.commands.ValidateLbRecordCommand;
 import com.googlecode.ipv6.IPv6Address;
+import org.elasticsearch.common.netty.channel.ExceptionEvent;
 
 public class GloboDnsResource extends ManagerBase implements ServerResource {
     private String _zoneId;
@@ -457,6 +458,7 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
      * @return true if record exists and was removed.
      */
     protected boolean removeRecord(String recordName, String recordValue, String bindZoneName, boolean reverse) {
+
         Domain domain = searchDomain(bindZoneName, reverse);
         if (domain == null) {
             s_logger.warn("Domain " + bindZoneName + " doesn't exists in GloboDNS. Record " + recordName + " has already been removed.");
@@ -472,24 +474,32 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
                         + ". Will not delete it.");
                 return false;
             }
-            _globoDns.getRecordAPI().removeRecord(record.getId());
+            retryRemoveDnsRecord(recordName, bindZoneName, record);
         }
 
-        int x = 0;
-        while(x < 3) {
-
-            Boolean resultIfRecordExists = removeRecordIfItExists((record.getId()));
-            if (resultIfRecordExists) {
-                s_logger.warn("Trying to remove Record " + recordName + " in domain " + bindZoneName);
-                _globoDns.getRecordAPI().removeRecord(record.getId());
-            } else {
-                s_logger.warn("Record " + recordName + " in domain " + bindZoneName + " has already been removed.");
-                break;
-            }
-            x++;
-        }
 
         return true;
+    }
+
+    private void retryRemoveDnsRecord(String recordName, String bindZoneName, Record record) {
+        int x = 0;
+        while(x < 3) {
+            try{
+                Record checkRecord = _globoDns.getRecordAPI().getById(record.getId());
+                if (checkRecord != null) {
+                    s_logger.warn("Trying to remove Record " + recordName + " in domain " + bindZoneName);
+                    _globoDns.getRecordAPI().removeRecord(record.getId());
+                } else {
+                    s_logger.warn("Record " + recordName + " in domain " + bindZoneName + " has already been removed.");
+                    break;
+                }
+            } catch (GloboDnsException e) {
+                s_logger.warn("It wasn't possible to remove Dns Record: " + recordName + "\n" + e.getMessage());
+                e.printStackTrace();
+            }
+
+            x++;
+        }
     }
 
     /**
@@ -637,19 +647,4 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
         }
     }
 
-    private Boolean removeRecordIfItExists(Long recordId) {
-        Record record;
-        try{
-            record = _globoDns.getRecordAPI().getById(recordId);
-        } catch (Exception e) {
-            s_logger.error("Record not found");
-            return false;
-        }
-
-        if (record == null) {
-            return false;
-        }
-
-        return true;
-    }
 }

@@ -56,10 +56,10 @@ public class DeleteGloboLoadBalancerCmd extends BaseAsyncCmd {
             description = "the ID of the load balancer rule")
     private Long id;
 
-    @Parameter(name = "keepIp",
+    @Parameter(name = ApiConstants.KEEP_IP,
             type = CommandType.BOOLEAN,
-            description = "the equipment should keep Ip?")
-    private boolean keepIp;
+            description = "the equipment should keep Ip for future use?")
+    private Boolean keepip;
 
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
@@ -69,7 +69,12 @@ public class DeleteGloboLoadBalancerCmd extends BaseAsyncCmd {
         return id;
     }
 
-    public boolean getKeepIp() { return keepIp; }
+    public Boolean getKeepip() {
+        if(keepip != null)
+            return keepip;
+        else
+            return false;
+    }
 
     /////////////////////////////////////////////////////
     /////////////// API Implementation///////////////////
@@ -111,10 +116,10 @@ public class DeleteGloboLoadBalancerCmd extends BaseAsyncCmd {
         CallContext.current().setEventDetails("Load balancer Id: " + getId());
 
         boolean result = _firewallService.revokeRelatedFirewallRule(id, true);
-        result = result && _lbService.deleteLoadBalancerRule(id, true, keepIp);
+        result = result && _lbService.deleteLoadBalancerRule(id, true, getKeepip());
 
         if (result) {
-            if(!keepIp) {
+            if(!keepip) {
                 removeIpAddress(lb);
             }
             SuccessResponse response = new SuccessResponse(getCommandName());
