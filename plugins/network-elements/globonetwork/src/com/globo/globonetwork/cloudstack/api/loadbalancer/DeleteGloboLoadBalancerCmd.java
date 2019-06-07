@@ -119,7 +119,7 @@ public class DeleteGloboLoadBalancerCmd extends BaseAsyncCmd {
         result = result && _lbService.deleteLoadBalancerRule(id, true, getKeepip());
 
         if (result) {
-            if(!keepip) {
+            if(!getKeepip()) {
                 removeIpAddress(lb);
             }
             SuccessResponse response = new SuccessResponse(getCommandName());
