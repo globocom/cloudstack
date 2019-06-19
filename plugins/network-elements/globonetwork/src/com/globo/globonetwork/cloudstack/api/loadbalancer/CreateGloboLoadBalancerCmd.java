@@ -119,6 +119,7 @@ public class CreateGloboLoadBalancerCmd extends CreateLoadBalancerRuleCmd /*impl
 
             super.create();
         } catch (UserCloudRuntimeException e) {
+            handleErrorAfterIpCreated(name, ipCreated, ipAddressId);
             throw e;
         } catch (Exception e) {
             s_logger.error("[load_balancer " + name + "] error creating load balancer ", e);
@@ -295,6 +296,7 @@ public class CreateGloboLoadBalancerCmd extends CreateLoadBalancerRuleCmd /*impl
 
 
     private void handleErrorAfterIpCreated(String lbName, boolean ipCreated, Long ipAddressId) {
+        s_logger.warn("[load_balancer " + lbName + "] trying to disassociateIp after an error " + ipAddressId);
         if (ipCreated) {
             boolean result = globoNetworkSvc.disassociateIpAddrFromGloboNetwork(ipAddressId);
             if (result) {
