@@ -54,7 +54,6 @@ import com.globo.globodns.cloudstack.commands.RemoveRecordCommand;
 import com.globo.globodns.cloudstack.commands.SignInCommand;
 import com.globo.globodns.cloudstack.commands.ValidateLbRecordCommand;
 import com.googlecode.ipv6.IPv6Address;
-import org.elasticsearch.common.netty.channel.ExceptionEvent;
 
 public class GloboDnsResource extends ManagerBase implements ServerResource {
     private String _zoneId;
@@ -494,7 +493,7 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
                     break;
                 }
             } catch (GloboDnsException e) {
-                s_logger.warn("It wasn't possible to remove Dns Record: " + recordName + "\n" + e.getMessage());
+                s_logger.warn("The record: " + recordName + " because: \n" + e.getMessage());
                 e.printStackTrace();
             }
 
