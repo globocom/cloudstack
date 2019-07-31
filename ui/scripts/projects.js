@@ -570,7 +570,13 @@
                             }),
                             data: {
                                 id: args.context.projects[0].id,
-                                account: args.context.multiRule[0].username
+                                account: args.context.multiRule[0].username,
+                                businessserviceid: args.context.project[0].businessserviceid,
+                                clientid: args.context.project[0].clientid
+                                componentid: args.context.project[0].componentid,
+                                subcomponentid: args.context.project[0].subcomponentid,
+                                productid: args.context.project[0].productid,
+                                detailedusage: args.context.project[0].detailedusage
                             },
                             dataType: 'json',
                             async: true,
