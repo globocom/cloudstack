@@ -570,7 +570,13 @@
                             }),
                             data: {
                                 id: args.context.projects[0].id,
-                                account: args.context.multiRule[0].username
+                                account: args.context.multiRule[0].username,
+                                businessserviceid: args.context.projects[0].businessserviceid,
+                                clientid: args.context.projects[0].clientid,
+                                componentid: args.context.projects[0].componentid,
+                                subcomponentid: args.context.projects[0].subcomponentid,
+                                productid: args.context.projects[0].productid,
+                                detailedusage: args.context.projects[0].detailedusage
                             },
                             dataType: 'json',
                             async: true,
@@ -890,7 +896,9 @@
                                                    label: 'label.project.subcomponent',
                                                    defaultValue: project.subcomponentid,
                                                    select: function(args) {
+                                                    if(project.componentid) {
                                                        createDictionaryEntityOption('listSubComponents', 'listsubcomponentsresponse', 'subcomponent', args, {componentId: project.componentid, componentRequired: true})
+                                                    }
                                                    }
                                                },
                                                productid: {
