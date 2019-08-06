@@ -40,6 +40,7 @@ import javax.naming.ConfigurationException;
 
 import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.cloud.globodictionary.GloboDictionaryService;
+import com.cloud.network.NetworkService;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -107,6 +108,8 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     private ProjectJoinDao _projectJoinDao;
     @Inject
     AccountManager _accountMgr;
+    @Inject
+    NetworkService _networkService;
     @Inject
     DomainManager _domainMgr;
     @Inject
@@ -337,6 +340,11 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
         });
 
         if (updateResult) {
+            //TODO check if there is networks in the project
+            if(checkBlockingResources(caller, project)) {
+                s_logger.warn("Failed to remove project's id=" + project.getId() + " are networks in the project");
+                return false;
+            }
             //pass system caller when clenaup projects account
             if (!cleanupProject(project, _accountDao.findById(Account.ACCOUNT_ID_SYSTEM), User.UID_SYSTEM)) {
                 s_logger.warn("Failed to cleanup project's id=" + project.getId() + " resources, not removing the project yet");
@@ -348,6 +356,10 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
             s_logger.warn("Failed to mark the project id=" + project.getId() + " with state " + State.Disabled);
             return false;
         }
+    }
+
+    private boolean checkBlockingResources(final Account caller, final Project project) {
+        return false;
     }
 
     @DB
