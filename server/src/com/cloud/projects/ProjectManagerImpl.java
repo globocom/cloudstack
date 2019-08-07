@@ -40,7 +40,9 @@ import javax.naming.ConfigurationException;
 
 import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.cloud.globodictionary.GloboDictionaryService;
+import com.cloud.network.Network;
 import com.cloud.network.NetworkService;
+import org.apache.cloudstack.api.command.user.network.ListNetworksCmd;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -340,7 +342,6 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
         });
 
         if (updateResult) {
-            //TODO check if there is networks in the project
             if(checkBlockingResources(caller, project)) {
                 s_logger.warn("Failed to remove project's id=" + project.getId() + " are networks in the project");
                 return false;
@@ -359,7 +360,12 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     }
 
     private boolean checkBlockingResources(final Account caller, final Project project) {
-        return false;
+        ListNetworksCmd cmd = new ListNetworksCmd();
+        cmd.setProjectId(project.getId());
+        List<? extends Network> networks = _networkService.searchForAllNetworks(cmd);
+        if(networks != null && networks.size() > 0) {
+            return false;
+        } return true;
     }
 
     @DB
