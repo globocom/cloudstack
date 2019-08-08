@@ -1241,6 +1241,11 @@ public class GloboNetworkManagerTest {
         verify(_globoNetworkIpDetailDao).persist(any(GloboNetworkIpDetailVO.class));
     }
 
+    @Test(expected = InvalidParameterValueException.class)
+    public void testCheckLbName() {
+        _globoNetworkService.checkLbName("test..lb.globoi.com", "lb.globoi.com");
+    }
+
     private LoadBalancingRule createMockLbRule(String name, boolean revoked) {
         LoadBalancerVO lb = new LoadBalancerVO(null, null, null, 1L, 80, 8080, null, 1L, 1L, 1L, null);
         lb.setState(FirewallRule.State.Add);

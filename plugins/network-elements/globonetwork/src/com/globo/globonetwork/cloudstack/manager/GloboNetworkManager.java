@@ -2249,6 +2249,8 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
                 throw new InvalidParameterValueException("Load balancer name " + rule.getName() + " is not in the allowed list for domains.");
             }
 
+            checkLbName(rule.getName(), lbDomain);
+
             // Finally, validate LB record in GloboDNS
             String lbRecord = getLbRecord(rule.getName(), lbDomain);
 
@@ -2258,6 +2260,12 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         }
 
         return true;
+    }
+
+    public void checkLbName(String name, String lbDomain) {
+        if (name.contains(".." + lbDomain)) {
+            throw new InvalidParameterValueException("You mustn't use 2 points before lb domain.");
+        }
     }
 
     @Override
