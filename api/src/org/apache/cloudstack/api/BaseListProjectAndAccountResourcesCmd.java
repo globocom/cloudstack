@@ -32,3 +32,4 @@ public abstract class BaseListProjectAndAccountResourcesCmd extends BaseListAcco
         this.projectId = projectId;
     }
 }
+
