@@ -2263,7 +2263,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
     }
 
     public void checkLbName(String name, String lbDomain) {
-        if (name.contains(".." + lbDomain)) {
+        if (name.contains("..")) {
             throw new InvalidParameterValueException("You mustn't use 2 points before lb domain.");
         }
     }
