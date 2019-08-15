@@ -40,7 +40,9 @@ import javax.naming.ConfigurationException;
 
 import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.cloud.globodictionary.GloboDictionaryService;
+import com.cloud.network.Network;
 import com.cloud.network.NetworkService;
+import org.apache.cloudstack.api.command.user.network.ListNetworksCmd;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -326,25 +328,24 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
         boolean updateResult = Transaction.execute(new TransactionCallback<Boolean>() {
             @Override
             public Boolean doInTransaction(TransactionStatus status) {
-        s_logger.debug("Marking project id=" + project.getId() + " with state " + State.Disabled + " as a part of project delete...");
-        project.setState(State.Disabled);
-        boolean updateResult = _projectDao.update(project.getId(), project);
-        //owner can be already removed at this point, so adding the conditional check
-        Account projectOwner = getProjectOwner(project.getId());
-        if (projectOwner != null) {
-            _resourceLimitMgr.decrementResourceCount(projectOwner.getId(), ResourceType.project);
-        }
+                s_logger.debug("Verifying if there are no blocking resources  id=" + project.getId());
+                if(hasBlockingResources(caller, project)) {
+                    throw new CloudRuntimeException("Failed to remove project's id=" + project.getId() + " because there are networks in the project");
+                }
 
+                s_logger.debug("Marking project id=" + project.getId() + " with state " + State.Disabled + " as a part of project delete...");
+                project.setState(State.Disabled);
+                boolean updateResult = _projectDao.update(project.getId(), project);
+                //owner can be already removed at this point, so adding the conditional check
+                Account projectOwner = getProjectOwner(project.getId());
+                if (projectOwner != null) {
+                    _resourceLimitMgr.decrementResourceCount(projectOwner.getId(), ResourceType.project);
+                }
                 return updateResult;
             }
         });
 
         if (updateResult) {
-            //TODO check if there is networks in the project
-            if(checkBlockingResources(caller, project)) {
-                s_logger.warn("Failed to remove project's id=" + project.getId() + " are networks in the project");
-                return false;
-            }
             //pass system caller when clenaup projects account
             if (!cleanupProject(project, _accountDao.findById(Account.ACCOUNT_ID_SYSTEM), User.UID_SYSTEM)) {
                 s_logger.warn("Failed to cleanup project's id=" + project.getId() + " resources, not removing the project yet");
@@ -358,7 +359,13 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
         }
     }
 
-    private boolean checkBlockingResources(final Account caller, final Project project) {
+    private boolean hasBlockingResources(final Account caller, final Project project) {
+        ListNetworksCmd cmd = new ListNetworksCmd();
+        cmd.setProjectId(project.getId());
+        List<? extends Network> networks = _networkService.searchForAllNetworks(cmd);
+        if(networks != null && networks.size() > 0) {
+            return true;
+        }
         return false;
     }
 
