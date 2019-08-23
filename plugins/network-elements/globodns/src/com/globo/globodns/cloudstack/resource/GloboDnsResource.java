@@ -68,9 +68,9 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
 
     private String _password;
 
-    private Integer numberOfRetries = 1;
+    private Integer numberOfRetries = 3;
     private Integer connectTimeout = 20000;
-    private Integer readTimeout = 20000;;
+    private Integer readTimeout = 20000;
 
     protected GloboDns _globoDns;
 
@@ -473,32 +473,11 @@ public class GloboDnsResource extends ManagerBase implements ServerResource {
                         + ". Will not delete it.");
                 return false;
             }
-            retryRemoveDnsRecord(recordName, bindZoneName, record);
-        }
 
+            _globoDns.getRecordAPI().removeRecord(record.getId());
+        }
 
         return true;
-    }
-
-    private void retryRemoveDnsRecord(String recordName, String bindZoneName, Record record) {
-        int x = 0;
-        while(x < 3) {
-            try{
-                Record checkRecord = _globoDns.getRecordAPI().getById(record.getId());
-                if (checkRecord != null) {
-                    s_logger.warn("Trying to remove Record " + recordName + " in domain " + bindZoneName);
-                    _globoDns.getRecordAPI().removeRecord(record.getId());
-                } else {
-                    s_logger.warn("Record " + recordName + " in domain " + bindZoneName + " has already been removed.");
-                    break;
-                }
-            } catch (GloboDnsException e) {
-                s_logger.warn("The record: " + recordName + " because: \n" + e.getMessage());
-                e.printStackTrace();
-            }
-
-            x++;
-        }
     }
 
     /**
