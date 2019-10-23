@@ -648,6 +648,7 @@
             var page = 1;
             var getNextPage = function() {
                 var data2 = $.extend({}, data1, {
+                    details: 'min',
                     page: page,
                     pageSize: 500
                 });
@@ -789,6 +790,10 @@
                                 domainid: args.context.users[0].domainid
                             });
                         }
+
+                        $.extend(data, {
+                            details: 'min',
+                        });
 
                         $.ajax({
                             url: createURL('listProjects', {

@@ -24,13 +24,8 @@
 Name:      cloudstack
 Summary:   CloudStack IaaS Platform
 #http://fedoraproject.org/wiki/PackageNamingGuidelines#Pre-Release_packages
-%if "%{?_prerelease}" != ""
-%define _maventag %{_ver}-SNAPSHOT
+%define _maventag %{_fullver}
 Release:   %{_rel}%{dist}
-%else
-%define _maventag %{_ver}
-Release:   %{_rel}%{dist}
-%endif
 
 %{!?python_sitearch: %define python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(1))")}
 
@@ -263,7 +258,7 @@ cp build/gitrev.txt ${RPM_BUILD_ROOT}%{_datadir}/%{name}-common/scripts
 cp packaging/centos63/cloudstack-sccs ${RPM_BUILD_ROOT}/usr/bin
  
 mkdir -p ${RPM_BUILD_ROOT}%{_datadir}/%{name}-common/scripts/network/cisco
-cp -r plugins/network-elements/cisco-vnmc/scripts/network/cisco/* ${RPM_BUILD_ROOT}%{_datadir}/%{name}-common/scripts/network/cisco
+cp -r plugins/network-elements/cisco-vnmc/src/main/scripts/network/cisco/* ${RPM_BUILD_ROOT}%{_datadir}/%{name}-common/scripts/network/cisco
 
 # Management
 mkdir -p ${RPM_BUILD_ROOT}%{_datadir}/%{name}-management/
@@ -372,7 +367,7 @@ cp -r test/integration/* ${RPM_BUILD_ROOT}%{_datadir}/%{name}-integration-tests/
 # MYSQL HA
 if [ "x%{_ossnoss}" == "xnoredist" ] ; then
   mkdir -p ${RPM_BUILD_ROOT}%{_datadir}/%{name}-mysql-ha/lib
-  cp -r plugins/database/mysql-ha/target/cloud-plugin-database-mysqlha-%{_maventag}.jar ${RPM_BUILD_ROOT}%{_datadir}/%{name}-mysql-ha/lib
+  cp -r plugins/database/mysql-ha/target/cloud-plugin-database-mysqlha-%{_maventag}.jar ${RPM_BUILD_ROOT}%{_datadir}/%{name}-management/lib
 fi
 
 #License files from whisker
@@ -390,10 +385,6 @@ install -D tools/whisker/NOTICE ${RPM_BUILD_ROOT}%{_defaultdocdir}/%{name}-marvi
 install -D tools/whisker/LICENSE ${RPM_BUILD_ROOT}%{_defaultdocdir}/%{name}-marvin-%{version}/LICENSE
 install -D tools/whisker/NOTICE ${RPM_BUILD_ROOT}%{_defaultdocdir}/%{name}-integration-tests-%{version}/NOTICE
 install -D tools/whisker/LICENSE ${RPM_BUILD_ROOT}%{_defaultdocdir}/%{name}-integration-tests-%{version}/LICENSE
-if [ "x%{_ossnoss}" == "xnoredist" ] ; then
-  install -D tools/whisker/LICENSE ${RPM_BUILD_ROOT}%{_defaultdocdir}/%{name}-mysql-ha-%{version}/LICENSE
-  install -D tools/whisker/NOTICE ${RPM_BUILD_ROOT}%{_defaultdocdir}/%{name}-mysql-ha-%{version}/NOTICE
-fi
 
 %clean
 [ ${RPM_BUILD_ROOT} != "/" ] && rm -rf ${RPM_BUILD_ROOT}
@@ -591,7 +582,7 @@ pip install --upgrade /usr/share/cloudstack-marvin/Marvin-*.tar.gz
 %attr(0755,root,root) %{_bindir}/%{name}-ssh
 %attr(0755,root,root) %{_sysconfdir}/init.d/%{name}-agent
 %attr(0644,root,root) %{_sysconfdir}/profile.d/%{name}-agent-profile.sh
-%attr(0644,root,root) %{_sysconfdir}/logrotate.d/%{name}-agent
+%config(noreplace) %{_sysconfdir}/logrotate.d/%{name}-agent
 %attr(0755,root,root) %{_datadir}/%{name}-common/scripts/network/cisco
 %config(noreplace) %{_sysconfdir}/%{name}/agent
 %dir %{_localstatedir}/log/%{name}/agent
@@ -644,9 +635,7 @@ pip install --upgrade /usr/share/cloudstack-marvin/Marvin-*.tar.gz
 %if "%{_ossnoss}" == "noredist"
 %files mysql-ha
 %defattr(0644,cloud,cloud,0755)
-%attr(0644,root,root) %{_datadir}/%{name}-mysql-ha/lib/*
-%{_defaultdocdir}/%{name}-mysql-ha-%{version}/LICENSE
-%{_defaultdocdir}/%{name}-mysql-ha-%{version}/NOTICE
+%attr(0644,root,root) %{_datadir}/%{name}-management/lib/*mysqlha*jar
 %endif
 
 %files baremetal-agent

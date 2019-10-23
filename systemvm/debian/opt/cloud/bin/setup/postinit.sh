@@ -21,65 +21,47 @@
 # Eject cdrom if any
 eject || true
 
-# Setup router
-CMDLINE=/var/cache/cloud/cmdline
-for str in $(cat $CMDLINE)
-  do
-    KEY=$(echo $str | cut -d= -f1)
-    VALUE=$(echo $str | cut -d= -f2)
-    case $KEY in
-      type)
-        export TYPE=$VALUE
-        ;;
-      *)
-        ;;
-    esac
-done
+# Restart journald for setting changes to apply
+systemctl restart systemd-journald
 
+TYPE=$(grep -Po 'type=\K[a-zA-Z]*' /var/cache/cloud/cmdline)
 if [ "$TYPE" == "router" ] || [ "$TYPE" == "vpcrouter" ] || [ "$TYPE" == "dhcpsrvr" ]
 then
   if [ -x /opt/cloud/bin/update_config.py ]
   then
-      /opt/cloud/bin/update_config.py cmd_line.json || true
-      logger -t cloud "postinit: Updated config cmd_line.json"
+    /opt/cloud/bin/update_config.py cmd_line.json || true
   fi
-fi
-
-if [ "$TYPE" == "router" ]
-then
-    python /opt/cloud/bin/baremetal-vr.py &
-    logger -t cloud "Started baremetal-vr service"
 fi
 
 [ ! -f /var/cache/cloud/enabled_svcs ] && touch /var/cache/cloud/enabled_svcs
 for svc in $(cat /var/cache/cloud/enabled_svcs)
 do
-   logger -t cloud "Starting $svc"
-   systemctl enable --no-block --now $svc
+  systemctl enable --now --no-block $svc
 done
 
 [ ! -f /var/cache/cloud/disabled_svcs ] && touch /var/cache/cloud/disabled_svcs
 for svc in $(cat /var/cache/cloud/disabled_svcs)
 do
-   logger -t cloud "Stopping $svc"
-   systemctl disable --no-block --now $svc
+  systemctl disable --now --no-block $svc
 done
 
 # Restore the persistent iptables nat, rules and filters for IPv4 and IPv6 if they exist
 ipv4="/etc/iptables/rules.v4"
 if [ -e $ipv4 ]
 then
-   iptables-restore < $ipv4
+  iptables-restore < $ipv4
 fi
 
 ipv6="/etc/iptables/rules.v6"
 if [ -e $ipv6 ]
 then
-   ip6tables-restore < $ipv6
+  ip6tables-restore < $ipv6
 fi
 
-# Enable SSH by default
-systemctl enable --no-block --now ssh
+# Patch known systemd/sshd memory leak - https://github.com/systemd/systemd/issues/8015#issuecomment-476160981
+echo '@include null' >> /etc/pam.d/systemd-user
+
+# Enable and Start SSH
+systemctl enable --now --no-block ssh
 
 date > /var/cache/cloud/boot_up_done
-logger -t cloud "Boot up process done"

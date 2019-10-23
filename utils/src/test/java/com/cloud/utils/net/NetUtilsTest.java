@@ -37,13 +37,13 @@ import java.net.UnknownHostException;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import com.googlecode.ipv6.IPv6Network;
 import org.apache.log4j.Logger;
 import org.junit.Test;
 
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.net.NetUtils.SupersetOrSubset;
 import com.googlecode.ipv6.IPv6Address;
+import com.googlecode.ipv6.IPv6Network;
 
 public class NetUtilsTest {
 
@@ -677,5 +677,58 @@ public class NetUtilsTest {
         assertTrue(NetUtils.isValidPort(65535));
         assertFalse(NetUtils.isValidPort(-1));
         assertFalse(NetUtils.isValidPort(65536));
+    }
+
+    @Test
+    public void testIsIpv4() {
+        assertTrue(NetUtils.isIpv4("192.168.1.1"));
+        assertFalse(NetUtils.isIpv4("2a01:4f8:130:2192::2"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testIsIpv4ExpectException() {
+        NetUtils.isIpv4("test");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testIsIpv4ExpectException2() {
+        NetUtils.isIpv4("2001:db8:300::/64");
+    }
+
+    public void testAllIpsOfDefaultNic() {
+        final String defaultHostIp = NetUtils.getDefaultHostIp();
+        if (defaultHostIp != null) {
+            assertTrue(NetUtils.getAllDefaultNicIps().stream().anyMatch(defaultHostIp::contains));
+        }
+    }
+
+    @Test
+    public void testIsIPv6EUI64() {
+        assertTrue(NetUtils.isIPv6EUI64("fe80::5054:8fff:fe9f:af61"));
+        assertTrue(NetUtils.isIPv6EUI64("2a00:f10:305:0:464:64ff:fe00:4e0"));
+        assertFalse(NetUtils.isIPv6EUI64("2001:db8::100:1"));
+        assertFalse(NetUtils.isIPv6EUI64("2a01:4f9:2a:185f::2"));
+    }
+
+    @Test
+    public void testLinkLocal() {
+        final String cidr = NetUtils.getLinkLocalCIDR();
+        assertEquals("255.255.0.0", NetUtils.getLinkLocalNetMask());
+        assertEquals("169.254.0.1", NetUtils.getLinkLocalGateway());
+        assertEquals("169.254.0.0/16", cidr);
+        assertEquals("169.254.0.1", NetUtils.getLinkLocalFirstAddressFromCIDR(cidr));
+        assertEquals("169.254.0.1/255.255.0.0", NetUtils.getLinkLocalAddressFromCIDR(cidr));
+        assertEquals("169.254.240.1/255.255.240.0", NetUtils.getLinkLocalAddressFromCIDR("169.254.240.0/20"));
+
+        String[] range = NetUtils.getLinkLocalIPRange("169.254.0.0/16");
+        assertEquals("169.254.0.2", range[0]);
+        assertEquals("169.254.255.254", range[1]);
+    }
+
+    @Test
+    public void testCidrNetmask() {
+        assertEquals("255.255.255.0", NetUtils.cidr2Netmask("192.168.0.0/24"));
+        assertEquals("255.255.0.0", NetUtils.cidr2Netmask("169.254.0.0/16"));
+        assertEquals("255.255.240.0", NetUtils.cidr2Netmask("169.254.240.0/20"));
     }
 }

@@ -151,6 +151,8 @@
                         g_userProjectsEnabled = json.listcapabilitiesresponse.capability.allowusercreateprojects;
 
                         g_cloudstackversion = json.listcapabilitiesresponse.capability.cloudstackversion;
+                        // Allow users to see all accounts within a domain
+                        g_allowUserViewAllDomainAccounts = json.listcapabilitiesresponse.capability.allowuserviewalldomainaccounts;
 
                         if (json.listcapabilitiesresponse.capability.apilimitinterval != null && json.listcapabilitiesresponse.capability.apilimitmax != null) {
                             var intervalLimit = ((json.listcapabilitiesresponse.capability.apilimitinterval * 1000) / json.listcapabilitiesresponse.capability.apilimitmax) * 3; //multiply 3 to be on safe side
@@ -187,6 +189,24 @@
                     }
                 });
 
+                // Update global pagesize for sort key in UI
+                $.ajax({
+                    type: 'GET',
+                    url: createURL('listConfigurations'),
+                    data: {name: 'sortkey.algorithm'},
+                    dataType: 'json',
+                    async: false,
+                    success: function(data, textStatus, xhr) {
+                        if (data && data.listconfigurationsresponse && data.listconfigurationsresponse.configuration) {
+                            var config = data.listconfigurationsresponse.configuration[0];
+                            if (config && config.name == 'sortkey.algorithm') {
+                                g_sortKeyIsAscending = config.value == 'true';
+                            }
+                        }
+                    },
+                    error: function(xhr) { // ignore any errors, fallback to the default
+                    }
+                });
 
                 // Populate IDP list
                 $.ajax({
@@ -223,13 +243,7 @@
                 var array1 = [];
                 array1.push("&username=" + encodeURIComponent(args.data.username));
 
-                var password;
-                if (md5HashedLogin)
-                    password = $.md5(args.data.password);
-                else
-                    password = todb(args.data.password);
-                array1.push("&password=" + password);
-
+                cloudStack.addPasswordToCommandUrlParameterArray(array1, args.data.password);
                 var domain;
                 if (args.data.domain != null && args.data.domain.length > 0) {
                     if (args.data.domain.charAt(0) != "/")
@@ -305,6 +319,8 @@
                                 g_userProjectsEnabled = json.listcapabilitiesresponse.capability.allowusercreateprojects;
 
                                 g_cloudstackversion = json.listcapabilitiesresponse.capability.cloudstackversion;
+                                // Allow users to see all accounts within a domain
+                                g_allowUserViewAllDomainAccounts = json.listcapabilitiesresponse.capability.allowuserviewalldomainaccounts;
 
                                 if (json.listcapabilitiesresponse.capability.apilimitinterval != null && json.listcapabilitiesresponse.capability.apilimitmax != null) {
                                     var intervalLimit = ((json.listcapabilitiesresponse.capability.apilimitinterval * 1000) / json.listcapabilitiesresponse.capability.apilimitmax) * 3; //multiply 3 to be on safe side
@@ -362,6 +378,7 @@
                         g_kvmsnapshotenabled = null;
                         g_regionsecondaryenabled = null;
                         g_loginCmdText = null;
+                        g_allowUserViewAllDomainAccounts = null;
 
                         // Remove any cookies
                         var cookies = document.cookie.split(";");
@@ -398,6 +415,7 @@
                 g_kvmsnapshotenabled = null;
                 g_regionsecondaryenabled = null;
                 g_loginCmdText = null;
+                g_allowUserViewAllDomainAccounts = null;
 
                 // Remove any cookies
                 var cookies = document.cookie.split(";");
@@ -458,10 +476,10 @@
                 });
 
                 // Logout action
-                $('#user-options a').live('click', function() {
-                    loginArgs.logoutAction({
-                        context: cloudStack.context
-                    });
+                $(document).on('click', '#user-options a', function() {
+                  loginArgs.logoutAction({
+                    context: cloudStack.context
+                  });
                 });
 
                 window._reloadUI = function() {
@@ -599,6 +617,6 @@
             cloudStack.uiCustom.login(loginArgs);
         }
 
-        document.title = _l('label.app.name');
+        document.title = _l(cloudStackOptions.docTitle);
     });
 })(cloudStack, jQuery);
