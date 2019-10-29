@@ -389,7 +389,8 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         return true;
     }
 
-    private Ip getSourceIp(LoadBalancer lb) {
+    @Override
+    public Ip getSourceIp(LoadBalancer lb) {
         Ip sourceIp = null;
         if (lb.getScheme() == Scheme.Public) {
             sourceIp = _networkModel.getPublicIpAddress(lb.getSourceIpAddressId()).getAddress();
@@ -454,7 +455,11 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
     }
 
     private boolean validateHealthCheck(CreateLBHealthCheckPolicyCmd cmd) {
-        LoadBalancerVO loadBalancer = _lbDao.findById(cmd.getLbRuleId());
+        return validateHealthCheck(cmd.getLbRuleId());
+    }
+
+    private boolean validateHealthCheck(Long ruleId) {
+        LoadBalancerVO loadBalancer = _lbDao.findById(ruleId);
         String capability = getLBCapability(loadBalancer.getNetworkId(), Capability.HealthCheckPolicy.getName());
         if (capability != null) {
             return true;
@@ -587,6 +592,46 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         return policy;
     }
 
+    public StickinessPolicy validateAndPersistLbStickinessPolicy(Long lbRuleId, String lbStickinessPolicyName, String lbStickinessMethodName, Map paramList, String description, Boolean forDisplay) {
+        CreateLBStickinessPolicyCmd cmd = new CreateLBStickinessPolicyCmd();
+        cmd.setLbRuleId(lbRuleId);
+        cmd.setLbStickinessPolicyName(lbStickinessPolicyName);
+        cmd.setParamList(paramList);
+        /* Generic validations */
+        if (!genericValidator(cmd)) {
+            throw new InvalidParameterValueException("Failed to create Stickiness policy: Validation Failed " + lbRuleId);
+        }
+
+        /*
+         * Specific validations using network element validator for specific
+         * validations
+         */
+        LBStickinessPolicyVO lbpolicy = new LBStickinessPolicyVO(lbRuleId, lbStickinessPolicyName, lbStickinessMethodName, paramList, description);
+        List<LbStickinessPolicy> policyList = new ArrayList<LbStickinessPolicy>();
+        policyList.add(new LbStickinessPolicy(lbStickinessMethodName, lbpolicy.getParams()));
+        LoadBalancerVO loadBalancer = _lbDao.findById(lbRuleId);
+        Ip sourceIp = getSourceIp(loadBalancer);
+        LoadBalancingRule lbRule = new LoadBalancingRule(loadBalancer, getExistingDestinations(lbpolicy.getId()), policyList, null, sourceIp, null, loadBalancer.getLbProtocol());
+
+        GloboResourceConfigurationVO skipDnsErrorCmd = _globoResourceConfigurationDao.getFirst(GloboResourceType.LOAD_BALANCER, loadBalancer.getUuid(), GloboResourceKey.skipDnsError);
+        boolean skipDnsError = (skipDnsErrorCmd != null && skipDnsErrorCmd.getBooleanValue());
+        lbRule.setSkipDnsError(skipDnsError);
+
+        if (!validateLbRule(lbRule)) {
+            throw new InvalidParameterValueException("Failed to create Stickiness policy: Validation Failed " + lbRuleId);
+        }
+
+        /* Finally Insert into DB */
+        LBStickinessPolicyVO policy = new LBStickinessPolicyVO(loadBalancer.getId(), lbStickinessPolicyName, lbStickinessMethodName, paramList, description);
+        if (forDisplay != null) {
+            policy.setDisplay(forDisplay);
+        }
+        policy = _lb2stickinesspoliciesDao.persist(policy);
+
+        return policy;
+    }
+
+
     @Override
     @DB
     @ActionEvent(eventType = EventTypes.EVENT_LB_HEALTHCHECKPOLICY_CREATE, eventDescription = "create load balancer health check to load balancer", create = true)
@@ -654,6 +699,46 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         policy = _lb2healthcheckDao.persist(policy);
         return policy;
     }
+
+        @DB
+    public HealthCheckPolicy validateAndPersistLbHealthcheckPolicy(Long lbRuleId, String pingPath, String description, int timeout, int healthcheckInterval, int healthyThreshold, int unhealthyThreshold, Boolean forDisplay) {
+        /*
+         * Validate Whether LB Provider has the capabilities to support Health
+         * Checks
+         */
+        if (!validateHealthCheck(lbRuleId)) {
+            throw new InvalidParameterValueException(
+                    "Failed to create HealthCheck policy: Validation Failed (HealthCheck Policy is not supported by LB Provider for the LB rule id :" + lbRuleId + ")");
+        }
+
+        /* Validation : check for the multiple hc policies to the rule id */
+        List<LBHealthCheckPolicyVO> hcPolicies = _lb2healthcheckDao.listByLoadBalancerId(lbRuleId, false);
+        if (hcPolicies.size() > 0) {
+            throw new InvalidParameterValueException("Failed to create HealthCheck policy: Already policy attached  for the LB Rule id :" + lbRuleId);
+        }
+        /*
+         * Specific validations using network element validator for specific
+         * validations
+         */
+        LBHealthCheckPolicyVO hcpolicy = new LBHealthCheckPolicyVO(lbRuleId, pingPath, description, timeout,
+                healthcheckInterval, healthyThreshold, unhealthyThreshold);
+
+        List<LbHealthCheckPolicy> hcPolicyList = new ArrayList<LbHealthCheckPolicy>();
+        hcPolicyList.add(new LbHealthCheckPolicy(hcpolicy.getpingpath(), hcpolicy.getDescription(), hcpolicy.getResponseTime(), hcpolicy.getHealthcheckInterval(), hcpolicy
+                .getHealthcheckThresshold(), hcpolicy.getUnhealthThresshold()));
+
+        // Finally Insert into DB
+        LBHealthCheckPolicyVO policy = new LBHealthCheckPolicyVO(lbRuleId, pingPath, description, timeout,
+                healthcheckInterval, healthyThreshold, unhealthyThreshold);
+
+        if (forDisplay != null) {
+            policy.setDisplay(forDisplay);
+        }
+
+        policy = _lb2healthcheckDao.persist(policy);
+        return policy;
+    }
+
 
     @Override
     public boolean validateLbRule(LoadBalancingRule lbRule) {
@@ -1261,8 +1346,6 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
             // right VO object or table name.
             throw ex;
         }
-
-        return success;
     }
 
     @Override
@@ -2089,7 +2172,8 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         return handled;
     }
 
-    private LoadBalancingRule getLoadBalancerRuleToApply(LoadBalancerVO lb) {
+    @Override
+    public LoadBalancingRule getLoadBalancerRuleToApply(LoadBalancerVO lb) {
 
         List<LbStickinessPolicy> policyList = getStickinessPolicies(lb.getId());
         Ip sourceIp = getSourceIp(lb);
@@ -2138,11 +2222,6 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
             AutoScaleVmGroupVO vmGroup = _autoScaleVmGroupDao.listByAll(lb.getId(), null).get(0);
             LbAutoScaleVmGroup lbAutoScaleVmGroup = getLbAutoScaleVmGroup(vmGroup, vmGroup.getState(), lb);
             loadBalancing.setAutoScaleVmGroup(lbAutoScaleVmGroup);
-        } else {
-            List<LbDestination> dstList = getExistingDestinations(lb.getId());
-            loadBalancing.setDestinations(dstList);
-            List<LbHealthCheckPolicy> hcPolicyList = getHealthCheckPolicies(lb.getId());
-            loadBalancing.setHealthCheckPolicies(hcPolicyList);
         }
 
         return loadBalancing;
@@ -2795,8 +2874,7 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         return dstList;
     }
 
-    @Override
-    public Nic getLbInstanceNic(long lbId, long vmId) {
+    private Nic getLbInstanceNic(long lbId, long vmId) {
         LoadBalancerVO lb = _lbDao.findById(lbId);
         if (lb == null) {
             throw new InvalidParameterValueException("Failed to load load balancer " + lbId + ". LB not found");
@@ -2978,9 +3056,8 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         return true;
     }
 
-
-    @Override
-    public boolean isLinkedChildLoadBalancer(String lbuuid) {
+    @Deprecated
+    private boolean isLinkedChildLoadBalancer(String lbuuid) {
         List<GloboResourceConfigurationVO> linkedConfig = globoConfigDao.getConfiguration(GloboResourceType.LOAD_BALANCER, lbuuid, GloboResourceKey.linkedLoadBalancer);
 
         if (linkedConfig != null) {
@@ -2989,8 +3066,8 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
         return false;
     }
 
-    @Override
-    public boolean isLinkedParentLoadBalancer(String lbuuid) {
+    @Deprecated
+    private boolean isLinkedParentLoadBalancer(String lbuuid) {
         List<GloboResourceConfigurationVO> linkedConfig = globoConfigDao.getConfigsByValue(GloboResourceType.LOAD_BALANCER, GloboResourceKey.linkedLoadBalancer, lbuuid);
 
         if (linkedConfig != null) {

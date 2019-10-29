@@ -39,6 +39,10 @@ public abstract class BaseListDomainResourcesCmd extends BaseListCmd implements 
         return listAll == null ? false : listAll;
     }
 
+    public void setListAll(Boolean listAll) {
+        this.listAll = listAll;
+    }
+
     @Override
     public boolean isRecursive() {
         return recursive == null ? false : recursive;

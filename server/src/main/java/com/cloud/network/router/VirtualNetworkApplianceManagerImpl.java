@@ -246,7 +246,6 @@ import com.cloud.vm.dao.NicIpAliasVO;
 import com.cloud.vm.dao.UserVmDao;
 import com.cloud.vm.dao.UserVmDetailsDao;
 import com.cloud.vm.dao.VMInstanceDao;
-import com.cloud.vm.VirtualMachine.State;
 /**
  * VirtualNetworkApplianceManagerImpl manages the different types of virtual
  * network appliances available in the Cloud Stack.

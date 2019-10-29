@@ -335,7 +335,7 @@ public class CreateLoadBalancerRuleCmd extends BaseAsyncCreateCmd /*implements L
                 // no need to apply the rule on the backend as it exists in the db only
 
 //                _lbService.deleteLoadBalancerRule(getEntityId(), false, false);
-                _lbService.deleteLoadBalancerRule(getEntityId(), false);
+                _lbService.deleteLoadBalancerRule(getEntityId(), false, false);
 
                 throw new ServerApiException(ApiErrorCode.INTERNAL_ERROR, "Failed to create load balancer rule");
             }

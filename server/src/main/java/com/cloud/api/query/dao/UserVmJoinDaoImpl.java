@@ -657,7 +657,7 @@ public class UserVmJoinDaoImpl extends GenericDaoBaseWithTagInformation<UserVmJo
         vmResponse.setServiceOfferingName(rs.getString("service_offering_name"));
         vmResponse.setServiceOfferingId(rs.getString("service_offering_uuid"));
         vmResponse.setOsTypeName(rs.getString("os_name"));
-        vmResponse.setOsTypeId(rs.getLong("os_id"));
+        vmResponse.setOsTypeId(rs.getString("os_id"));
         vmResponse.setHostName(rs.getString("host_name"));
         vmResponse.setZoneId(rs.getString("data_center_id"));
         vmResponse.setZoneName(rs.getString("data_center_name"));

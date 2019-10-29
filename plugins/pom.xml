@@ -103,7 +103,6 @@
         <module>network-elements/stratosphere-ssp</module>
         <module>network-elements/brocade-vcs</module>
         <module>network-elements/vxlan</module>
-        <module>network-elements/globodns</module>
         <module>network-elements/globonetwork</module>
         <module>network-elements/globoaclapi</module>
 

@@ -322,6 +322,11 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
                         }
 
                         String value = tags.get(key);
+
+                        if (value == null || value.isEmpty()) {
+                            throw new InvalidParameterValueException("Value for the key " + key + " is either null or empty");
+                        }
+
                         boolean isKeyAscii = CharMatcher.ascii().matchesAllOf(key);
                         boolean isValueAscii = CharMatcher.ascii().matchesAllOf(value);
 
@@ -338,12 +343,6 @@ public class TaggedResourceManagerImpl extends ManagerBase implements TaggedReso
 
                         checkResourceAccessible(accountId, domainId, "Account '" + caller +
                                 "' doesn't have permissions to create tags" + " for resource '" + id + "(" + key + ")'.");
-
-                        String value = tags.get(key);
-
-                        if (value == null || value.isEmpty()) {
-                            throw new InvalidParameterValueException("Value for the key " + key + " is either null or empty");
-                        }
 
                         ResourceTag tag =  _resourceTagDao.findByResourceIdAndResourceTypeAndKey(id, resourceType, key);
                         if (tag != null){

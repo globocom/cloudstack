@@ -1579,13 +1579,13 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
             if (zone.getNetworkType() == NetworkType.Basic) {
                 vm = _userVmService.createBasicSecurityGroupVirtualMachine(zone, serviceOffering, template, null, owner, instanceName,
                         instanceName, null, null, null, HypervisorType.XenServer, HTTPMethod.GET, null, null, null,
-                    null, true, null, null, null, null, null, null);
+                    null, true, null, null, null, null, null, null, null);
             } else {
                 if (zone.isSecurityGroupEnabled()) {
                     vm = _userVmService.createAdvancedSecurityGroupVirtualMachine(zone, serviceOffering, template, null, null,
                         owner, instanceName,
                             instanceName, null, null, null, HypervisorType.XenServer, HTTPMethod.GET, null, null,
-                        null, null, true, null, null, customParameters, null, null, null);
+                        null, null, true, null, null, customParameters, null, null, null, null);
 
                 } else {
                     List<Long> networkIds = new ArrayList<>();
@@ -1594,7 +1594,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
                     networkIds.add(mainNetworkId);
                     networkIds.addAll(getAdditionalNetWorkIds(profileVo, zone));
                     vm = _userVmService.createAdvancedVirtualMachine(zone, serviceOffering, template, networkIds, owner, instanceName, instanceName,
-                        null, null, null, template.getHypervisorType(), HTTPMethod.POST, profileVo.getUserData(), null, null, addrs, true, null, null, customParameters, null, null, null);
+                        null, null, null, template.getHypervisorType(), HTTPMethod.POST, profileVo.getUserData(), null, null, addrs, true, null, null, customParameters, null, null, null, null);
 
                 }
             }
@@ -1725,7 +1725,6 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
             s_logger.info(message.toString(), ex);
             throw new ServerApiException(ApiErrorCode.INSUFFICIENT_CAPACITY_ERROR, message.toString());
         }
-        return true;
     }
 
     protected boolean assignLBruleToNewVm(UserVm vm, AutoScaleVmGroupVO asGroup) {
@@ -1844,10 +1843,6 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
                     s_logger.error("Can not assign LB rule for this new VM");
                     break;
                 }
-            } else {
-                s_logger.error("Can not deploy new VM for scaling up in the group "
-                    + asGroup.getId() + ". Waiting for next round");
-                break;
             }
         } catch(ServerApiException ex) {
             String message = "It was not possible do start VM for Auto Scale Id: " + asGroup.getUuid() + " Reason: " + ex.getDescription();
@@ -1919,6 +1914,7 @@ public class AutoScaleManagerImpl<Type> extends ManagerBase implements AutoScale
                         }, destroyVmGracePeriod, TimeUnit.SECONDS);
                     }
                 } else {
+                    String message = "Failed to remove LB rule for the VM being destroyed.";
                     createScaleDownFailedEvent(asGroup.getUuid(), "Scale down action failed for Auto Scale group id: " + groupId + ". Reason: " + message);
                     s_logger.error("Can not remove LB rule for the VM being destroyed. Do nothing more.");
                 }

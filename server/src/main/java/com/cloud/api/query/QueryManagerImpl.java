@@ -16,9 +16,7 @@
 // under the License.
 package com.cloud.api.query;
 
-import com.cloud.storage.dao.VolumeDetailsDao;
 import com.cloud.utils.exception.CloudRuntimeException;
-import com.cloud.vm.dao.NicDetailsDao;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -231,7 +229,6 @@ import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.SearchCriteria.Func;
 import com.cloud.utils.db.SearchCriteria.Op;
-import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.vm.DomainRouterVO;
 import com.cloud.vm.UserVmVO;
 import com.cloud.vm.VMInstanceVO;
@@ -239,8 +236,8 @@ import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VmDetailConstants;
 import com.cloud.vm.dao.DomainRouterDao;
 import com.cloud.vm.dao.UserVmDao;
-import com.cloud.vm.dao.VMInstanceDao;
 import com.google.common.base.Strings;
+import com.cloud.vm.dao.VMInstanceDao;
 
 @Component
 public class QueryManagerImpl extends MutualExclusiveIdsManagerBase implements QueryService, Configurable {
@@ -1306,7 +1303,7 @@ public class QueryManagerImpl extends MutualExclusiveIdsManagerBase implements Q
         if (cmd.isSimple()){
             projectResponses = ViewResponseHelper.createSimpleProjectResponse(projects.first().toArray(new ProjectJoinVO[projects.first().size()]));
         }else{
-            projectResponses = ViewResponseHelper.createProjectResponse(projects.first().toArray(new ProjectJoinVO[projects.first().size()]));
+            projectResponses = ViewResponseHelper.createProjectResponse(cmd.getDetails(), projects.first().toArray(new ProjectJoinVO[projects.first().size()]));
         }
         response.setResponses(projectResponses, projects.second());
         return response;

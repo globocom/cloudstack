@@ -42,7 +42,6 @@ import javax.naming.ConfigurationException;
 
 import com.cloud.network.as.AutoScaleVmGroupVmMapVO;
 import com.cloud.network.as.dao.AutoScaleVmGroupVmMapDao;
-import com.cloud.server.ResourceTag;
 import com.cloud.server.TaggedResourceService;
 import com.cloud.storage.TemplateOVFPropertyVO;
 import com.cloud.storage.dao.TemplateOVFPropertiesDao;
@@ -494,6 +493,8 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
     private TemplateOVFPropertiesDao templateOVFPropertiesDao;
     @Inject
     private TaggedResourceService _taggedResourceService;
+    @Inject
+    protected AutoScaleVmGroupVmMapDao _asGroupVmMapDao;
 
     private ScheduledExecutorService _executor = null;
     private ScheduledExecutorService _vmIpFetchExecutor = null;
@@ -1134,7 +1135,6 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
 
         // Check if the new service offering can be applied to vm instance
         ServiceOffering newSvcOffering = _offeringDao.findById(svcOffId);
-        Account owner = _accountMgr.getActiveAccountById(vmInstance.getAccountId());
         _accountMgr.checkAccess(owner, newSvcOffering, _dcDao.findById(vmInstance.getDataCenterId()));
 
         _itMgr.upgradeVmDb(vmId, svcOffId);
@@ -2949,8 +2949,10 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
 
     private void removeVmFromAutoScaleGroup(long vmId) {
         AutoScaleVmGroupVmMapVO autoScaleVmMap = _asGroupVmMapDao.findByVmId(vmId);
-        if(autoScaleVmMap != null){
+        if (autoScaleVmMap != null) {
             _asGroupVmMapDao.remove(autoScaleVmMap.getVmGroupId(), vmId);
+        }
+    }
 
     private List<VolumeVO> getVolumesFromIds(DestroyVMCmd cmd) {
         List<VolumeVO> volumes = new ArrayList<>();

@@ -182,12 +182,7 @@ public interface LoadBalancingRulesService {
 
     StickinessPolicy validateAndPersistLbStickinessPolicy(Long lbRuleId, String lbStickinessPolicyName, String lbStickinessMethodName, Map paramList, String description, Boolean forDisplay);
 
-    public boolean isLinkedChildLoadBalancer(String lbuuid);
-
-    public boolean isLinkedParentLoadBalancer(String lbuuid);
-
-    public void throwExceptionIfIsChildLoadBalancer(Long id, String operation);
-
+    void throwExceptionIfIsChildLoadBalancer(Long id, String operation);
     void throwExceptionIfIsParentLoadBalancer(Long id, String actualCommandName);
     void throwExceptionIfIsParentLoadBalancer(List<Long> ids, String operation);
 }

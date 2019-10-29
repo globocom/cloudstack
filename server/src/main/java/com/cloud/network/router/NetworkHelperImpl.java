@@ -16,6 +16,16 @@
 // under the License.
 package com.cloud.network.router;
 
+import com.cloud.agent.api.Command;
+import com.cloud.agent.api.routing.NetworkElementCommand;
+import com.cloud.agent.api.routing.VmDataCommand;
+import com.cloud.dc.DataCenterVO;
+import com.cloud.dc.dao.DataCenterDao;
+import com.cloud.network.element.UserDataServiceProvider;
+import com.cloud.vm.UserVmVO;
+import com.cloud.vm.VirtualMachineProfile;
+import com.cloud.vm.VirtualMachineProfileImpl;
+import com.cloud.vm.dao.UserVmDao;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -154,6 +164,15 @@ public class NetworkHelperImpl implements NetworkHelper {
     protected IpAddressManager _ipAddrMgr;
     @Inject
     ConfigurationDao _configDao;
+
+    @Inject
+    private RouterControlHelper _routerControlHelper;
+
+    @Inject
+    private UserVmDao _vmDao;
+
+    @Inject
+    private DataCenterDao _dcDao;
 
     protected final Map<HypervisorType, ConfigKey<String>> hypervisorsMap = new HashMap<>();
 
@@ -845,6 +864,68 @@ public class NetworkHelperImpl implements NetworkHelper {
             }
         }
         return true;
+    }
+
+
+    @Override
+    public boolean updateVMMetadaInVrouter(long userVmId, Map<String, String> vmData) throws InsufficientCapacityException, ResourceUnavailableException {
+        UserVmVO vm = _vmDao.findById(userVmId);
+
+        if (vm == null) {
+            throw new CloudRuntimeException("UserVm " + userVmId + " do not exists!");
+        }
+
+        VMTemplateVO template = _templateDao.findByIdIncludingRemoved(vm.getTemplateId());
+
+        List<? extends Nic> nics = _nicDao.listByVmId(vm.getId());
+        if (nics == null || nics.isEmpty()) {
+            s_logger.error("unable to find any nics for vm " + vm.getUuid());
+            throw new CloudRuntimeException("unable to find any nics for vm " + vm.getUuid());
+        }
+        boolean result = true;
+        for (Nic nic : nics) {
+            Network network = _networkDao.findById(nic.getNetworkId());
+            NicProfile nicProfile = new NicProfile(nic, network, null, null, null, _networkModel.isSecurityGroupSupportedInNetwork(network), _networkModel.getNetworkTag(
+                    template.getHypervisorType(), network));
+
+            VirtualMachineProfile vmProfile = new VirtualMachineProfileImpl(vm);
+
+            UserDataServiceProvider element = _networkModel.getUserDataUpdateProvider(network);
+            if (element == null) {
+                throw new CloudRuntimeException("Can't find network element for " + Network.Service.UserData.getName() + " provider needed for UserData update");
+            }
+
+            List<DomainRouterVO> routers = _routerDao.listByNetworkAndRole(network.getId(), Role.VIRTUAL_ROUTER);
+            if (routers == null || routers.isEmpty()) {
+                s_logger.debug("Can't find virtual router element in network " + network.getId());
+                return false;
+            }
+
+            for (DomainRouterVO router : routers) {
+                final VmDataCommand cmd = new VmDataCommand(nic.getIPv4Address(), vm.getInstanceName(), _networkModel.getExecuteInSeqNtwkElmtCmd());
+                cmd.setAccessDetail(NetworkElementCommand.ROUTER_IP, _routerControlHelper.getRouterControlIp(router.getId()));
+                cmd.setAccessDetail(NetworkElementCommand.ROUTER_GUEST_IP, _routerControlHelper.getRouterIpInNetwork(nic.getNetworkId(), router.getId()));
+                cmd.setAccessDetail(NetworkElementCommand.ROUTER_NAME, router.getInstanceName());
+
+                final DataCenterVO dcVo = _dcDao.findById(router.getDataCenterId());
+                cmd.setAccessDetail(NetworkElementCommand.ZONE_NETWORK_TYPE, dcVo.getNetworkType().toString());
+
+                for (String key : vmData.keySet()) {
+                    String value = vmData.get(key);
+                    cmd.addVmData("metadata", key, value);
+                }
+                final Commands cmds = new Commands(Command.OnError.Stop);
+                cmds.addCommand("vmdata", cmd);
+                boolean resultRouter = sendCommandsToRouter(router, cmds);
+
+                if (!resultRouter) {
+                    s_logger.error("Failed to update userdata for vm " + vm.getUuid() + " and nic " + nic.getUuid() + " vr " + router.getUuid());
+                }
+                result = resultRouter && result;
+            }
+
+        }
+        return result;
     }
 
     /*

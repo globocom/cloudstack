@@ -508,7 +508,7 @@ public class AutoScaleManagerImplTest {
                 eq(Arrays.asList(1L)), eq(owner), eq("instanceName"), eq("instanceName"), isNull(Long.class),
                 isNull(Long.class), isNull(String.class), eq(Hypervisor.HypervisorType.XenServer),
                 eq(BaseCmd.HTTPMethod.POST), eq(USER_DATA), isNull(String.class), isNull(Map.class),
-                any(Network.IpAddresses.class), eq(true), isNull(String.class), isNull(List.class), any(Map.class), isNull(String.class), isNull(Map.class), isNull(Map.class))).
+                any(Network.IpAddresses.class), eq(true), isNull(String.class), isNull(List.class), any(Map.class), isNull(String.class), isNull(Map.class), isNull(Map.class), isNull(Map.class))).
                 thenThrow(new InsufficientNetworkCapacityException("Network error", Networks.class, 1L));
         autoScaleManager._userVmService = userVmService;
 
@@ -557,7 +557,7 @@ public class AutoScaleManagerImplTest {
 
     private UserVmService mockCreateUserVm(AccountVO owner, DataCenterVO zone, ServiceOfferingVO serviceOffering, VirtualMachineTemplate template, UserVmVO userVm, List<Long> networkIds) throws InsufficientCapacityException, ResourceUnavailableException, ResourceAllocationException {
         UserVmService userVmService = mock(UserVmService.class);
-        when(userVmService.createAdvancedVirtualMachine(eq(zone), eq(serviceOffering), eq(template), eq(networkIds), eq(owner), eq("instanceName"), eq("instanceName"), isNull(Long.class), isNull(Long.class), isNull(String.class), eq(Hypervisor.HypervisorType.XenServer), eq(BaseCmd.HTTPMethod.POST), eq(USER_DATA), isNull(String.class), isNull(Map.class), any(Network.IpAddresses.class), eq(true), isNull(String.class), isNull(List.class), any(Map.class), isNull(String.class), isNull(Map.class), isNull(Map.class))).thenReturn(userVm);
+        when(userVmService.createAdvancedVirtualMachine(eq(zone), eq(serviceOffering), eq(template), eq(networkIds), eq(owner), eq("instanceName"), eq("instanceName"), isNull(Long.class), isNull(Long.class), isNull(String.class), eq(Hypervisor.HypervisorType.XenServer), eq(BaseCmd.HTTPMethod.POST), eq(USER_DATA), isNull(String.class), isNull(Map.class), any(Network.IpAddresses.class), eq(true), isNull(String.class), isNull(List.class), any(Map.class), isNull(String.class), isNull(Map.class), isNull(Map.class), isNull(Map.class))).thenReturn(userVm);
         autoScaleManager._userVmService = userVmService;
         return userVmService;
     }
@@ -734,12 +734,12 @@ public class AutoScaleManagerImplTest {
         }
 
         @Override
-        public boolean getEnablePassword() {
+        public boolean isEnablePassword() {
             return false;
         }
 
         @Override
-        public boolean getEnableSshKey() {
+        public boolean isEnableSshKey() {
             return false;
         }
 

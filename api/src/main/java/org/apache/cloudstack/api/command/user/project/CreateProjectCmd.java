@@ -58,6 +58,24 @@ public class CreateProjectCmd extends BaseAsyncCreateCmd {
     @Parameter(name = ApiConstants.DISPLAY_TEXT, type = CommandType.STRING, required = true, description = "display text of the project")
     private String displayText;
 
+    @Parameter(name = ApiConstants.BUSINESS_SERVICE_ID, type = CommandType.STRING, required = true, description = "business service id")
+    private String businessServiceId;
+
+    @Parameter(name = ApiConstants.CLIENT_ID, type = CommandType.STRING, required = true, description = "client id")
+    private String clientId;
+
+    @Parameter(name = ApiConstants.COMPONENT_ID, type = CommandType.STRING, required = true, description = "component id")
+    private String componentId;
+
+    @Parameter(name = ApiConstants.SUB_COMPONENT_ID, type = CommandType.STRING, required = true, description = "sub-component id")
+    private String subComponentId;
+
+    @Parameter(name = ApiConstants.PRODUCT_ID, type = CommandType.STRING, required = false, description = "product id")
+    private String productId;
+
+    @Parameter(name = ApiConstants.DETAILED_USAGE, type = CommandType.BOOLEAN, required = false, description = "true if project has detailed usage by third party app")
+    private Boolean detailedUsage = false;
+
     // ///////////////////////////////////////////////////
     // ///////////////// Accessors ///////////////////////
     // ///////////////////////////////////////////////////

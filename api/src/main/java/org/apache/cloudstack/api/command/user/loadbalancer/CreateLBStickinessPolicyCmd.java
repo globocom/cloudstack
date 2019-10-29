@@ -116,6 +116,10 @@ public class CreateLBStickinessPolicyCmd extends BaseAsyncCreateCmd {
         return paramList;
     }
 
+    public void setParamList(Map paramList) {
+        this.paramList = paramList;
+    }
+
     // ///////////////////////////////////////////////////
     // ///////////// API Implementation///////////////////
     // ///////////////////////////////////////////////////

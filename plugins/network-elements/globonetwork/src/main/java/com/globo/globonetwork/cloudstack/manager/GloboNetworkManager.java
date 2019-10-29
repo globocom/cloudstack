@@ -469,7 +469,7 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
         // if the network offering has persistent set to true, implement the
         // network
         NetworkOfferingVO ntwkOff = _networkOfferingDao.findById(networkOfferingId);
-        if (ntwkOff.getIsPersistent()) {
+        if (ntwkOff.isPersistent()) {
             try {
                 if (network.getState() == Network.State.Setup) {
                     s_logger.debug("Network id=" + network.getId() + " is already provisioned");
@@ -2854,10 +2854,10 @@ public class GloboNetworkManager implements GloboNetworkService, PluggableServic
     NetworkService _networkService;
     @Override
     public Pair<List<? extends Network>, Integer> searchForLbNetworks(ListGloboLbNetworksCmd cmd) {
-        List<? extends Network> networks = _networkService.searchForAllNetworks(cmd);
+        Pair<List<? extends Network>, Integer> networks = _networkService.searchForNetworks(cmd);
 
         List<Network> networksToReturn = new ArrayList<Network>();
-        for (Network network : networks){
+        for (Network network : networks.first()){
             List<GloboNetworkLoadBalancerEnvironment> lbEnvs = listGloboNetworkLBEnvironmentsFromDB(network.getPhysicalNetworkId(), network.getId(), null);
             if (lbEnvs != null && lbEnvs.size() > 0) {
                 networksToReturn.add(network);

@@ -68,6 +68,12 @@ public class ListProjectsCmd extends BaseListAccountResourcesCmd {
     @Parameter(name = "simple", type = CommandType.BOOLEAN, description = "List only basic projec data like id, name, domain")
     private boolean simple;
 
+    @Parameter(name = ApiConstants.DETAILS,
+            type = CommandType.LIST,
+            collectionType = CommandType.STRING,
+            description = "comma separated list of project details requested, value can be a list of [ all, resource, min]")
+    private List<String> viewDetails;
+
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
     /////////////////////////////////////////////////////

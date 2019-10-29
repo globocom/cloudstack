@@ -42,14 +42,9 @@ import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.cloud.globodictionary.GloboDictionaryService;
 import com.cloud.network.Network;
 import com.cloud.network.NetworkService;
+import com.cloud.utils.Pair;
 import org.apache.cloudstack.api.command.user.network.ListNetworksCmd;
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
-import org.springframework.stereotype.Component;
-
-import com.sun.mail.smtp.SMTPMessage;
-import com.sun.mail.smtp.SMTPSSLTransport;
-import com.sun.mail.smtp.SMTPTransport;
 
 import org.apache.cloudstack.acl.SecurityChecker.AccessType;
 import org.apache.cloudstack.context.CallContext;
@@ -367,8 +362,9 @@ public class ProjectManagerImpl extends ManagerBase implements ProjectManager {
     private boolean hasBlockingResources(final Account caller, final Project project) {
         ListNetworksCmd cmd = new ListNetworksCmd();
         cmd.setProjectId(project.getId());
-        List<? extends Network> networks = _networkService.searchForAllNetworks(cmd);
-        if(networks != null && networks.size() > 0) {
+        cmd.setListAll(true);
+        Pair<List<? extends Network>, Integer> response = _networkService.searchForNetworks(cmd);
+        if(response.second() > 0) {
             return true;
         }
         return false;

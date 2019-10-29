@@ -1219,7 +1219,7 @@ public class IpAddressManagerImpl extends ManagerBase implements IpAddressManage
             ipaddr = Transaction.execute(new TransactionCallbackWithException<IPAddressVO, InsufficientAddressCapacityException>() {
                 @Override
                 public IPAddressVO doInTransaction(TransactionStatus status) throws InsufficientAddressCapacityException {
-                    PortableIpVO allocatedPortableIp;
+                    PortableIpVO allocatedPortableIp = null;
 
                     List<PortableIpVO> portableIpVOs = _portableIpDao.listByRegionIdAndState(1, PortableIp.State.Free);
                     if (portableIpVOs == null || portableIpVOs.isEmpty()) {

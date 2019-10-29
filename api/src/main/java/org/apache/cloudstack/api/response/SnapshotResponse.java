@@ -224,7 +224,7 @@ public class SnapshotResponse extends BaseResponseWithTagInformation implements 
         this.zoneName = zoneName;
     }
 
-    public void setTags(List<ResourceTagResponse> tags) {
+    public void setTags(Set<ResourceTagResponse> tags) {
         this.tags = tags;
     }
 
