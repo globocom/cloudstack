@@ -226,6 +226,9 @@ var listSubComponents = function(callback, parentId){
         return urlString;
     }
 
+    function todb(val) {
+        return encodeURIComponent(val);
+    }
 
 //LB provider map
 var lbProviderMap = {
