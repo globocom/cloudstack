@@ -26,7 +26,7 @@ gen_version(){
     git commit -m "generating build number: ${tag_version}"
     git push origin ${1}
 
-    echo "${cs_version}-${tag_version}"
+    tag="${cs_version}-${tag_version}"
 }
 
 gen_tag(){
@@ -36,7 +36,7 @@ gen_tag(){
     git checkout -q ${branch}
     echo "Getting last changes from git..."
     git pull -q
-    tag=$(gen_version)
+    gen_version
     echo "generating tag: ${tag} ;"
     git tag $tag
     remote=$(cat .git/config  | awk -F\" '/\[remote/ {print $2}')
