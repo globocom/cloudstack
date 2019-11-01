@@ -37,6 +37,7 @@ gen_tag(){
     echo "Getting last changes from git..."
     git pull -q
     tag=$(gen_version)
+    echo "generating tag: ${tag} ;"
     git tag $tag
     remote=$(cat .git/config  | awk -F\" '/\[remote/ {print $2}')
     git push --tags
