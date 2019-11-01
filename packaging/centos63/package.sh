@@ -99,11 +99,11 @@ function packaging() {
 	(cd ../../; tar -c --exclude .git --exclude dist  .  | tar -C $RPMDIR/SOURCES/$PACK_PROJECT-$VERSION -x )
 	(cd $RPMDIR/SOURCES/; tar -czf $PACK_PROJECT-$VERSION.tgz $PACK_PROJECT-$VERSION)
 
-    echo ". Verifying variables"
-    echo $RPMDIR
-    echo $DEFVER
-    echo $DEFREL
-    echo $DEFPRE
+#    echo ". Verifying variables"
+#    echo " rpmdir $RPMDIR"
+#    echo " defver $DEFVER"
+#    echo " defrel $DEFREL"
+#    echo " defpre $DEFPRE"
 
     echo ". executing rpmbuild"
 
