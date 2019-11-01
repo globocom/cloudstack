@@ -4012,6 +4012,10 @@ table tr.selected td.actions .action.disabled .icon {
   text-align: left;
 }
 
+.ui-dialog .ui-dialog-titlebar-close {
+    display: none;
+}
+
 .ui-dialog-titlebar {
   height: 33px;
   margin: auto;

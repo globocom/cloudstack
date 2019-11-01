@@ -1663,7 +1663,7 @@
                 var $dialog = $('<div>');
                 $dialog.dialog({
                     title: 'label.autoscale.configuration.wizard',
-                    closeonEscape: false,
+                    closeOnEscape: false,
 
                     draggable: true,
                     width: 825,

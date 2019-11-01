@@ -432,10 +432,10 @@
             var $loading = $('<div>').addClass('loading-overlay').appendTo($autoscalerDialog);
             $autoscalerDialog.dialog({
                 title: _l('label.autoscale.configuration.wizard'),
-                width: 825,
+                width: 975,
                 height: 600,
                 draggable: true,
-                closeonEscape: false,
+                closeOnEscape: false,
                 overflow: 'auto',
                 open: function() {
                     $("button").each(function() {
@@ -448,7 +448,6 @@
                     click: function() {
                         $autoscalerDialog.dialog('destroy');
                         $('.overlay').remove();
-                        $('.loading-overlay').remove()
                     }
                 }, {
                     text: _l('Apply'),
@@ -472,7 +471,6 @@
                             response: {
                                 success: function() {
                                     $loading.remove();
-                                    $('.loading-overlay').remove()
                                     $autoscalerDialog.dialog('destroy');
                                     $autoscalerDialog.closest(':ui-dialog').remove();
                                     $('.overlay').remove();
