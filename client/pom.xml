@@ -156,8 +156,8 @@
         <dependency>
             <groupId>org.apache.cloudstack</groupId>
             <artifactId>cloud-plugin-user-authenticator-oauth2</artifactId>
-      <version>${project.version}</version>
-    </dependency>
+          <version>${project.version}</version>
+        </dependency>
     <dependency>
       <groupId>org.apache.cloudstack</groupId>
       <artifactId>cloud-plugin-user-authenticator-sha256salted</artifactId>
