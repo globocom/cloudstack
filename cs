@@ -21,8 +21,8 @@ gen_version(){
     cs_version=$(mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep '^[0-9]\.')
     #cs_version="4.11.1.0"
     tag_version=$(date +%Y%m%d%H%M)
-    echo "tag.number=${tag_version}" > "${BASEDIR}/client/resources/build.properties"
-    git add "${BASEDIR}/client/resources/build.properties"
+    echo "tag.number=${tag_version}" > "${BASEDIR}/client/src/java/resources/build.properties"
+    git add "${BASEDIR}/client/src/java/resources/build.properties"
     git commit -m "generating build number: ${tag_version}"
     git push origin ${1}
 
