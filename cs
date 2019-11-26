@@ -56,7 +56,7 @@ gen_package(){
     # export some shell environments variables
     export MAVEN_OPTS="-XX:MaxPermSize=800m -Xmx2g"
 
-    (cd packaging/centos63; ./package.sh -t ${tag})
+    (cd packaging; ./package.sh --pack oss --distribution centos7 -T)
 
     [[ $? -ne 0 ]] && echo "Failed to compile package. Please, fix errors." && return 1
 
@@ -65,8 +65,8 @@ gen_package(){
     rpms='agent awsapi baremetal-agent cli common management usage'
     for f in ${rpms}; do rm -f $(ls -1t ${REPOPATH}/cloudstack-${f}* 2>/dev/null | awk 'NR>5 {print}') ; done
 
-    echo -n "Copying files ${BUILDDIR}/RPMS/x86_64/cloudstack-[a-z]*-${tag}.el6.x86_64.rpm to $REPOPATH..."
-    if mv ${BUILDDIR}/RPMS/x86_64/cloudstack-[a-z]*-${tag}.el6.x86_64.rpm $REPOPATH; then
+    echo -n "Copying files ${BUILDDIR}/RPMS/x86_64/cloudstack-[a-z]*-${tag}.el7.x86_64.rpm to $REPOPATH..."
+    if mv ${BUILDDIR}/RPMS/x86_64/cloudstack-[a-z]*-${tag}.el7.x86_64.rpm $REPOPATH; then
         echo "done"
     else
         echo -e "\nFailed to copy rpm file"

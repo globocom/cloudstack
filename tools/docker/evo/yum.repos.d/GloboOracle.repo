@@ -1,0 +1,63 @@
+#
+# $Id: GloboRedHat.repo,v 1.3 2009/06/10 17:09:47 jonny Exp $
+#
+# Versao temporaria, até termos um em RPM.
+#
+
+[base]
+name=Oracle $releasever - Base
+baseurl=http://yum-cm.globoi.com/OracleLinux/OL7/os/$basearch
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/OracleLinux/OL7/os/$basearch/RPM-GPG-KEY
+priority=50
+enabled=1
+
+[ol7_latest]
+name=Oracle Linux $releasever Latest ($basearch)
+baseurl=http://yum-cm.globoi.com/OracleLinux/OL7/$basearch/ol7_latest
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/OracleLinux/OL7/os/$basearch/RPM-GPG-KEY
+priority=50
+enabled=1
+
+[ol7_UEKR4]
+name=Oracle Linux $releasever Latest ($basearch)
+baseurl=http://yum-cm.globoi.com/OracleLinux/OL7/$basearch/ol7_UEKR4
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/OracleLinux/OL7/os/$basearch/RPM-GPG-KEY
+priority=50
+enabled=1
+
+[ol7_optional_latest]
+name=Oracle Linux $releasever Optional Latest ($basearch)
+baseurl=http://yum-cm.globoi.com/OracleLinux/OL7/$basearch/ol7_optional_latest
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/OracleLinux/OL7/os/$basearch/RPM-GPG-KEY
+priority=50
+enabled=1
+
+[ol7_ceph]
+name=Oracle Linux $releasever Latest ($basearch)
+baseurl=http://yum-cm.globoi.com/OracleLinux/OL7/$basearch/ol7_ceph
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/OracleLinux/OL7/os/$basearch/RPM-GPG-KEY
+priority=50
+enabled=0
+
+[supso]
+name=RedHat - Globo Custom Updates
+baseurl=http://yum-cm.globoi.com/OracleLinux/OL7/supso/$basearch
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/OracleLinux/OL7/RPM-GPG-KEY-GloboCom
+priority=10
+enabled=1
+
+[globo]
+name=RedHat - Globo Custom Updates
+baseurl=http://yum-cm.globoi.com/OracleLinux/OL7/globo/$basearch
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/OracleLinux/OL7/RPM-GPG-KEY-GloboCom
+priority=20
+enabled=1
+
+# EOF

@@ -45,7 +45,7 @@ BuildRequires: gcc
 BuildRequires: glibc-devel
 BuildRequires: /usr/bin/mkisofs
 BuildRequires: mysql-connector-python
-BuildRequires: maven => 3.0.0
+#BuildRequires: maven => 3.0.0
 
 %description
 CloudStack is a highly-scalable elastic, open source,
@@ -189,7 +189,7 @@ if [ "%{_sim}" == "SIMULATOR" -o "%{_sim}" == "simulator" ] ; then
    FLAGS="$FLAGS -Dsimulator"
 fi
 
-mvn -Psystemvm,developer $FLAGS clean package
+mvn -Psystemvm,developer $FLAGS -DskipTests clean package
 
 %install
 [ ${RPM_BUILD_ROOT} != "/" ] && rm -rf ${RPM_BUILD_ROOT}

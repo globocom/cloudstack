@@ -1,0 +1,13 @@
+# Arquivo Gerenciado pelo Puppet
+# ['Template utilizado': supso/templates/artifactory.repo.erb]
+
+
+[Artifactory]
+name=Artifactory
+baseurl=https://artifactory.globoi.com/artifactory/rpm-local/redhat/7/$basearch
+enabled=1
+gpgcheck=0
+priority=20
+proxy=_none_
+
+# EOF

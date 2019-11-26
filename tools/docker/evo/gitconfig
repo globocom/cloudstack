@@ -1,0 +1,8 @@
+[http]
+	proxy = http://proxy.globoi.com:3128
+[push]
+	default = simple
+[user]
+	name = Jenkins Evo
+	email = acsbulder@corp.globoi.com
+
