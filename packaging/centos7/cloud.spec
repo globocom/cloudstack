@@ -189,6 +189,7 @@ if [ "%{_sim}" == "SIMULATOR" -o "%{_sim}" == "simulator" ] ; then
    FLAGS="$FLAGS -Dsimulator"
 fi
 
+#mvn -Psystemvm,developer $FLAGS -DskipTests clean package
 mvn -Psystemvm,developer $FLAGS -DskipTests clean package
 
 %install
