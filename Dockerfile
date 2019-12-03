@@ -24,6 +24,8 @@ LABEL author="Evo Infra" email="iaas@corp.globo.com"
 RUN rm -fr /etc/yum.repos.d
 COPY tools/docker/evo/yum.repos.d/ /etc/yum.repos.d/
 
+COPY tools/docker/evo/settings.xml /etc/maven/
+
 # COPY tools/docker/evo/mysql-connector-python-8.0.18-1.el7.x86_64.rpm /tmp/
 # RUN rpm -i /tmp/mysql-connector-python-8.0.18-1.el7.x86_64.rpm
 
@@ -57,6 +59,8 @@ RUN yum install -y \
 WORKDIR /root/cloudstack
 
 COPY tools/docker/evo/gitconfig /root/.gitconfig
+
+ENV MAVEN_OPTS='-Dhttp.proxyHost=proxy.globoi.com -Dhttp.proxyPort=3128 -Dhttps.proxyHost=proxy.globoi.com -Dhttps.proxyPort=3128'
 
 ARG TAG
 
