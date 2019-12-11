@@ -17,12 +17,12 @@
 #
 # CloudStack-simulator build
 
-FROM oraclelinux:7.7
+FROM oraclelinux:6.10
 
 LABEL author="Evo Infra" email="iaas@corp.globo.com"
 
-RUN rm -fr /etc/yum.repos.d
-COPY tools/docker/evo/ol7/yum.repos.d/ /etc/yum.repos.d/
+# RUN rm -fr /etc/yum.repos.d
+# COPY tools/docker/evo/ol6/yum.repos.d/ /etc/yum.repos.d/
 
 COPY tools/docker/evo/settings.xml /etc/maven/
 
@@ -39,8 +39,7 @@ RUN yum install -y \
     sudo \
     ipmitool \
     java-1.8.0-openjdk \
-    java-1.7.0-openjdk \
-    maven \
+		java-1.8.0-openjdk-devel \
     python-dev \
     python-setuptools \
     python-pip \
@@ -53,8 +52,41 @@ RUN yum install -y \
     glibc-devel\
     gcc\
     ws-commons\
-    ws-commons-util\
-    mysql-connector-python
+    ws-commons-util \
+    mysql-connector-python \
+		wget \
+		tar
+
+# RUN yum install -y --skip-broken \
+#     apache-maven_globo \
+#     java-1.8.0-openjdk-devel \
+#     libffi-devel  \
+#     openssl-devel \
+#     python27_generic_globo \
+#     python27-virtualenv_generic_globo \
+#     python27-setuptools_generic_globo \
+#     mysql-connector-python \
+#     MySQL-python \
+#     mysql-server \
+#     mysql-devel \
+#     mysql-libs \
+#     tomcat6 \
+#     genisoimage \
+#     createrepo \
+#     ws-commons-util \
+#     vsftpd \
+#     mlocate \
+#     which \
+#     rpm-build\
+# 		tar
+
+RUN wget -O /tmp/apache-maven-3.6.3-bin.tar.gz https://www-us.apache.org/dist/maven/maven-3/3.6.3/binaries/apache-maven-3.6.3-bin.tar.gz 
+RUN tar -zxvf /tmp/apache-maven-3.6.3-bin.tar.gz -C /opt/
+
+RUN wget -O /tmp/mysql-connector-python-2.1.7-1.el6.x86_64.rpm http://repo.mysql.com/yum/mysql-connectors-community/el/6/x86_64//mysql-connector-python-2.1.7-1.el6.x86_64.rpm
+RUN yum install -y /tmp/mysql-connector-python-2.1.7-1.el6.x86_64.rpm
+
+RUN rm -f /tmp/mysql-connector-python-2.1.7-1.el6.x86_64.rpm /tmp/apache-maven-3.6.3-bin.tar.gz 
 
 WORKDIR /root/cloudstack
 
@@ -64,4 +96,7 @@ COPY tools/docker/evo/gitconfig /root/.gitconfig
 
 ARG TAG
 
-CMD ./packaging/package.sh --distribution centos7 --release $TAG
+ENV PATH="/opt/apache-maven-3.6.3/bin:${PATH}"
+# ENV JAVA_HOME="/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.171-3.b10.el6_9.x86_64/jre"
+
+CMD ./packaging/package.sh --distribution centos63 --release $TAG

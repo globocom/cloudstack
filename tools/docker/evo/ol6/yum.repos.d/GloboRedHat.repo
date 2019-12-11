@@ -1,0 +1,83 @@
+#
+# $Id: GloboRedHat.repo,v 1.3 2009/06/10 17:09:47 jonny Exp $
+#
+# Versao temporaria, até termos um em RPM.
+#
+
+[Globo-rhel-6-server-rpms]
+name=RedHat - rhel-6-server-rpms
+baseurl=http://yum-cm.globoi.com/redhat/$releasever/$basearch/rhel-6-server-rpms
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY
+       http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY-redhat-beta
+priority=50
+enabled=1
+
+[Globo-rhel-6-server-optional-rpms]
+name=RedHat - rhel-6-server-optional-rpms
+baseurl=http://yum-cm.globoi.com/redhat/$releasever/$basearch/rhel-6-server-optional-rpms
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY
+       http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY-redhat-beta
+priority=50
+enabled=1
+
+[Globo-rhel-6-server-supplementary-rpms]
+name=RedHat - rhel-6-server-supplementary-rpms
+baseurl=http://yum-cm.globoi.com/redhat/$releasever/$basearch/rhel-6-server-supplementary-rpms
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY
+       http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY-redhat-beta
+priority=50
+enabled=1
+
+[Globo-rhel-6-server-cf-tools-1-rpms]
+name=RedHat - rhel-6-server-cf-tools-1-rpms
+baseurl=http://yum-cm.globoi.com/redhat/$releasever/$basearch/rhel-6-server-cf-tools-1-rpms
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY
+       http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY-redhat-beta
+priority=50
+enabled=0
+
+[Globo-rhel-6-server-rhev-agent-rpms]
+name=RedHat - rhel-6-server-rhev-agent-rpms
+baseurl=http://yum-cm.globoi.com/redhat/$releasever/$basearch/rhel-6-server-rhev-agent-rpms
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY
+       http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY-redhat-beta
+priority=50
+enabled=0
+
+[Globo-rhel-6-server-sam-rpms]
+name=RedHat - rhel-6-server-sam-rpms
+baseurl=http://yum-cm.globoi.com/redhat/$releasever/$basearch/rhel-6-server-sam-rpms
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY
+       http://yum-cm.globoi.com/redhat/$releasever/RPM-GPG-KEY-redhat-beta
+priority=50
+enabled=0
+
+[supso]
+name=RedHat - Globo Custom Updates
+baseurl=http://yum-cm.globoi.com/redhat/$releasever/supso/$basearch
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/redhat/RPM-GPG-KEY-GloboCom
+priority=10
+enabled=1
+
+[globo]
+name=RedHat - Globo Custom Updates
+baseurl=http://yum-cm.globoi.com/redhat/$releasever/globo/$basearch
+gpgcheck=1
+gpgkey=http://yum-cm.globoi.com/redhat/RPM-GPG-KEY-GloboCom
+priority=20
+enabled=1
+
+# EOF
