@@ -29,11 +29,11 @@ import com.cloud.utils.Pair;
 
 public class MigrateWithStorageSendCommand extends Command {
     VirtualMachineTO vm;
-    List<Pair<VolumeTO, Object>> volumeToSr;
-    List<Pair<NicTO, Object>> nicToNetwork;
+    List<Pair<VolumeTO, String>> volumeToSr;
+    List<Pair<NicTO, String>> nicToNetwork;
     Map<String, String> token;
 
-    public MigrateWithStorageSendCommand(VirtualMachineTO vm, List<Pair<VolumeTO, Object>> volumeToSr, List<Pair<NicTO, Object>> nicToNetwork, Map<String, String> token) {
+    public MigrateWithStorageSendCommand(VirtualMachineTO vm, List<Pair<VolumeTO, String>> volumeToSr, List<Pair<NicTO, String>> nicToNetwork, Map<String, String> token) {
         this.vm = vm;
         this.volumeToSr = volumeToSr;
         this.nicToNetwork = nicToNetwork;
@@ -44,11 +44,11 @@ public class MigrateWithStorageSendCommand extends Command {
         return vm;
     }
 
-    public List<Pair<VolumeTO, Object>> getVolumeToSr() {
+    public List<Pair<VolumeTO, String>> getVolumeToSr() {
         return volumeToSr;
     }
 
-    public List<Pair<NicTO, Object>> getNicToNetwork() {
+    public List<Pair<NicTO, String>> getNicToNetwork() {
         return nicToNetwork;
     }
 

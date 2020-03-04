@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.gson.Gson;
 import org.apache.log4j.Logger;
 
 import com.cloud.agent.api.Answer;
@@ -66,19 +67,19 @@ public final class XenServer610MigrateWithStorageReceiveCommandWrapper extends C
             // the answer object. It'll be deserialzed and object created in migrate with
             // storage send command execution.
             // Get a map of all the SRs to which the vdis will be migrated.
-            final List<Pair<VolumeTO, Object>> volumeToSr = new ArrayList<>();
-
+            final List<Pair<VolumeTO, String>> volumeToSr = new ArrayList<>();
+            Gson gson = new Gson();
             for (final Pair<VolumeTO, String> entry : volumeToStorageUuid) {
                 final String storageUuid = entry.second();
                 final SR sr = xenServer610Resource.getStorageRepository(connection, storageUuid);
 
-                volumeToSr.add(new Pair<VolumeTO, Object>(entry.first(), sr));
+                volumeToSr.add(new Pair<VolumeTO, String>(entry.first(), gson.toJson(sr)));
             }
             // Get the list of networks to which the vifs will attach.
-            final List<Pair<NicTO, Object>> nicToNetwork = new ArrayList<Pair<NicTO, Object>>();
+            final List<Pair<NicTO, String>> nicToNetwork = new ArrayList<Pair<NicTO, String>>();
             for (final NicTO nicTo : vmSpec.getNics()) {
                 final Network network = xenServer610Resource.getNetwork(connection, nicTo);
-                nicToNetwork.add(new Pair<NicTO, Object>(nicTo, network));
+                nicToNetwork.add(new Pair<NicTO, String>(nicTo, gson.toJson(network)));
             }
 
             final XsLocalNetwork nativeNetworkForTraffic = xenServer610Resource.getNativeNetworkForTraffic(connection, TrafficType.Storage, null);

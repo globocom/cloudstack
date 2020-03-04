@@ -28,8 +28,8 @@ import com.cloud.utils.Pair;
 
 public class MigrateWithStorageReceiveAnswer extends Answer {
 
-    List<Pair<VolumeTO, Object>> volumeToSr;
-    List<Pair<NicTO, Object>> nicToNetwork;
+    List<Pair<VolumeTO, String>> volumeToSr;
+    List<Pair<NicTO, String>> nicToNetwork;
     Map<String, String> token;
 
     public MigrateWithStorageReceiveAnswer(MigrateWithStorageReceiveCommand cmd, Exception ex) {
@@ -39,7 +39,7 @@ public class MigrateWithStorageReceiveAnswer extends Answer {
         token = null;
     }
 
-    public MigrateWithStorageReceiveAnswer(MigrateWithStorageReceiveCommand cmd, List<Pair<VolumeTO, Object>> volumeToSr, List<Pair<NicTO, Object>> nicToNetwork,
+    public MigrateWithStorageReceiveAnswer(MigrateWithStorageReceiveCommand cmd, List<Pair<VolumeTO, String>> volumeToSr, List<Pair<NicTO, String>> nicToNetwork,
             Map<String, String> token) {
         super(cmd, true, null);
         this.volumeToSr = volumeToSr;
@@ -47,11 +47,11 @@ public class MigrateWithStorageReceiveAnswer extends Answer {
         this.token = token;
     }
 
-    public List<Pair<VolumeTO, Object>> getVolumeToSr() {
+    public List<Pair<VolumeTO, String>> getVolumeToSr() {
         return volumeToSr;
     }
 
-    public List<Pair<NicTO, Object>> getNicToNetwork() {
+    public List<Pair<NicTO, String>> getNicToNetwork() {
         return nicToNetwork;
     }
 

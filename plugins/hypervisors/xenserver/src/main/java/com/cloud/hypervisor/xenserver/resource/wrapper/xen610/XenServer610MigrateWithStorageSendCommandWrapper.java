@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 import org.apache.log4j.Logger;
 
 import com.cloud.agent.api.Answer;
@@ -56,8 +58,8 @@ public final class XenServer610MigrateWithStorageSendCommandWrapper extends Comm
         final Connection connection = xenServer610Resource.getConnection();
 
         final VirtualMachineTO vmSpec = command.getVirtualMachine();
-        final List<Pair<VolumeTO, Object>> volumeToSr = command.getVolumeToSr();
-        final List<Pair<NicTO, Object>> nicToNetwork = command.getNicToNetwork();
+        final List<Pair<VolumeTO, String>> volumeToSr = command.getVolumeToSr();
+        final List<Pair<NicTO, String>> nicToNetwork = command.getNicToNetwork();
         final Map<String, String> token = command.getToken();
         final String vmName = vmSpec.getName();
 
@@ -72,18 +74,20 @@ public final class XenServer610MigrateWithStorageSendCommandWrapper extends Comm
             // agent attache. Seriliaze the SR and Network objects here to a string and pass in
             // the answer object. It'll be deserialzed and object created in migrate with
             // storage send command execution.
+            Gson gson = new Gson();
+
             final Map<String, String> other = new HashMap<String, String>();
             other.put("live", "true");
 
             // Create the vdi map which tells what volumes of the vm need to go
             // on which sr on the destination.
             final Map<VDI, SR> vdiMap = new HashMap<VDI, SR>();
-            for (final Pair<VolumeTO, Object> entry : volumeToSr) {
-                if (entry.second() instanceof SR) {
-                    final SR sr = (SR)entry.second();
+            for (final Pair<VolumeTO, String> entry : volumeToSr) {
+                try {
+                    final SR sr = gson.fromJson(entry.second(), SR.class);
                     final VDI vdi = xenServer610Resource.getVDIbyUuid(connection, entry.first().getPath());
                     vdiMap.put(vdi, sr);
-                } else {
+                }catch (JsonParseException e){
                     throw new CloudRuntimeException("The object " + entry.second() + " passed is not of type SR.");
                 }
             }
@@ -96,12 +100,12 @@ public final class XenServer610MigrateWithStorageSendCommandWrapper extends Comm
 
             // Create the vif map.
             final Map<VIF, Network> vifMap = new HashMap<VIF, Network>();
-            for (final Pair<NicTO, Object> entry : nicToNetwork) {
-                if (entry.second() instanceof Network) {
-                    final Network network = (Network)entry.second();
+            for (final Pair<NicTO, String> entry : nicToNetwork) {
+                try{
+                    final Network network = gson.fromJson(entry.second(), Network.class);
                     final VIF vif = xenServer610Resource.getVifByMac(connection, vmToMigrate, entry.first().getMac());
                     vifMap.put(vif, network);
-                } else {
+                }catch (JsonParseException e){
                     throw new CloudRuntimeException("The object " + entry.second() + " passed is not of type Network.");
                 }
             }
