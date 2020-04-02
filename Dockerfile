@@ -60,7 +60,7 @@ WORKDIR /root/cloudstack
 
 COPY tools/docker/evo/gitconfig /root/.gitconfig
 
-# ENV MAVEN_OPTS='-Dhttp.proxyHost=proxy.globoi.com -Dhttp.proxyPort=3128 -Dhttps.proxyHost=proxy.globoi.com -Dhttps.proxyPort=3128'
+ENV MAVEN_OPTS='-Dhttp.proxyHost=proxy.globoi.com -Dhttp.proxyPort=3128 -Dhttps.proxyHost=proxy.globoi.com -Dhttps.proxyPort=3128'
 
 ARG TAG
 
