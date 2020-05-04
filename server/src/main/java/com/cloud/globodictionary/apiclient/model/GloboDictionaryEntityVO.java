@@ -19,6 +19,8 @@ package com.cloud.globodictionary.apiclient.model;
 import com.cloud.globodictionary.GloboDictionaryEntity;
 import com.google.gson.annotations.SerializedName;
 
+import java.util.Optional;
+
 public class GloboDictionaryEntityVO implements GloboDictionaryEntity {
 
     @SerializedName("id_service_now")
@@ -64,6 +66,7 @@ public class GloboDictionaryEntityVO implements GloboDictionaryEntity {
     }
 
     public boolean isActive() {
+        this.setStatus(Optional.ofNullable(this.getStatus()).orElseGet(() -> "Desativado"));
         return this.getStatus().equals("Ativo") || this.getStatus().equals("Em uso");
     }
 
