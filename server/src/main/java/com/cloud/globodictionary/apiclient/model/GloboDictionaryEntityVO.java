@@ -66,7 +66,8 @@ public class GloboDictionaryEntityVO implements GloboDictionaryEntity {
     }
 
     public boolean isActive() {
-        this.setStatus(Optional.ofNullable(this.getStatus()).orElseGet(() -> "Desativado"));
+        String statusNotNullable = Optional.ofNullable(this.getStatus()).orElseGet(() -> "Com problema");
+        this.setStatus(statusNotNullable);
         return this.getStatus().equals("Ativo") || this.getStatus().equals("Em uso");
     }
 
